@@ -114,7 +114,7 @@ CREATE TABLE IF NOT EXISTS `meetings` (
 -- Compliance & Security Audit Log
 CREATE TABLE IF NOT EXISTS `audit_log` (
   `id` INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
-  `user_id` INT UNSIGNED NOT NULL,
+  `user_id` INT UNSIGNED NULL,
   `action_type` VARCHAR(50) NOT NULL,
   `target_type` VARCHAR(50) NOT NULL,
   `target_id` INT UNSIGNED NULL,
