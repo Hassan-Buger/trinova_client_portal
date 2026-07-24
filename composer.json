@@ -1,0 +1,14 @@
+{
+    "name": "trinova/client-portal",
+    "description": "TriNova Accounting Client Portal",
+    "type": "project",
+    "license": "proprietary",
+    "require": {
+        "php": ">=8.2"
+    },
+    "autoload": {
+        "psr-4": {
+            "Application\\": "application/"
+        }
+    }
+}

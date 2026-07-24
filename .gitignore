@@ -1,0 +1,9 @@
+/vendor/
+/node_modules/
+.env
+storage/uploads/*
+!storage/uploads/.htaccess
+storage/logs/*
+!storage/logs/.htaccess
+.DS_Store
+Thumbs.db

@@ -1,0 +1,15 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer components {
+  .card-soft {
+    @apply bg-white rounded-3xl p-6 shadow-soft border border-gray-100/80 transition-all duration-200;
+  }
+  .btn-primary {
+    @apply bg-brand-teal-600 hover:bg-brand-teal-700 text-white font-medium px-6 py-3 rounded-2xl shadow-sm transition-colors duration-150 flex items-center justify-center gap-2;
+  }
+  .btn-accent {
+    @apply bg-brand-orange-500 hover:bg-brand-orange-600 text-white font-medium px-6 py-3 rounded-2xl shadow-sm transition-colors duration-150 flex items-center justify-center gap-2;
+  }
+}
