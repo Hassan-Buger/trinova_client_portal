@@ -89,7 +89,7 @@
                                     <?= date('d M Y, H:i', strtotime($doc['created_at'])) ?>
                                 </td>
                                 <td style="padding:16px;text-align:right">
-                                    <a href="/staff/documents/download/<?= $doc['id'] ?>" style="background:#f0f5f3;color:#0d9488;padding:8px 14px;border-radius:10px;font-weight:700;font-size:13px;display:inline-flex;align-items:center;gap:6px">
+                                    <a href="/documents/download/<?= $doc['id'] ?>" style="background:#f0f5f3;color:#0d9488;padding:8px 14px;border-radius:10px;font-weight:700;font-size:13px;display:inline-flex;align-items:center;gap:6px">
                                         Download
                                     </a>
                                 </td>

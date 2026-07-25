@@ -61,8 +61,8 @@
                                     <?= date('d M Y, H:i:s', strtotime($log['created_at'])) ?>
                                 </td>
                                 <td style="padding:16px;font-weight:700;color:#213330">
-                                    <?= htmlspecialchars($log['user_name']) ?>
-                                    <span style="font-size:11.5px;color:#7d8e88;font-weight:500">(<?= htmlspecialchars($log['user_role']) ?>)</span>
+                                    <?= htmlspecialchars($log['user_name'] ?? 'System') ?>
+                                    <span style="font-size:11.5px;color:#7d8e88;font-weight:500">(<?= htmlspecialchars($log['user_role'] ?? 'system') ?>)</span>
                                 </td>
                                 <td style="padding:16px">
                                     <span style="padding:4px 10px;border-radius:999px;font-size:12px;font-weight:700;background:#e6ecf5;color:#41556f">

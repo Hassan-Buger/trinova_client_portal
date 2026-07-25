@@ -46,7 +46,7 @@
                             ?>
                             <div style="max-width:78%;<?= $align ?>border-radius:18px;padding:15px 18px;box-shadow:0 2px 8px rgba(16,54,45,.04);background:<?= $bubbleBg ?>">
                                 <div style="font-size:12px;font-weight:700;margin-bottom:5px;<?= $isStaff ? 'color:rgba(255,255,255,.85);' : 'color:#5f726c;' ?>">
-                                    <?= htmlspecialchars($msg['sender_name']) ?> &middot; <?= date('H:i, d M', strtotime($msg['created_at'])) ?>
+                                    <?= htmlspecialchars($msg['sender_name'] ?? 'User') ?> &middot; <?= date('H:i, d M', strtotime($msg['created_at'])) ?>
                                 </div>
                                 <div style="font-size:14px;line-height:1.45;color:<?= $textColor ?>;white-space:pre-wrap"><?= htmlspecialchars($msg['body']) ?></div>
                             </div>

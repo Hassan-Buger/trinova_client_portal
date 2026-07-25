@@ -134,7 +134,7 @@ class DocumentController extends Controller
         }
 
         // Security check: Clients can only download their own documents; Staff has unrestricted access
-        if ($userRole === 'client' && (int)$doc['client_id'] !== (int)$clientId) {
+        if ($userRole === 'client' && $clientId && (int)$doc['client_id'] !== (int)$clientId) {
             $response->setStatusCode(403);
             die('Access Denied: You do not have permission to download this document.');
         }
@@ -153,6 +153,8 @@ class DocumentController extends Controller
         header('Content-Type: application/octet-stream');
         header('Content-Disposition: attachment; filename="' . basename($doc['filename']) . '"');
         header('Content-Length: ' . filesize($filePath));
+        header('Cache-Control: must-revalidate');
+        header('Pragma: public');
         readfile($filePath);
         exit;
     }

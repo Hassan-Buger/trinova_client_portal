@@ -56,7 +56,7 @@
                     <div style="display:flex;align-items:center;gap:14px;padding:13px 0;border-bottom:1px solid rgba(20,60,50,.07)">
                         <div style="width:9px;height:9px;border-radius:50%;background:#0d9488;flex-shrink:0"></div>
                         <div style="flex:1;font-size:14px">
-                            <span style="font-weight:700"><?= htmlspecialchars($act['user_name']) ?></span>
+                            <span style="font-weight:700"><?= htmlspecialchars($act['user_name'] ?? 'System') ?></span>
                             <span style="color:#5f726c"><?= htmlspecialchars($act['action_type']) ?> on <?= htmlspecialchars($act['target_type']) ?></span>
                         </div>
                         <div style="color:#8a9a94;font-size:12.5px;font-weight:500;white-space:nowrap">

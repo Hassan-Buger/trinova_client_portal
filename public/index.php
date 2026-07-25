@@ -56,6 +56,9 @@ $app->router->post('/password/reset', [PasswordResetController::class, 'sendRese
 $app->router->get('/password/reset/{token}', [PasswordResetController::class, 'showResetConfirm']);
 $app->router->post('/password/reset/confirm', [PasswordResetController::class, 'processReset'])->middleware([CsrfMiddleware::class]);
 
+// --- SHARED SECURED FILE STREAMING ROUTE ---
+$app->router->get('/documents/download/{id}', [ClientDocumentController::class, 'download'])->middleware([AuthMiddleware::class, SessionTimeoutMiddleware::class]);
+
 // --- SECURED CLIENT ROUTES ---
 $app->router->group([
     'prefix' => '/client',
