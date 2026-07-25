@@ -1,9 +1,9 @@
 -- TriNova Accounting Client Portal Database Schema
-CREATE DATABASE IF NOT EXISTS `trinova_portal`
-  DEFAULT CHARACTER SET utf8mb4
-  COLLATE utf8mb4_unicode_ci;
-
-USE `trinova_portal`;
+-- CREATE DATABASE IF NOT EXISTS `trinova_portal`
+--   DEFAULT CHARACTER SET utf8mb4
+--   COLLATE utf8mb4_unicode_ci;
+-- 
+-- USE `trinova_portal`;
 
 -- Core Users Table
 CREATE TABLE IF NOT EXISTS `users` (
