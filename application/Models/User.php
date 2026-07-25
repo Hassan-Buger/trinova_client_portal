@@ -80,6 +80,46 @@ class User extends Model
         return $stmt->fetchAll();
     }
 
+    public function paginate(array $filters, int $page = 1, int $perPage = 20): array
+    {
+        $page = max(1, $page);
+        $perPage = max(10, min($perPage, 50));
+        $where = [];
+        $params = [];
+        if (($filters['search'] ?? '') !== '') {
+            $like = '%' . $filters['search'] . '%';
+            $where[] = '(u.name LIKE :search_name OR u.email LIKE :search_email)';
+            $params += ['search_name' => $like, 'search_email' => $like];
+        }
+        if (($filters['role'] ?? '') !== '') {
+            $where[] = 'u.role = :role';
+            $params['role'] = $filters['role'];
+        }
+        if (($filters['status'] ?? '') !== '') {
+            $where[] = 'u.status = :status';
+            $params['status'] = $filters['status'];
+        }
+        if (($filters['login'] ?? '') === 'never') {
+            $where[] = 'u.last_login_at IS NULL';
+        } elseif (($filters['login'] ?? '') === 'logged_in') {
+            $where[] = 'u.last_login_at IS NOT NULL';
+        } elseif (($filters['login'] ?? '') === 'recent_30') {
+            $where[] = 'u.last_login_at >= DATE_SUB(NOW(), INTERVAL 30 DAY)';
+        }
+        $whereSql = $where ? 'WHERE ' . implode(' AND ', $where) : '';
+        $countStmt = $this->db->prepare("SELECT COUNT(*) FROM users u {$whereSql}");
+        $countStmt->execute($params);
+        $total = (int)$countStmt->fetchColumn();
+        $totalPages = max(1, (int)ceil($total / $perPage));
+        $page = min($page, $totalPages);
+        $offset = ($page - 1) * $perPage;
+        $sorts = ['name_asc' => 'u.name ASC', 'newest' => 'u.created_at DESC', 'last_login' => 'u.last_login_at IS NULL, u.last_login_at DESC', 'role' => 'u.role ASC, u.name ASC'];
+        $orderBy = $sorts[$filters['sort'] ?? 'name_asc'] ?? $sorts['name_asc'];
+        $stmt = $this->db->prepare("SELECT u.id, u.name, u.email, u.role, u.status, u.created_at, u.last_login_at, c.id AS client_id FROM users u LEFT JOIN clients c ON c.user_id = u.id {$whereSql} ORDER BY {$orderBy} LIMIT {$perPage} OFFSET {$offset}");
+        $stmt->execute($params);
+        return ['items' => $stmt->fetchAll(), 'total' => $total, 'page' => $page, 'per_page' => $perPage, 'total_pages' => $totalPages];
+    }
+
     public function create(array $data): int
     {
         $stmt = $this->db->prepare("

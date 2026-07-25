@@ -23,14 +23,40 @@ class RequestController extends Controller
 
     public function index(Request $request, Response $response): void
     {
-        $requests = $this->requestModel->getAllWithDetails();
+        $query = $request->getQueryParams();
+        $statuses = ['Awaiting Client', 'Uploaded', 'Under Review', 'Completed'];
+        $filters = [
+            'search' => trim((string)($query['q'] ?? '')),
+            'client_id' => max(0, (int)($query['client_id'] ?? 0)),
+            'created_by' => max(0, (int)($query['created_by'] ?? 0)),
+            'status' => in_array(($query['status'] ?? ''), $statuses, true) ? $query['status'] : '',
+            'due_from' => $this->validDate($query['due_from'] ?? '') ? $query['due_from'] : '',
+            'due_to' => $this->validDate($query['due_to'] ?? '') ? $query['due_to'] : '',
+            'timing' => in_array(($query['timing'] ?? ''), ['overdue', 'upcoming'], true) ? $query['timing'] : '',
+            'sort' => in_array(($query['sort'] ?? ''), ['due_asc', 'due_desc', 'newest', 'client_asc'], true) ? $query['sort'] : 'due_asc',
+        ];
+        $requestedPerPage = (int)($query['per_page'] ?? 20);
+        $perPage = in_array($requestedPerPage, [10, 20, 50], true) ? $requestedPerPage : 20;
+        $pagination = $this->requestModel->paginateWithDetails($filters, max(1, (int)($query['page'] ?? 1)), $perPage);
         $clients  = $this->clientModel->getAllWithUsers();
+        $staff = (new \Application\Models\User())->getAllStaff();
 
         $this->render('staff/requests/index', [
             'pageTitle' => 'Document Request Management',
-            'requests'  => $requests,
+            'requests'  => $pagination['items'],
             'clients'   => $clients,
+            'staff' => $staff,
+            'statuses' => $statuses,
+            'filters' => $filters,
+            'pagination' => $pagination,
         ], 'main');
+    }
+
+    private function validDate(mixed $value): bool
+    {
+        if (!is_string($value) || !preg_match('/^\d{4}-\d{2}-\d{2}$/', $value)) return false;
+        $date = \DateTimeImmutable::createFromFormat('!Y-m-d', $value);
+        return $date !== false && $date->format('Y-m-d') === $value;
     }
 
     public function create(Request $request, Response $response): void
@@ -42,8 +68,10 @@ class RequestController extends Controller
         $description = trim($body['description'] ?? '');
         $dueDate     = trim($body['due_date'] ?? '');
 
-        if ($clientId <= 0 || empty($title) || empty($dueDate)) {
-            Session::setFlash('error', 'Client, request title, and due date are required.');
+        $today = new \DateTimeImmutable('today');
+        $parsedDueDate = \DateTimeImmutable::createFromFormat('!Y-m-d', $dueDate);
+        if ($clientId <= 0 || empty($title) || !$parsedDueDate || $parsedDueDate->format('Y-m-d') !== $dueDate || $parsedDueDate < $today) {
+            Session::setFlash('error', 'Client, request title, and a due date of today or later are required.');
             $response->redirect('/staff/requests');
             return;
         }

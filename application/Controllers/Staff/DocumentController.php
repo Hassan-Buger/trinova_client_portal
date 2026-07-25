@@ -9,6 +9,7 @@ use Application\Core\Response;
 use Application\Core\Session;
 use Application\Models\Client;
 use Application\Models\Document;
+use Application\Models\Notification;
 use Application\Services\AuditService;
 
 class DocumentController extends Controller
@@ -105,6 +106,14 @@ class DocumentController extends Controller
         ]);
 
         AuditService::log('staff_upload', 'documents', $docId);
+        try {
+            $client = $this->clientModel->findById($clientId);
+            if ($client && !empty($client['user_id'])) {
+                (new Notification())->create((int)$client['user_id'], 'document_received', 'document:' . $docId);
+            }
+        } catch (\Throwable $e) {
+            // Notifications must never prevent a successful document upload.
+        }
         Session::setFlash('success', "Document '{$filename}' dispatched to client account successfully.");
         $response->redirect('/staff/documents');
     }

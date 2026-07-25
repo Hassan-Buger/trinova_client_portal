@@ -17,37 +17,14 @@
             </div>
         </div>
         <div style="display:flex;align-items:center;gap:10px">
-            <button onclick="document.getElementById('resetPasswordModal').style.display='flex'" style="background:#fff8ee;color:#e07d24;border:1px solid #f6dfc0;padding:11px 18px;border-radius:14px;font-weight:700;font-size:13.5px;cursor:pointer">Reset Password</button>
-            <button onclick="document.getElementById('deleteClientModal').style.display='flex'" style="background:#fef2f2;color:#dc2626;border:1px solid #fca5a5;padding:11px 18px;border-radius:14px;font-weight:700;font-size:13.5px;cursor:pointer">Delete Client</button>
             <button onclick="document.getElementById('addEntityModal').style.display='flex'" style="background:#41556f;color:#fff;padding:11px 20px;border-radius:14px;font-weight:700;font-size:13.5px;cursor:pointer;border:none;box-shadow:0 8px 18px -8px rgba(65,85,111,.7)">+ Link Business Entity</button>
-        </div>
-    </div>
-
-    <!-- Reset Password Modal -->
-    <div id="resetPasswordModal" style="display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(20,40,35,.45);backdrop-filter:blur(6px);z-index:99;align-items:center;justify-content:center;padding:20px">
-        <div style="background:#fff;border-radius:24px;width:100%;max-width:460px;padding:32px;box-shadow:0 24px 60px -28px rgba(0,0,0,.4);animation:tnpop .25s ease">
-            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px">
-                <h3 style="margin:0;font-size:19px;font-weight:800">Reset Client Password</h3>
-                <button onclick="document.getElementById('resetPasswordModal').style.display='none'" style="background:none;border:none;font-size:24px;cursor:pointer;color:#8a9a94">&times;</button>
-            </div>
-
-            <form id="resetPasswordForm" onsubmit="handleResetPassword(event)">
-                <input type="hidden" name="csrf_token" value="<?= htmlspecialchars(\Application\Core\Session::csrfToken()) ?>">
-                <input type="hidden" name="client_id" value="<?= $client['id'] ?>">
-                <input type="hidden" name="is_ajax" value="1">
-                
-                <p style="font-size:14px;color:#61756e;margin-top:0">Resetting password for: <strong style="color:#213330"><?= htmlspecialchars($client['name']) ?></strong></p>
-
-                <div style="margin-bottom:24px">
-                    <label style="display:block;font-size:13px;font-weight:700;color:#3a4d47;margin-bottom:6px">New Password</label>
-                    <input type="text" name="new_password" value="password123" required style="width:100%;padding:13px 16px;border:1.5px solid #e0e9e5;border-radius:14px;font-size:14px;background:#fbfdfc">
+            <details style="position:relative">
+                <summary style="list-style:none;background:#f0f5f3;color:#61756e;padding:11px 16px;border-radius:14px;font-weight:700;font-size:13px;cursor:pointer">Account actions</summary>
+                <div style="position:absolute;right:0;top:48px;background:#fff;border:1px solid #e0e9e5;border-radius:14px;padding:10px;min-width:190px;z-index:10;box-shadow:0 16px 34px -18px rgba(16,54,45,.45)">
+                    <a href="/staff/users?q=<?= urlencode($client['email']) ?>" style="display:block;padding:9px 10px;font-size:13px;font-weight:700;color:#0d9488">Manage portal user</a>
+                    <button onclick="document.getElementById('deleteClientModal').style.display='flex'" style="width:100%;text-align:left;background:none;color:#dc2626;border:0;padding:9px 10px;font-weight:700;font-size:13px;cursor:pointer">Permanently delete client</button>
                 </div>
-
-                <div style="display:flex;justify-content:flex-end;gap:12px">
-                    <button type="button" onclick="document.getElementById('resetPasswordModal').style.display='none'" style="background:#f0f5f3;color:#5f726c;border:none;padding:12px 20px;border-radius:12px;font-weight:700;font-size:14px;cursor:pointer">Cancel</button>
-                    <button type="submit" id="resetSubmitBtn" style="background:#e07d24;color:#fff;border:none;padding:12px 24px;border-radius:12px;font-weight:700;font-size:14px;cursor:pointer">Update Password</button>
-                </div>
-            </form>
+            </details>
         </div>
     </div>
 
@@ -59,7 +36,7 @@
                 <button onclick="document.getElementById('deleteClientModal').style.display='none'" style="background:none;border:none;font-size:24px;cursor:pointer;color:#8a9a94">&times;</button>
             </div>
 
-            <form id="deleteClientForm" onsubmit="handleDeleteClient(event)">
+            <form action="/staff/clients/delete" method="POST" data-ajax-form>
                 <input type="hidden" name="csrf_token" value="<?= htmlspecialchars(\Application\Core\Session::csrfToken()) ?>">
                 <input type="hidden" name="client_id" value="<?= $client['id'] ?>">
                 <input type="hidden" name="is_ajax" value="1">
@@ -67,10 +44,12 @@
                 <p style="font-size:14px;color:#61756e;line-height:1.5;margin-top:0">
                     Are you sure you want to delete <strong style="color:#213330"><?= htmlspecialchars($client['name']) ?></strong>? This will permanently remove their profile, files, messages, and login access.
                 </p>
+                <label style="display:block;font-size:12.5px;font-weight:700;color:#3a4d47;margin-top:18px">Type DELETE to confirm</label>
+                <input type="text" name="confirm_delete" pattern="DELETE" required autocomplete="off" style="width:100%;padding:11px 14px;margin-top:6px;border:1.5px solid #fca5a5;border-radius:12px;background:#fffafa">
 
                 <div style="display:flex;justify-content:flex-end;gap:12px;margin-top:24px">
                     <button type="button" onclick="document.getElementById('deleteClientModal').style.display='none'" style="background:#f0f5f3;color:#5f726c;border:none;padding:12px 20px;border-radius:12px;font-weight:700;font-size:14px;cursor:pointer">Cancel</button>
-                    <button type="submit" id="deleteSubmitBtn" style="background:#dc2626;color:#fff;border:none;padding:12px 24px;border-radius:12px;font-weight:700;font-size:14px;cursor:pointer">Delete Client</button>
+                    <button type="submit" data-loading-text="Deleting…" style="background:#dc2626;color:#fff;border:none;padding:12px 24px;border-radius:12px;font-weight:700;font-size:14px;cursor:pointer">Delete Permanently</button>
                 </div>
             </form>
         </div>
@@ -244,79 +223,3 @@
         </div>
     </div>
 </div>
-
-<script>
-function showToast(message, isError = false) {
-    let toast = document.getElementById('toastSuccess');
-    if (!toast) return;
-    toast.innerText = message;
-    toast.style.background = isError ? '#fdecdc' : '#e2f3ea';
-    toast.style.color = isError ? '#e07d24' : '#3f9d6d';
-    toast.style.display = 'block';
-    setTimeout(() => {
-        toast.style.display = 'none';
-    }, 4500);
-}
-
-function handleResetPassword(e) {
-    e.preventDefault();
-    let form = e.target;
-    let formData = new FormData(form);
-    let submitBtn = document.getElementById('resetSubmitBtn');
-    submitBtn.disabled = true;
-    submitBtn.innerText = 'Updating...';
-
-    fetch('/staff/clients/reset-password', {
-        method: 'POST',
-        headers: { 'X-Requested-With': 'XMLHttpRequest' },
-        body: formData
-    })
-    .then(res => res.json().catch(() => ({ success: true, message: 'Password updated successfully.' })))
-    .then(data => {
-        document.getElementById('resetPasswordModal').style.display = 'none';
-        submitBtn.disabled = false;
-        submitBtn.innerText = 'Update Password';
-        showToast(data.message || 'Password updated successfully!');
-    })
-    .catch(() => {
-        document.getElementById('resetPasswordModal').style.display = 'none';
-        submitBtn.disabled = false;
-        submitBtn.innerText = 'Update Password';
-        showToast('Password updated successfully!');
-    });
-}
-
-function handleDeleteClient(e) {
-    e.preventDefault();
-    let form = e.target;
-    let formData = new FormData(form);
-    let submitBtn = document.getElementById('deleteSubmitBtn');
-    submitBtn.disabled = true;
-    submitBtn.innerText = 'Deleting...';
-
-    fetch('/staff/clients/delete', {
-        method: 'POST',
-        headers: { 'X-Requested-With': 'XMLHttpRequest' },
-        body: formData
-    })
-    .then(res => res.json().catch(() => ({ success: true, message: 'Client deleted successfully.' })))
-    .then(data => {
-        document.getElementById('deleteClientModal').style.display = 'none';
-        submitBtn.disabled = false;
-        submitBtn.innerText = 'Delete Client';
-        showToast(data.message || 'Client deleted successfully!');
-        setTimeout(() => {
-            window.location.href = '/staff/clients';
-        }, 1200);
-    })
-    .catch(() => {
-        document.getElementById('deleteClientModal').style.display = 'none';
-        submitBtn.disabled = false;
-        submitBtn.innerText = 'Delete Client';
-        showToast('Client deleted successfully!');
-        setTimeout(() => {
-            window.location.href = '/staff/clients';
-        }, 1200);
-    });
-}
-</script>

@@ -36,6 +36,7 @@ use Application\Controllers\Staff\MessageController as StaffMessageController;
 use Application\Controllers\Staff\DeadlineController as StaffDeadlineController;
 use Application\Controllers\Staff\UserAdminController as StaffUserAdminController;
 use Application\Controllers\Staff\AuditController as StaffAuditController;
+use Application\Controllers\NotificationController;
 
 // Simple dotenv loader fallback for environment variables
 $envFile = $basePath . '/.env';
@@ -71,6 +72,9 @@ $app->router->post('/activate', [ActivationController::class, 'processActivation
 
 // --- SHARED DOWNLOAD ROUTE (accessible by all authenticated users: staff & clients) ---
 $app->router->get('/documents/download/{id}', [ClientDocumentController::class, 'download'])->middleware([AuthMiddleware::class, SessionTimeoutMiddleware::class]);
+$app->router->get('/documents/view/{id}', [ClientDocumentController::class, 'view'])->middleware([AuthMiddleware::class, SessionTimeoutMiddleware::class]);
+$app->router->get('/notifications/feed', [NotificationController::class, 'feed'])->middleware([AuthMiddleware::class, SessionTimeoutMiddleware::class]);
+$app->router->post('/notifications/read-all', [NotificationController::class, 'readAll'])->middleware([AuthMiddleware::class, SessionTimeoutMiddleware::class, CsrfMiddleware::class]);
 
 // --- EXPLICIT STAFF CLIENT ACTION ROUTES ---
 $app->router->post('/staff/clients/reset-password', [StaffClientController::class, 'resetPassword'])->middleware([AuthMiddleware::class, SessionTimeoutMiddleware::class, RoleMiddleware::class . ':staff', CsrfMiddleware::class]);
@@ -127,6 +131,7 @@ $app->router->group([
     $r->get('/users', [StaffUserAdminController::class, 'index']);
     $r->post('/users/create', [StaffUserAdminController::class, 'createUser'])->middleware([CsrfMiddleware::class]);
     $r->post('/users/toggle-status', [StaffUserAdminController::class, 'toggleStatus'])->middleware([CsrfMiddleware::class]);
+    $r->post('/users/reset-password', [StaffUserAdminController::class, 'resetPassword'])->middleware([CsrfMiddleware::class]);
 });
 
 // Security response headers

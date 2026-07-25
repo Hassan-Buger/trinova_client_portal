@@ -34,11 +34,40 @@
         .tn-message-meta { font-size:12px;font-weight:700;margin-bottom:5px;opacity:.78; }
         .tn-message-body { font-size:14px;line-height:1.5;white-space:pre-wrap;overflow-wrap:anywhere; }
         .tn-main[aria-busy="true"] #portal-content { opacity:.62;transition:opacity .15s ease; }
+        .tn-welcome-text { margin-top:4px;color:#7d8e88;font-size:12.5px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis; }
+        .tn-notification-wrap { position:relative; }
+        .tn-notification-button { width:44px;height:44px;border-radius:14px;border:1px solid rgba(20,60,50,.08);background:#fff;display:flex;align-items:center;justify-content:center;cursor:pointer;color:#5f726c;position:relative; }
+        .tn-notification-badge { position:absolute;top:5px;right:5px;min-width:18px;height:18px;padding:0 5px;background:#ef8f3c;color:#fff;border-radius:999px;border:2px solid #fff;font-size:10px;font-weight:800;line-height:14px;text-align:center; }
+        .tn-notification-panel { position:absolute;right:0;top:52px;width:min(360px,calc(100vw - 32px));background:#fff;border:1px solid rgba(20,60,50,.09);border-radius:17px;box-shadow:0 22px 55px -24px rgba(16,54,45,.55);overflow:hidden;z-index:30; }
+        .tn-notification-heading { padding:15px 17px;border-bottom:1px solid #edf2f0;font-size:13px;font-weight:800;color:#41556f; }
+        .tn-notification-list { max-height:360px;overflow:auto; }
+        .tn-notification-item { display:block;padding:13px 17px;border-bottom:1px solid #f0f4f2;color:#213330; }
+        .tn-notification-item:hover { background:#f7faf9;color:#0f766e; }
+        .tn-notification-message { display:block;font-size:13px;font-weight:700;line-height:1.4; }
+        .tn-notification-time { display:block;margin-top:4px;color:#8a9a94;font-size:11px;font-weight:600; }
+        .tn-notification-empty { padding:24px 17px;text-align:center;color:#8a9a94;font-size:13px; }
         @media(max-width:1080px){ .tn-navlabel, .tn-brandword, .tn-logout-label { display: none !important; } .tn-side { width: 80px !important; align-items: center; } .tn-navitem { justify-content: center; } }
-        @media(max-width:760px){ .tn-side { width: 66px !important; padding: 16px 8px !important; } .tn-topbar { padding: 14px 16px !important; } .tn-pagetitle { font-size: 19px !important; } }
+        @media(max-width:760px){
+            body { overflow-x:hidden; }
+            .tn-side { position:fixed !important;left:0;right:0;bottom:0;top:auto !important;width:100% !important;height:76px !important;padding:7px 8px env(safe-area-inset-bottom) !important;border-right:0 !important;border-top:1px solid rgba(20,60,50,.1);z-index:20;align-items:stretch !important; }
+            .tn-side > div:first-child, .tn-side > a:last-child { display:none !important; }
+            .tn-side nav { display:flex !important;flex-direction:row !important;gap:3px !important;overflow-x:auto;overflow-y:hidden;scrollbar-width:none; }
+            .tn-side nav::-webkit-scrollbar { display:none; }
+            .tn-side .tn-navitem { min-width:68px;padding:7px 6px !important;gap:3px !important;flex:0 0 auto;flex-direction:column;justify-content:center;font-size:10px !important;text-align:center; }
+            .tn-side .tn-navitem svg { width:19px;height:19px; }
+            .tn-side .tn-navlabel { display:block !important;max-width:72px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis; }
+            .tn-main { width:100%;padding-bottom:78px; }
+            .tn-topbar { padding:12px 14px !important;gap:10px !important; }
+            .tn-pagetitle { font-size:18px !important; }
+            .tn-welcome-text { max-width:190px;font-size:11px; }
+            #portal-content { padding:8px 14px 30px !important; }
+            .tn-toast-stack { right:12px;left:12px;bottom:90px; }
+            .tn-toast { min-width:0;max-width:none;width:100%; }
+            .tn-notification-panel { position:fixed;right:12px;top:70px;width:calc(100vw - 24px); }
+        }
     </style>
 </head>
-<body data-portal-authenticated="<?= \Application\Core\Session::get('user_id') ? '1' : '0' ?>">
+<body data-portal-authenticated="<?= \Application\Core\Session::get('user_id') ? '1' : '0' ?>" data-csrf-token="<?= htmlspecialchars(\Application\Core\Session::csrfToken()) ?>">
 
 <div id="tnPageProgress" class="tn-page-progress" aria-hidden="true"></div>
 <div id="tnToastStack" class="tn-toast-stack" aria-live="polite" aria-atomic="true"></div>

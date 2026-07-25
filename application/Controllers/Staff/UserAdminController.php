@@ -21,12 +21,46 @@ class UserAdminController extends Controller
 
     public function index(Request $request, Response $response): void
     {
-        $users = $this->userModel->getAll();
+        $query = $request->getQueryParams();
+        $filters = [
+            'search' => trim((string)($query['q'] ?? '')),
+            'role' => in_array(($query['role'] ?? ''), ['client', 'staff'], true) ? $query['role'] : '',
+            'status' => in_array(($query['status'] ?? ''), ['active', 'suspended', 'pending_activation'], true) ? $query['status'] : '',
+            'login' => in_array(($query['login'] ?? ''), ['never', 'logged_in', 'recent_30'], true) ? $query['login'] : '',
+            'sort' => in_array(($query['sort'] ?? ''), ['name_asc', 'newest', 'last_login', 'role'], true) ? $query['sort'] : 'name_asc',
+        ];
+        $requestedPerPage = (int)($query['per_page'] ?? 20);
+        $perPage = in_array($requestedPerPage, [10, 20, 50], true) ? $requestedPerPage : 20;
+        $pagination = $this->userModel->paginate($filters, max(1, (int)($query['page'] ?? 1)), $perPage);
 
         $this->render('staff/users/index', [
             'pageTitle' => 'User Administration',
-            'users'     => $users,
+            'users'     => $pagination['items'],
+            'filters' => $filters,
+            'pagination' => $pagination,
         ], 'main');
+    }
+
+    public function resetPassword(Request $request, Response $response): void
+    {
+        $userId = (int)($request->getBody()['user_id'] ?? 0);
+        $newPassword = trim((string)($request->getBody()['new_password'] ?? ''));
+        $user = $userId > 0 ? $this->userModel->findById($userId) : null;
+
+        if (!$user || $user['status'] === 'pending_activation' || strlen($newPassword) < 8) {
+            if ($request->isAjax()) $response->json(['success' => false, 'message' => 'Choose a valid user and enter a password of at least 8 characters.'], 422);
+            Session::setFlash('error', 'Choose an activated user and enter a password of at least 8 characters.');
+            $response->redirect('/staff/users');
+        }
+
+        $this->userModel->updatePassword($userId, password_hash($newPassword, PASSWORD_ARGON2ID));
+        $this->userModel->resetLoginAttempts($userId);
+        AuditService::log('staff_reset_user_password', 'users', $userId);
+        NotificationService::sendPromptEmail($user['email'], 'Your TriNova Portal password was reset', 'A staff member reset your portal password. Contact TriNova immediately if you did not expect this change.');
+        $message = "Password for '{$user['name']}' updated successfully.";
+        if ($request->isAjax()) $response->json(['success' => true, 'message' => $message]);
+        Session::setFlash('success', $message);
+        $response->redirect('/staff/users');
     }
 
     public function createUser(Request $request, Response $response): void

@@ -7,6 +7,8 @@ use Application\Core\Request;
 use Application\Core\Response;
 use Application\Core\Session;
 use Application\Models\Message;
+use Application\Models\Notification;
+use Application\Models\User;
 use Application\Services\AuditService;
 use Application\Services\NotificationService;
 
@@ -62,6 +64,16 @@ class MessageController extends Controller
             ]);
 
             AuditService::log('message_sent', 'messages', $msgId);
+            try {
+                $notificationModel = new Notification();
+                foreach ((new User())->getAllStaff() as $staff) {
+                    if (($staff['status'] ?? '') === 'active') {
+                        $notificationModel->create((int)$staff['id'], 'message_received', 'client:' . (int)$clientId);
+                    }
+                }
+            } catch (\Throwable $e) {
+                // The message remains successful if notification storage is unavailable.
+            }
             NotificationService::sendPromptEmail('staff@trinova.co.uk', 'New Client Message Received', 'A new message was posted by client on TriNova Portal.');
             Session::setFlash('success', 'Message sent.');
         } elseif ($request->isAjax()) {

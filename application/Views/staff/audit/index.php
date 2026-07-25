@@ -1,7 +1,6 @@
 <div class="tn-screen" style="max-width:1120px">
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:24px">
         <div>
-            <h2 style="margin:0 0 6px;font-size:26px;font-weight:800;letter-spacing:-.02em">Compliance Audit Trail</h2>
             <p style="margin:0;color:#61756e;font-size:14.5px">Immutable security log of authentication events, uploads, downloads, and system actions.</p>
         </div>
     </div>

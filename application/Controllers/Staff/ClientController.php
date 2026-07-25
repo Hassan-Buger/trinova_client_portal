@@ -175,13 +175,14 @@ class ClientController extends Controller
     {
         $body     = $request->getBody();
         $clientId = (int)($body['client_id'] ?? 0);
+        $confirmation = trim((string)($body['confirm_delete'] ?? ''));
 
-        if ($clientId <= 0) {
+        if ($clientId <= 0 || $confirmation !== 'DELETE') {
             if ($request->isAjax()) {
-                $response->json(['success' => false, 'message' => 'Invalid client ID.'], 400);
+                $response->json(['success' => false, 'message' => 'Type DELETE to confirm permanent client removal.'], 422);
                 return;
             }
-            \Application\Core\Session::setFlash('error', 'Invalid client ID.');
+            \Application\Core\Session::setFlash('error', 'Type DELETE to confirm permanent client removal.');
             $response->redirect('/staff/clients');
             return;
         }
@@ -194,7 +195,7 @@ class ClientController extends Controller
 
             $msg = "Client account '{$name}' removed successfully.";
             if ($request->isAjax()) {
-                $response->json(['success' => true, 'message' => $msg]);
+                $response->json(['success' => true, 'message' => $msg, 'redirect' => '/staff/clients']);
                 return;
             }
             \Application\Core\Session::setFlash('success', $msg);

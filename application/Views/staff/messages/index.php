@@ -1,6 +1,5 @@
 <div class="tn-screen" style="max-width:1120px">
     <div style="margin-bottom:24px">
-        <h2 style="margin:0 0 6px;font-size:26px;font-weight:800;letter-spacing:-.02em">Staff Messaging Console</h2>
         <p style="margin:0;color:#61756e;font-size:14.5px">Select a client thread to read conversation history and send responses.</p>
     </div>
 

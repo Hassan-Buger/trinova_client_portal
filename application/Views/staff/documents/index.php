@@ -1,7 +1,6 @@
 <div class="tn-screen" style="max-width:1120px">
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:24px">
         <div>
-            <h2 style="margin:0 0 6px;font-size:26px;font-weight:800;letter-spacing:-.02em">Document Management</h2>
             <p style="margin:0;color:#61756e;font-size:14.5px">Overview of all client uploads and dispatch new files to clients.</p>
         </div>
         <button onclick="document.getElementById('dispatchModal').style.display='flex'" style="background:#41556f;color:#fff;padding:12px 22px;border-radius:14px;font-weight:700;font-size:14px;cursor:pointer;border:none;box-shadow:0 8px 18px -8px rgba(65,85,111,.7)">+ Dispatch Document to Client</button>
@@ -168,6 +167,10 @@
                                     <?= date('d M Y, H:i', strtotime($doc['created_at'])) ?>
                                 </td>
                                 <td style="padding:16px;text-align:right">
+                                    <?php $previewable = in_array(strtolower(pathinfo((string)$doc['filename'], PATHINFO_EXTENSION)), ['pdf', 'png', 'jpg', 'jpeg', 'txt', 'csv'], true); ?>
+                                    <?php if ($previewable): ?>
+                                        <a href="/documents/view/<?= $doc['id'] ?>" target="_blank" rel="noopener" style="background:#fff;color:#41556f;border:1px solid #dfe8e4;padding:8px 14px;border-radius:10px;font-weight:700;font-size:13px;display:inline-flex;margin-right:6px">View</a>
+                                    <?php endif; ?>
                                     <a href="/documents/download/<?= $doc['id'] ?>" style="background:#f0f5f3;color:#0d9488;padding:8px 14px;border-radius:10px;font-weight:700;font-size:13px;display:inline-flex;align-items:center;gap:6px">
                                         Download
                                     </a>

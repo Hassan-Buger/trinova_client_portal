@@ -1,6 +1,5 @@
 <div class="tn-screen" style="max-width:1120px">
     <div style="margin-bottom:24px">
-        <h2 style="margin:0 0 6px;font-size:26px;font-weight:800;letter-spacing:-.02em">Documents from TriNova</h2>
         <p style="margin:0;color:#61756e;font-size:14.5px">Official tax returns, financial statements, and documents prepared for you by our team.</p>
     </div>
 
@@ -36,14 +35,20 @@
                         </div>
                         <div style="display:flex;align-items:center;justify-content:space-between;padding-top:14px;border-top:1px solid #eef4f1">
                             <span style="font-size:12px;color:#41556f;font-weight:600">By <?= htmlspecialchars($doc['uploaded_by_name'] ?? 'TriNova Team') ?></span>
+                            <div style="display:flex;align-items:center;gap:7px">
+                            <?php $previewable = in_array(strtolower(pathinfo((string)$doc['filename'], PATHINFO_EXTENSION)), ['pdf', 'png', 'jpg', 'jpeg', 'txt', 'csv'], true); ?>
+                            <?php if ($previewable): ?>
+                                <a href="/documents/view/<?= $doc['id'] ?>" target="_blank" rel="noopener" style="background:#f0f5f3;color:#41556f;padding:9px 14px;border-radius:12px;font-weight:700;font-size:13px">View</a>
+                            <?php endif; ?>
                             <a href="/documents/download/<?= $doc['id'] ?>" style="background:#0d9488;color:#fff;padding:9px 16px;border-radius:12px;font-weight:700;font-size:13px;display:inline-flex;align-items:center;gap:6px">
                                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                                     <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
                                     <polyline points="7 10 12 15 17 10"></polyline>
                                     <line x1="12" y1="15" x2="12" y2="3"></line>
                                 </svg>
-                                Download PDF
+                                Download
                             </a>
+                            </div>
                         </div>
                     </div>
                 <?php endforeach; ?>

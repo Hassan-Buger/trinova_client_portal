@@ -1,7 +1,6 @@
 <div class="tn-screen" style="max-width:1120px">
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:24px">
         <div>
-            <h2 style="margin:0 0 6px;font-size:26px;font-weight:800;letter-spacing:-.02em">My Uploads</h2>
             <p style="margin:0;color:#61756e;font-size:14.5px">All files you have uploaded to TriNova Accounting.</p>
         </div>
         <a href="/client/documents/upload" style="background:#0d9488;color:#fff;padding:12px 22px;border-radius:14px;font-weight:700;font-size:14px;box-shadow:0 8px 18px -8px rgba(13,148,136,.7)">+ Upload New File</a>
@@ -55,6 +54,10 @@
                                     </span>
                                 </td>
                                 <td style="padding:16px;text-align:right">
+                                    <?php $previewable = in_array(strtolower(pathinfo((string)$doc['filename'], PATHINFO_EXTENSION)), ['pdf', 'png', 'jpg', 'jpeg', 'txt', 'csv'], true); ?>
+                                    <?php if ($previewable): ?>
+                                        <a href="/documents/view/<?= $doc['id'] ?>" target="_blank" rel="noopener" style="background:#fff;color:#41556f;border:1px solid #dfe8e4;padding:8px 14px;border-radius:10px;font-weight:700;font-size:13px;display:inline-flex;margin-right:6px">View</a>
+                                    <?php endif; ?>
                                     <a href="/documents/download/<?= $doc['id'] ?>" style="background:#f0f5f3;color:#0d9488;padding:8px 14px;border-radius:10px;font-weight:700;font-size:13px;display:inline-flex;align-items:center;gap:6px">
                                         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                                             <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>

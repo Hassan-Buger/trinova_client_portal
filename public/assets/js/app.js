@@ -9,6 +9,7 @@
     const state = {
         navigating: false,
         messageTimer: null,
+        notificationTimer: null,
     };
 
     const content = () => document.getElementById('portal-content');
@@ -59,6 +60,12 @@
         });
     }
 
+    function updateHeaderContext(url) {
+        const path = new URL(url, window.location.origin).pathname.replace(/\/$/, '');
+        const welcome = document.getElementById('portalWelcomeText');
+        if (welcome) welcome.hidden = !['/staff/dashboard', '/client/dashboard'].includes(path);
+    }
+
     function applyPage(payload, url, pushState) {
         const target = content();
         if (!target || typeof payload.html !== 'string') return false;
@@ -71,6 +78,7 @@
         document.title = title;
         const heading = document.getElementById('portal-page-title');
         if (heading) heading.textContent = title;
+        updateHeaderContext(url);
         updateNavigation(url);
 
         if (pushState) window.history.pushState({ trinova: true }, '', url);
@@ -262,6 +270,117 @@
         state.messageTimer = window.setInterval(() => pollMessages(false), 7000);
     }
 
+    function notificationTime(value) {
+        const date = new Date(value);
+        if (Number.isNaN(date.getTime())) return '';
+        const seconds = Math.max(0, Math.round((Date.now() - date.getTime()) / 1000));
+        if (seconds < 60) return 'Just now';
+        if (seconds < 3600) return `${Math.floor(seconds / 60)} min ago`;
+        if (seconds < 86400) return `${Math.floor(seconds / 3600)} hr ago`;
+        return new Intl.DateTimeFormat(undefined, { day: 'numeric', month: 'short', year: 'numeric' }).format(date);
+    }
+
+    function renderNotifications(items) {
+        const list = document.getElementById('portalNotificationList');
+        if (!list) return;
+        list.replaceChildren();
+        if (!items.length) {
+            const empty = document.createElement('div');
+            empty.className = 'tn-notification-empty';
+            empty.textContent = 'No new notifications';
+            list.appendChild(empty);
+            return;
+        }
+        items.forEach((item) => {
+            const link = document.createElement('a');
+            link.className = 'tn-notification-item';
+            link.href = item.url;
+            const message = document.createElement('span');
+            message.className = 'tn-notification-message';
+            message.textContent = item.message;
+            const time = document.createElement('time');
+            time.className = 'tn-notification-time';
+            time.dateTime = item.created_at;
+            time.textContent = notificationTime(item.created_at);
+            time.title = new Intl.DateTimeFormat(undefined, { dateStyle: 'full', timeStyle: 'short' }).format(new Date(item.created_at));
+            link.append(message, time);
+            list.appendChild(link);
+        });
+    }
+
+    function setNotificationCount(count) {
+        const badge = document.getElementById('portalNotificationBadge');
+        if (!badge) return;
+        badge.hidden = count <= 0;
+        badge.textContent = count > 99 ? '99+' : String(count);
+    }
+
+    async function loadNotifications() {
+        if (document.body.dataset.portalAuthenticated !== '1' || document.hidden) return;
+        try {
+            const response = await fetch('/notifications/feed', {
+                headers: { 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
+                credentials: 'same-origin',
+            });
+            const payload = await response.json();
+            if (!response.ok || payload.success === false) return;
+            const items = Array.isArray(payload.notifications) ? payload.notifications : [];
+            renderNotifications(items);
+            setNotificationCount(Number(payload.count) || 0);
+        } catch (_) {
+            // Notifications are progressive enhancement; the portal remains usable without polling.
+        }
+    }
+
+    async function markNotificationsRead() {
+        const token = document.body.dataset.csrfToken || '';
+        try {
+            const response = await fetch('/notifications/read-all', {
+                method: 'POST',
+                headers: {
+                    'Accept': 'application/json',
+                    'Content-Type': 'application/x-www-form-urlencoded;charset=UTF-8',
+                    'X-Requested-With': 'XMLHttpRequest',
+                },
+                credentials: 'same-origin',
+                body: new URLSearchParams({ csrf_token: token }),
+            });
+            if (response.ok) setNotificationCount(0);
+        } catch (_) {
+            // A later poll will retry and keep the unread state accurate.
+        }
+    }
+
+    function initialiseNotifications() {
+        const button = document.getElementById('portalNotificationButton');
+        const panel = document.getElementById('portalNotificationPanel');
+        if (!button || !panel) return;
+
+        button.addEventListener('click', async () => {
+            const opening = panel.hidden;
+            panel.hidden = !opening;
+            button.setAttribute('aria-expanded', opening ? 'true' : 'false');
+            if (opening) {
+                await loadNotifications();
+                await markNotificationsRead();
+            }
+        });
+        panel.addEventListener('click', (event) => {
+            if (event.target.closest('.tn-notification-item')) {
+                panel.hidden = true;
+                button.setAttribute('aria-expanded', 'false');
+            }
+        });
+        document.addEventListener('click', (event) => {
+            if (!panel.hidden && !event.target.closest('.tn-notification-wrap')) {
+                panel.hidden = true;
+                button.setAttribute('aria-expanded', 'false');
+            }
+        });
+        loadNotifications();
+        state.notificationTimer = window.setInterval(loadNotifications, 30000);
+    }
+
     function initialisePage() {
         initialiseMessages();
     }
@@ -288,8 +407,14 @@
     });
 
     window.addEventListener('popstate', () => navigate(window.location.href, { push: false }));
-    document.addEventListener('visibilitychange', () => { if (!document.hidden) pollMessages(false); });
+    document.addEventListener('visibilitychange', () => {
+        if (!document.hidden) {
+            pollMessages(false);
+            loadNotifications();
+        }
+    });
     window.TrinovaPortal = { navigate, showToast, refreshMessages: pollMessages };
 
     initialisePage();
+    initialiseNotifications();
 })();
