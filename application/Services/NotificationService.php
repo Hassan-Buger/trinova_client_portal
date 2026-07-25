@@ -29,24 +29,47 @@ class NotificationService
             'html'    => $htmlContent,
         ]);
 
-        $ch = curl_init('https://api.resend.com/emails');
-        curl_setopt_array($ch, [
-            CURLOPT_RETURNTRANSFER => true,
-            CURLOPT_POST           => true,
-            CURLOPT_POSTFIELDS     => $payload,
-            CURLOPT_HTTPHEADER     => [
-                'Authorization: Bearer ' . $apiKey,
-                'Content-Type: application/json',
-            ],
-            CURLOPT_TIMEOUT        => 10,
-        ]);
+        $response = false;
+        $httpCode = 0;
 
-        $response = curl_exec($ch);
-        $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-        curl_close($ch);
+        if (function_exists('curl_init')) {
+            $ch = curl_init('https://api.resend.com/emails');
+            curl_setopt_array($ch, [
+                CURLOPT_RETURNTRANSFER => true,
+                CURLOPT_POST           => true,
+                CURLOPT_POSTFIELDS     => $payload,
+                CURLOPT_HTTPHEADER     => [
+                    'Authorization: Bearer ' . $apiKey,
+                    'Content-Type: application/json',
+                ],
+                CURLOPT_TIMEOUT        => 10,
+                CURLOPT_SSL_VERIFYPEER => true,
+            ]);
+
+            $response = curl_exec($ch);
+            $httpCode = (int) curl_getinfo($ch, CURLINFO_HTTP_CODE);
+            curl_close($ch);
+        } else {
+            // Fallback to file_get_contents if cURL extension is not enabled
+            $opts = [
+                'http' => [
+                    'method'  => 'POST',
+                    'header'  => "Authorization: Bearer {$apiKey}\r\nContent-Type: application/json\r\n",
+                    'content' => $payload,
+                    'timeout' => 10,
+                    'ignore_errors' => true,
+                ],
+            ];
+            $context  = stream_context_create($opts);
+            $response = @file_get_contents('https://api.resend.com/emails', false, $context);
+            if (isset($http_response_header[0])) {
+                preg_match('{HTTP\/\S+\s+(\d+)}', $http_response_header[0], $m);
+                $httpCode = (int) ($m[1] ?? 0);
+            }
+        }
 
         if ($httpCode < 200 || $httpCode >= 300) {
-            self::logEmail($toEmail, $subject, "[RESEND API ERROR HTTP {$httpCode}]: " . $response);
+            self::logEmail($toEmail, $subject, "[RESEND API ERROR HTTP {$httpCode}]: " . ($response ?: 'No response'));
         }
 
         return $httpCode >= 200 && $httpCode < 300;
@@ -113,10 +136,6 @@ class NotificationService
 
         return self::sendResendEmail($toEmail, $subject, $html);
     }
-
-    /**
-     * Log email dispatch to storage/logs/mail.log for audit debugging
-     */
 
     public static function sendPromptEmail(string $toEmail, string $subject, string $messageBody): bool
     {
