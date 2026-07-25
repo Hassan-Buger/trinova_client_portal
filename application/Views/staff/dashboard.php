@@ -1,26 +1,8 @@
 <div class="tn-screen" style="max-width:1120px">
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:22px">
         <div>
-            <p style="margin:0 0 4px;color:#61756e;font-size:15px">All four of you share access to every client. Here is what needs attention today.</p>
+            <p style="margin:0 0 4px;color:#61756e;font-size:15px">Overview of tasks, recent uploads, unread messages, and compliance deadlines.</p>
             <h2 style="margin:0;font-size:26px;font-weight:800;letter-spacing:-.02em">Staff Dashboard</h2>
-        </div>
-        
-        <!-- Staff Identity Switcher -->
-        <div style="display:flex;align-items:center;gap:8px;background:#fff;padding:6px 14px;border-radius:18px;border:1px solid rgba(20,60,50,.08);box-shadow:0 1px 2px rgba(16,54,45,.04)">
-            <span style="font-size:12.5px;color:#61756e;font-weight:600">Active Staff:</span>
-            <div style="display:flex;gap:4px">
-                <?php foreach ($staffMembers as $member): ?>
-                    <?php
-                    $isMe = ((int)\Application\Core\Session::get('user_id') === (int)$member['id']);
-                    $btnStyle = $isMe 
-                        ? 'background:#41556f;color:#fff;font-weight:700;' 
-                        : 'background:#f0f5f3;color:#5f726c;font-weight:600;';
-                    ?>
-                    <a href="/staff/switch/<?= $member['id'] ?>" style="padding:4px 10px;border-radius:10px;font-size:12px;<?= $btnStyle ?>">
-                        <?= htmlspecialchars($member['name']) ?>
-                    </a>
-                <?php endforeach; ?>
-            </div>
         </div>
     </div>
 

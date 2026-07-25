@@ -27,6 +27,7 @@ use Application\Controllers\Staff\RequestController as StaffRequestController;
 use Application\Controllers\Staff\MessageController as StaffMessageController;
 use Application\Controllers\Staff\DeadlineController as StaffDeadlineController;
 use Application\Controllers\Staff\UserAdminController as StaffUserAdminController;
+use Application\Controllers\Staff\AuditController as StaffAuditController;
 
 // Simple dotenv loader fallback for environment variables
 $envFile = dirname(__DIR__) . '/.env';
@@ -87,7 +88,6 @@ $app->router->group([
     'middleware' => [AuthMiddleware::class, SessionTimeoutMiddleware::class, RoleMiddleware::class . ':staff']
 ], function($r) {
     $r->get('/dashboard', [StaffDashboardController::class, 'index']);
-    $r->get('/switch/{id}', [StaffDashboardController::class, 'switchIdentity']);
     $r->get('/clients', [StaffClientController::class, 'index']);
     $r->post('/clients/create', [StaffClientController::class, 'create'])->middleware([CsrfMiddleware::class]);
     $r->get('/clients/{id}', [StaffClientController::class, 'show']);
@@ -103,7 +103,7 @@ $app->router->group([
     $r->get('/deadlines', [StaffDeadlineController::class, 'index']);
     $r->post('/deadlines/create', [StaffDeadlineController::class, 'create'])->middleware([CsrfMiddleware::class]);
     $r->post('/deadlines/update-status', [StaffDeadlineController::class, 'updateStatus'])->middleware([CsrfMiddleware::class]);
-    $r->get('/audit', [\Application\Controllers\Staff\AuditController::class, 'index']);
+    $r->get('/audit', [StaffAuditController::class, 'index']);
     $r->get('/users', [StaffUserAdminController::class, 'index']);
     $r->post('/users/create', [StaffUserAdminController::class, 'createUser'])->middleware([CsrfMiddleware::class]);
     $r->post('/users/toggle-status', [StaffUserAdminController::class, 'toggleStatus'])->middleware([CsrfMiddleware::class]);

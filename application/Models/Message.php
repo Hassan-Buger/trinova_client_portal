@@ -31,7 +31,7 @@ class Message extends Model
         $stmt = $this->db->prepare("
             SELECT m.*, u.name AS sender_name, u.role AS sender_role
             FROM messages m
-            JOIN users u ON u.id = m.sender_id
+            LEFT JOIN users u ON u.id = m.sender_id
             WHERE m.client_id = :client_id
             ORDER BY m.created_at ASC
         ");
@@ -56,17 +56,19 @@ class Message extends Model
 
     public function markAsReadForRecipient(int $clientId, string $recipientRole): void
     {
-        // If recipient is client, mark staff messages as read. If recipient is staff, mark client messages as read.
+        // Mark messages as read where sender role is NOT the recipient (i.e., messages FROM the other side)
+        $senderRole = ($recipientRole === 'staff') ? 'client' : 'staff';
         $stmt = $this->db->prepare("
-            UPDATE messages
-            SET read_at = NOW()
-            WHERE client_id = :client_id 
-              AND read_at IS NULL 
-              AND sender_id IN (SELECT id FROM users WHERE role != :recipient_role)
+            UPDATE messages m
+            JOIN users u ON u.id = m.sender_id
+            SET m.read_at = NOW()
+            WHERE m.client_id = :client_id
+              AND m.read_at IS NULL
+              AND u.role = :sender_role
         ");
         $stmt->execute([
-            'client_id'      => $clientId,
-            'recipient_role' => $recipientRole
+            'client_id'   => $clientId,
+            'sender_role' => $senderRole,
         ]);
     }
 }
