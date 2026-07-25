@@ -4,7 +4,14 @@
  * TriNova Client Portal - Front Controller
  */
 
-require_once __DIR__ . '/../vendor/autoload.php';
+$appDir = dirname(__DIR__);
+if (file_exists($appDir . '/trinova_app/vendor/autoload.php')) {
+    require_once $appDir . '/trinova_app/vendor/autoload.php';
+    $basePath = $appDir . '/trinova_app';
+} else {
+    require_once $appDir . '/vendor/autoload.php';
+    $basePath = $appDir;
+}
 
 use Application\Core\Application;
 use Application\Middleware\AuthMiddleware;
@@ -31,19 +38,20 @@ use Application\Controllers\Staff\UserAdminController as StaffUserAdminControlle
 use Application\Controllers\Staff\AuditController as StaffAuditController;
 
 // Simple dotenv loader fallback for environment variables
-$envFile = dirname(__DIR__) . '/.env';
+$envFile = $basePath . '/.env';
 if (file_exists($envFile)) {
     $lines = file($envFile, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
     foreach ($lines as $line) {
-        if (str_starts_with(trim($line), '#')) continue;
-        if (str_contains($line, '=')) {
+        $trimmed = trim($line);
+        if (strpos($trimmed, '#') === 0) continue;
+        if (strpos($line, '=') !== false) {
             [$key, $val] = explode('=', $line, 2);
             $_ENV[trim($key)] = trim(trim($val), '"\'');
         }
     }
 }
 
-$app = new Application(dirname(__DIR__));
+$app = new Application($basePath);
 
 // --- PUBLIC AUTH ROUTES ---
 $app->router->get('/', function($req, $res) {
@@ -126,4 +134,4 @@ header('Referrer-Policy: same-origin');
 header('X-XSS-Protection: 1; mode=block');
 
 // Boot application
-$app->run();
+$app.run();
