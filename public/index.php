@@ -86,7 +86,9 @@ $app->router->group([
     $r->get('/dashboard', [StaffDashboardController::class, 'index']);
     $r->get('/switch/{id}', [StaffDashboardController::class, 'switchIdentity']);
     $r->get('/clients', [StaffClientController::class, 'index']);
+    $r->post('/clients/create', [StaffClientController::class, 'create'])->middleware([CsrfMiddleware::class]);
     $r->get('/clients/{id}', [StaffClientController::class, 'show']);
+    $r->post('/clients/add-entity', [StaffClientController::class, 'addEntity'])->middleware([CsrfMiddleware::class]);
     $r->get('/documents', [StaffDocumentController::class, 'index']);
     $r->post('/documents/upload', [StaffDocumentController::class, 'upload'])->middleware([CsrfMiddleware::class]);
     $r->get('/requests', [StaffRequestController::class, 'index']);
@@ -97,7 +99,10 @@ $app->router->group([
     $r->get('/deadlines', [StaffDeadlineController::class, 'index']);
     $r->post('/deadlines/create', [StaffDeadlineController::class, 'create'])->middleware([CsrfMiddleware::class]);
     $r->post('/deadlines/update-status', [StaffDeadlineController::class, 'updateStatus'])->middleware([CsrfMiddleware::class]);
+    $r->get('/audit', [\Application\Controllers\Staff\AuditController::class, 'index']);
     $r->get('/users', [StaffUserAdminController::class, 'index']);
+    $r->post('/users/create', [StaffUserAdminController::class, 'createUser'])->middleware([CsrfMiddleware::class]);
+    $r->post('/users/toggle-status', [StaffUserAdminController::class, 'toggleStatus'])->middleware([CsrfMiddleware::class]);
 });
 
 // Security response headers

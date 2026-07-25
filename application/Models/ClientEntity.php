@@ -17,4 +17,19 @@ class ClientEntity extends Model
         $stmt->execute(['client_id' => $clientId]);
         return $stmt->fetchAll();
     }
+
+    public function create(array $data): int
+    {
+        $stmt = $this->db->prepare("
+            INSERT INTO client_entities (client_id, company_name, company_number, tax_reference)
+            VALUES (:client_id, :company_name, :company_number, :tax_reference)
+        ");
+        $stmt->execute([
+            'client_id'      => $data['client_id'],
+            'company_name'   => $data['company_name'],
+            'company_number' => $data['company_number'] ?? null,
+            'tax_reference'  => $data['tax_reference'] ?? null,
+        ]);
+        return (int) $this->db->lastInsertId();
+    }
 }
