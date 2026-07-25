@@ -65,4 +65,15 @@ class DocumentRequest extends Model
         $stmt = $this->db->prepare("UPDATE document_requests SET status = :status WHERE id = :id");
         return $stmt->execute(['status' => $status, 'id' => $id]);
     }
+
+    public function getOverdueCount(): int
+    {
+        $stmt = $this->db->query("
+            SELECT COUNT(*) AS total 
+            FROM document_requests 
+            WHERE status != 'Completed' AND due_date < CURRENT_DATE()
+        ");
+        $row = $stmt->fetch();
+        return (int) ($row['total'] ?? 0);
+    }
 }
