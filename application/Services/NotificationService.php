@@ -11,13 +11,14 @@ class NotificationService
      */
     public static function sendResendEmail(string $toEmail, string $subject, string $htmlContent): bool
     {
-        $apiKey = App::get('resend_api_key');
+        $apiKey = App::get('resend_api_key') ?: getenv('RESEND_API_KEY') ?: ($_ENV['RESEND_API_KEY'] ?? '');
         $from   = App::get('email_from', 'TriNova Portal <onboarding@resend.dev>');
 
         // Log locally first
         self::logEmail($toEmail, $subject, strip_tags($htmlContent));
 
         if (empty($apiKey)) {
+            self::logEmail($toEmail, $subject, "[RESEND SKIPPED: RESEND_API_KEY is empty in .env]");
             return true; // Unconfigured API key silently logs to mail.log
         }
 
@@ -43,6 +44,10 @@ class NotificationService
         $response = curl_exec($ch);
         $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
         curl_close($ch);
+
+        if ($httpCode < 200 || $httpCode >= 300) {
+            self::logEmail($toEmail, $subject, "[RESEND API ERROR HTTP {$httpCode}]: " . $response);
+        }
 
         return $httpCode >= 200 && $httpCode < 300;
     }
