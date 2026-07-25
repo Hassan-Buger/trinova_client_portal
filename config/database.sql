@@ -139,14 +139,14 @@ CREATE TABLE IF NOT EXISTS `notifications` (
 
 -- Initial Seed Data: Password for all default accounts is "password123"
 -- Hashed using password_hash('password123', PASSWORD_BCRYPT)
--- $2y$10$4.aK9c1K8PjFpW1mPzPq3.v4y9hNq1v3zK4m5l6n7o8p9q0r1s2t3
+-- $2y$12$uUgV4QcXGo9b9eOEO3/rmuHsKgbwXBm06PfvEgIchptJEsOTFv4ee
 
 INSERT INTO `users` (`id`, `name`, `email`, `password_hash`, `role`, `status`) VALUES
-(1, 'Kirsty', 'kirsty@trinova.co.uk', '$2y$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi', 'staff', 'active'),
-(2, 'Jane', 'jane@trinova.co.uk', '$2y$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi', 'staff', 'active'),
-(3, 'Emma', 'emma@trinova.co.uk', '$2y$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi', 'staff', 'active'),
-(4, 'Jess', 'jess@trinova.co.uk', '$2y$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi', 'staff', 'active'),
-(5, 'Nick Powell', 'nick@powellelectrical.co.uk', '$2y$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi', 'client', 'active');
+(1, 'Kirsty', 'kirsty@trinova.co.uk', '$2y$12$uUgV4QcXGo9b9eOEO3/rmuHsKgbwXBm06PfvEgIchptJEsOTFv4ee', 'staff', 'active'),
+(2, 'Jane', 'jane@trinova.co.uk', '$2y$12$uUgV4QcXGo9b9eOEO3/rmuHsKgbwXBm06PfvEgIchptJEsOTFv4ee', 'staff', 'active'),
+(3, 'Emma', 'emma@trinova.co.uk', '$2y$12$uUgV4QcXGo9b9eOEO3/rmuHsKgbwXBm06PfvEgIchptJEsOTFv4ee', 'staff', 'active'),
+(4, 'Jess', 'jess@trinova.co.uk', '$2y$12$uUgV4QcXGo9b9eOEO3/rmuHsKgbwXBm06PfvEgIchptJEsOTFv4ee', 'staff', 'active'),
+(5, 'Nick Powell', 'nick@powellelectrical.co.uk', '$2y$12$uUgV4QcXGo9b9eOEO3/rmuHsKgbwXBm06PfvEgIchptJEsOTFv4ee', 'client', 'active');
 
 INSERT INTO `clients` (`id`, `user_id`, `phone`, `address`, `aml_status`, `notes`) VALUES
 (1, 5, '07700 900432', '14 Kiln Lane, Leeds LS1 4AB', 'Complete', 'Client prefers email for confirmations. Keep payroll reminders short.');
