@@ -54,14 +54,14 @@ class AuthController extends Controller
             if (!empty($user['locked_until']) && strtotime($user['locked_until']) > time()) {
                 $minsLeft = ceil((strtotime($user['locked_until']) - time()) / 60);
                 AuditService::log('failed_login_locked', 'users', $user['id']);
-                Session::setFlash('error', "Account locked due to 5 failed login attempts. Please try again in {$minsLeft} minutes or reset your password.");
+                Session::setFlash('error', "Your account is temporarily locked due to multiple failed login attempts. Please try again in {$minsLeft} minutes or reset your password.");
                 $response->redirect('/login');
                 return;
             }
 
             // Check if client is pending activation
             if ($user['status'] === 'pending_activation') {
-                Session::setFlash('error', 'Your account is pending email activation. Please check your welcome email to verify your address and create your password.');
+                Session::setFlash('error', 'Please complete your email verification and password setup before logging in.');
                 $response->redirect('/login');
                 return;
             }
@@ -74,7 +74,7 @@ class AuthController extends Controller
                     $lockedUntil = date('Y-m-d H:i:s', strtotime('+15 minutes'));
                     $this->userModel->lockAccount((int)$user['id'], $lockedUntil);
                     AuditService::log('account_locked', 'users', $user['id']);
-                    Session::setFlash('error', 'Account locked for 15 minutes due to 5 consecutive failed login attempts.');
+                    Session::setFlash('error', 'Your account is temporarily locked due to multiple failed login attempts. Please try again in 15 minutes or reset your password.');
                     $response->redirect('/login');
                     return;
                 }

@@ -15,7 +15,12 @@
     <div style="background:#fff;border-radius:28px;padding:36px 34px;box-shadow:0 2px 4px rgba(16,54,45,.04),0 24px 60px -28px rgba(16,54,45,.35)">
       <div style="display:inline-block;padding:6px 14px;border-radius:999px;background:#e2f3ea;color:#3f9d6d;font-size:12px;font-weight:700;margin-bottom:12px">Welcome Activation</div>
       <h1 style="margin:0 0 6px;font-size:23px;font-weight:800;letter-spacing:-.02em">Set Your Portal Password</h1>
-      <p style="margin:0 0 22px;color:#61756e;font-size:14px;line-height:1.5">Welcome <strong><?= htmlspecialchars($userName ?? 'Client') ?></strong> (<?= htmlspecialchars($email ?? '') ?>). Please set your portal password to activate your account.</p>
+      
+      <div style="margin-bottom:20px;padding:12px 16px;background:#e2f3ea;color:#3f9d6d;border-radius:14px;font-size:13.5px;font-weight:600">
+        ✓ Your email address has been verified successfully. Please create your password below.
+      </div>
+
+      <p style="margin:0 0 20px;color:#61756e;font-size:14px;line-height:1.5">Welcome <strong><?= htmlspecialchars($userName ?? 'Client') ?></strong> (<?= htmlspecialchars($email ?? '') ?>). Create your permanent portal password to activate access.</p>
       
       <?php if (!empty($error)): ?>
         <div style="margin-bottom:20px;padding:12px 16px;background:#fdecdc;color:#e07d24;border-radius:14px;font-size:13.5px;font-weight:600">
@@ -23,18 +28,23 @@
         </div>
       <?php endif; ?>
 
-      <form action="/activate" method="POST">
+      <form action="/activate" method="POST" onsubmit="this.querySelector('button[type=submit]').disabled=true; this.querySelector('button[type=submit]').innerText='Activating Account...';">
         <input type="hidden" name="csrf_token" value="<?= htmlspecialchars(\Application\Core\Session::csrfToken()) ?>">
         <input type="hidden" name="token" value="<?= htmlspecialchars($token ?? '') ?>">
 
         <div style="margin-bottom:16px">
           <label style="display:block;font-size:12.5px;font-weight:600;color:#3a4d47;margin-bottom:6px">Create Password</label>
-          <input type="password" name="password" placeholder="At least 8 characters" required style="width:100%;padding:13px 16px;border:1.5px solid #e0e9e5;border-radius:14px;font-size:14.5px;background:#fbfdfc">
+          <input type="password" name="password" placeholder="At least 8 characters" minlength="8" required style="width:100%;padding:13px 16px;border:1.5px solid #e0e9e5;border-radius:14px;font-size:14.5px;background:#fbfdfc">
         </div>
 
-        <div style="margin-bottom:24px">
+        <div style="margin-bottom:20px">
           <label style="display:block;font-size:12.5px;font-weight:600;color:#3a4d47;margin-bottom:6px">Confirm Password</label>
-          <input type="password" name="password_confirm" placeholder="Repeat your password" required style="width:100%;padding:13px 16px;border:1.5px solid #e0e9e5;border-radius:14px;font-size:14.5px;background:#fbfdfc">
+          <input type="password" name="password_confirm" placeholder="Repeat your password" minlength="8" required style="width:100%;padding:13px 16px;border:1.5px solid #e0e9e5;border-radius:14px;font-size:14.5px;background:#fbfdfc">
+        </div>
+
+        <div style="font-size:12.5px;color:#7d8e88;margin-bottom:24px;line-height:1.4">
+          • Must be at least 8 characters long<br>
+          • Passwords must match
         </div>
 
         <button type="submit" style="width:100%;padding:15px;background:#0d9488;color:#fff;border:none;border-radius:15px;font-size:15.5px;font-weight:700;cursor:pointer;box-shadow:0 8px 18px -8px rgba(13,148,136,.7)">Activate Account &amp; Log In</button>

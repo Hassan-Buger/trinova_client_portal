@@ -83,7 +83,7 @@ class ActivationController extends Controller
         AuditService::log('account_activated', 'users', $user['id'], $user['id']);
         NotificationService::sendPasswordChangedAlert($user['email'], $user['name']);
 
-        Session::setFlash('success', 'Your account has been activated successfully! Please sign in with your new password.');
+        Session::setFlash('success', 'Your password has been created successfully. You can now log in.');
         $response->redirect('/login');
     }
 }
