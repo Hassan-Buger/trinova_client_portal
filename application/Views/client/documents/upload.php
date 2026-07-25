@@ -42,6 +42,7 @@
 </div>
 
 <script>
+(() => {
 const dropzone = document.getElementById('dropzone');
 const fileInput = document.getElementById('fileInput');
 
@@ -66,4 +67,5 @@ dropzone.addEventListener('drop', (e) => {
         document.getElementById('selectedFileName').innerText = 'Selected: ' + fileInput.files[0].name;
     }
 });
+})();
 </script>

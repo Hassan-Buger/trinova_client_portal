@@ -20,11 +20,28 @@
         @keyframes tnfade { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
         @keyframes tnpop { from { opacity: 0; transform: scale(.96); } to { opacity: 1; transform: none; } }
         .tn-screen { animation: tnfade .34s cubic-bezier(.22,.61,.36,1); }
+        .tn-page-progress { position:fixed;top:0;left:0;height:3px;width:0;background:#0d9488;z-index:9999;opacity:0;transition:width .2s ease,opacity .2s ease; }
+        .tn-page-progress.is-loading { width:72%;opacity:1; }
+        .tn-page-progress.is-complete { width:100%;opacity:0; }
+        .tn-toast-stack { position:fixed;right:24px;bottom:24px;z-index:9998;display:flex;flex-direction:column;gap:10px;pointer-events:none; }
+        .tn-toast { min-width:280px;max-width:420px;padding:14px 18px;border-radius:15px;background:#e2f3ea;color:#287a52;font-size:14px;font-weight:700;box-shadow:0 16px 40px -20px rgba(16,54,45,.55);animation:tnpop .22s ease; }
+        .tn-toast.is-error { background:#fdecdc;color:#b45e18; }
+        .tn-message-day { align-self:center;color:#7d8e88;background:#eef4f1;border-radius:999px;padding:5px 11px;font-size:11px;font-weight:800;letter-spacing:.02em; }
+        .tn-message-bubble { max-width:78%;border-radius:18px;padding:15px 18px;box-shadow:0 2px 8px rgba(16,54,45,.04); }
+        .tn-message-bubble.is-mine { align-self:flex-end;border-bottom-right-radius:4px;background:#0d9488;color:#fff; }
+        [data-message-thread][data-current-role="staff"] .tn-message-bubble.is-mine { background:#41556f; }
+        .tn-message-bubble.is-theirs { align-self:flex-start;border-bottom-left-radius:4px;background:#fff;color:#213330;border:1px solid rgba(20,60,50,.08); }
+        .tn-message-meta { font-size:12px;font-weight:700;margin-bottom:5px;opacity:.78; }
+        .tn-message-body { font-size:14px;line-height:1.5;white-space:pre-wrap;overflow-wrap:anywhere; }
+        .tn-main[aria-busy="true"] #portal-content { opacity:.62;transition:opacity .15s ease; }
         @media(max-width:1080px){ .tn-navlabel, .tn-brandword, .tn-logout-label { display: none !important; } .tn-side { width: 80px !important; align-items: center; } .tn-navitem { justify-content: center; } }
         @media(max-width:760px){ .tn-side { width: 66px !important; padding: 16px 8px !important; } .tn-topbar { padding: 14px 16px !important; } .tn-pagetitle { font-size: 19px !important; } }
     </style>
 </head>
-<body>
+<body data-portal-authenticated="<?= \Application\Core\Session::get('user_id') ? '1' : '0' ?>">
+
+<div id="tnPageProgress" class="tn-page-progress" aria-hidden="true"></div>
+<div id="tnToastStack" class="tn-toast-stack" aria-live="polite" aria-atomic="true"></div>
 
 <?php
 $userId = \Application\Core\Session::get('user_id');
@@ -44,7 +61,7 @@ $role = \Application\Core\Session::get('role');
         <div class="tn-main" style="flex:1;min-width:0;display:flex;flex-direction:column">
             <?php require __DIR__ . '/header.php'; ?>
             
-            <main style="padding:8px 32px 48px;flex:1">
+            <main id="portal-content" tabindex="-1" style="padding:8px 32px 48px;flex:1">
                 <?php if ($flashSuccess = \Application\Core\Session::getFlash('success')): ?>
                     <div style="max-width:1120px;margin-bottom:16px;padding:14px 18px;background:#e2f3ea;color:#3f9d6d;border-radius:16px;font-weight:600;font-size:14px">
                         <?= htmlspecialchars($flashSuccess) ?>
@@ -62,5 +79,6 @@ $role = \Application\Core\Session::get('role');
     </div>
 <?php endif; ?>
 
+<script src="/assets/js/app.js" defer></script>
 </body>
 </html>

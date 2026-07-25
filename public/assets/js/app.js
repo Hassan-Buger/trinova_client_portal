@@ -1,18 +1,295 @@
 /**
- * TriNova Client Portal UI Helper Script
+ * TriNova Portal progressive enhancement layer.
+ * Every link and form continues to work through normal PHP navigation when this
+ * file is unavailable or a request cannot be enhanced safely.
  */
-document.addEventListener('DOMContentLoaded', () => {
-    // Session timeout warning helper (optional client-side prompt)
-    let inactivityTimer;
-    const resetTimer = () => {
-        clearTimeout(inactivityTimer);
-        // 14 minutes warning prompt before 15 min server session timeout
-        inactivityTimer = setTimeout(() => {
-            console.log('Session approaching 15-minute inactivity limit.');
-        }, 840000);
+(() => {
+    'use strict';
+
+    const state = {
+        navigating: false,
+        messageTimer: null,
     };
 
-    window.addEventListener('mousemove', resetTimer);
-    window.addEventListener('keydown', resetTimer);
-    resetTimer();
-});
+    const content = () => document.getElementById('portal-content');
+    const progress = () => document.getElementById('tnPageProgress');
+
+    function setBusy(isBusy) {
+        state.navigating = isBusy;
+        const main = document.querySelector('.tn-main');
+        if (main) main.setAttribute('aria-busy', isBusy ? 'true' : 'false');
+        const bar = progress();
+        if (!bar) return;
+        bar.classList.toggle('is-loading', isBusy);
+        if (!isBusy) {
+            bar.classList.add('is-complete');
+            window.setTimeout(() => bar.classList.remove('is-complete'), 240);
+        }
+    }
+
+    function showToast(message, type = 'success') {
+        if (!message) return;
+        const stack = document.getElementById('tnToastStack');
+        if (!stack) return;
+        const toast = document.createElement('div');
+        toast.className = `tn-toast${type === 'error' ? ' is-error' : ''}`;
+        toast.textContent = message;
+        stack.appendChild(toast);
+        window.setTimeout(() => toast.remove(), 4500);
+    }
+
+    function runInlineScripts(root) {
+        root.querySelectorAll('script').forEach((oldScript) => {
+            const script = document.createElement('script');
+            Array.from(oldScript.attributes).forEach((attr) => script.setAttribute(attr.name, attr.value));
+            script.textContent = oldScript.textContent;
+            oldScript.replaceWith(script);
+        });
+    }
+
+    function updateNavigation(url) {
+        const currentPath = new URL(url, window.location.origin).pathname.replace(/\/$/, '');
+        document.querySelectorAll('.tn-side .tn-navitem').forEach((link) => {
+            if (link.getAttribute('href') === '/logout') return;
+            const linkPath = new URL(link.href, window.location.origin).pathname.replace(/\/$/, '');
+            const active = currentPath === linkPath || (linkPath !== '' && currentPath.startsWith(`${linkPath}/`));
+            link.setAttribute('aria-current', active ? 'page' : 'false');
+            link.style.background = active ? '#ffffff' : 'transparent';
+            link.style.color = active ? '#0d9488' : '#61756e';
+        });
+    }
+
+    function applyPage(payload, url, pushState) {
+        const target = content();
+        if (!target || typeof payload.html !== 'string') return false;
+
+        stopMessagePolling();
+        target.innerHTML = payload.html;
+        runInlineScripts(target);
+
+        const title = payload.title || 'TriNova Client Portal';
+        document.title = title;
+        const heading = document.getElementById('portal-page-title');
+        if (heading) heading.textContent = title;
+        updateNavigation(url);
+
+        if (pushState) window.history.pushState({ trinova: true }, '', url);
+        if (payload.flash?.success) showToast(payload.flash.success);
+        if (payload.flash?.error) showToast(payload.flash.error, 'error');
+
+        initialisePage();
+        target.focus({ preventScroll: true });
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+        return true;
+    }
+
+    async function navigate(url, options = {}) {
+        if (state.navigating || !content()) return;
+        setBusy(true);
+        try {
+            const response = await fetch(url, {
+                headers: {
+                    'Accept': 'application/json',
+                    'X-Requested-With': 'XMLHttpRequest',
+                    'X-Trinova-Partial': '1',
+                },
+                credentials: 'same-origin',
+            });
+
+            if (new URL(response.url).pathname.endsWith('/login')) {
+                window.location.assign(response.url);
+                return;
+            }
+
+            const payload = await response.json();
+            if (!response.ok || !payload.success || !applyPage(payload, response.url || url, options.push !== false)) {
+                throw new Error(payload.message || 'Unable to load this page.');
+            }
+        } catch (error) {
+            showToast(error.message || 'Unable to load this page.', 'error');
+            if (options.fallback !== false) window.location.assign(url);
+        } finally {
+            setBusy(false);
+        }
+    }
+
+    function shouldEnhanceLink(link, event) {
+        if (!content() || document.body.dataset.portalAuthenticated !== '1') return false;
+        if (event.defaultPrevented || event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return false;
+        if (link.target || link.hasAttribute('download') || link.dataset.noAjax !== undefined) return false;
+        const url = new URL(link.href, window.location.origin);
+        if (url.origin !== window.location.origin || url.hash) return false;
+        if (url.pathname === '/logout' || url.pathname.includes('/documents/download/')) return false;
+        return true;
+    }
+
+    async function submitAjaxForm(form) {
+        const method = (form.method || 'GET').toUpperCase();
+        if (method === 'GET') {
+            const url = new URL(form.action || window.location.href, window.location.origin);
+            new FormData(form).forEach((value, key) => {
+                if (String(value).trim() !== '') url.searchParams.set(key, value);
+                else url.searchParams.delete(key);
+            });
+            await navigate(url.toString());
+            return;
+        }
+
+        const submitter = form.querySelector('[type="submit"]');
+        const originalLabel = submitter?.textContent;
+        if (submitter) {
+            submitter.disabled = true;
+            submitter.textContent = submitter.dataset.loadingText || 'Working…';
+        }
+
+        try {
+            const response = await fetch(form.action, {
+                method,
+                headers: { 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
+                body: new FormData(form),
+                credentials: 'same-origin',
+            });
+            if (new URL(response.url).pathname.endsWith('/login')) {
+                window.location.assign(response.url);
+                return;
+            }
+            const payload = await response.json();
+            if (!response.ok || payload.success === false) throw new Error(payload.message || 'The operation could not be completed.');
+
+            if (typeof payload.html === 'string') {
+                applyPage(payload, response.url || window.location.href, false);
+                return;
+            }
+
+            showToast(payload.message || 'Saved successfully.');
+            if (form.matches('[data-message-form]')) {
+                const textarea = form.querySelector('textarea[name="body"]');
+                if (textarea) textarea.value = '';
+                await pollMessages(true);
+            } else if (payload.redirect) {
+                await navigate(payload.redirect);
+            } else if (form.dataset.ajaxRefresh !== 'false') {
+                await navigate(window.location.href, { push: false, fallback: false });
+            }
+        } catch (error) {
+            showToast(error.message || 'The operation could not be completed.', 'error');
+        } finally {
+            if (submitter) {
+                submitter.disabled = false;
+                submitter.textContent = originalLabel;
+            }
+        }
+    }
+
+    function messageDateLabel(value) {
+        const date = new Date(value);
+        const today = new Date();
+        const yesterday = new Date(today);
+        yesterday.setDate(today.getDate() - 1);
+        const key = date.toDateString();
+        if (key === today.toDateString()) return 'Today';
+        if (key === yesterday.toDateString()) return 'Yesterday';
+        return new Intl.DateTimeFormat(undefined, { day: 'numeric', month: 'short', year: 'numeric' }).format(date);
+    }
+
+    function appendMessage(stream, message) {
+        if (stream.querySelector(`[data-message-id="${message.id}"]`)) return;
+        const date = new Date(message.created_at);
+        const dayKey = date.toISOString().slice(0, 10);
+        if (stream.dataset.lastDay !== dayKey) {
+            const separator = document.createElement('div');
+            separator.className = 'tn-message-day';
+            separator.textContent = messageDateLabel(message.created_at);
+            stream.appendChild(separator);
+            stream.dataset.lastDay = dayKey;
+        }
+
+        stream.querySelector('[data-empty-thread]')?.remove();
+        const mine = message.sender_role === stream.dataset.currentRole;
+        const bubble = document.createElement('article');
+        bubble.className = `tn-message-bubble ${mine ? 'is-mine' : 'is-theirs'}`;
+        bubble.dataset.messageId = message.id;
+        bubble.dataset.messageDay = dayKey;
+
+        const meta = document.createElement('div');
+        meta.className = 'tn-message-meta';
+        const time = new Intl.DateTimeFormat(undefined, { hour: '2-digit', minute: '2-digit' }).format(date);
+        meta.textContent = `${message.sender_name || 'User'} · ${time}`;
+        meta.title = new Intl.DateTimeFormat(undefined, { dateStyle: 'full', timeStyle: 'short' }).format(date);
+
+        const body = document.createElement('div');
+        body.className = 'tn-message-body';
+        body.textContent = message.body;
+        bubble.append(meta, body);
+        stream.appendChild(bubble);
+    }
+
+    async function pollMessages(forceScroll = false) {
+        const stream = document.querySelector('[data-message-thread]');
+        if (!stream || document.hidden) return;
+        const nearBottom = stream.scrollHeight - stream.scrollTop - stream.clientHeight < 100;
+        const messageNodes = stream.querySelectorAll('[data-message-id]');
+        const last = messageNodes.length ? messageNodes[messageNodes.length - 1].dataset.messageId : '0';
+        const url = new URL(stream.dataset.feedUrl, window.location.origin);
+        url.searchParams.set('after_id', last);
+
+        try {
+            const response = await fetch(url, {
+                headers: { 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
+                credentials: 'same-origin',
+            });
+            const payload = await response.json();
+            if (!response.ok || payload.success === false) return;
+            (payload.messages || []).forEach((message) => appendMessage(stream, message));
+            if (forceScroll || nearBottom) stream.scrollTop = stream.scrollHeight;
+        } catch (_) {
+            // Polling is optional; normal form submission and navigation still work.
+        }
+    }
+
+    function stopMessagePolling() {
+        if (state.messageTimer) window.clearInterval(state.messageTimer);
+        state.messageTimer = null;
+    }
+
+    function initialiseMessages() {
+        stopMessagePolling();
+        const stream = document.querySelector('[data-message-thread]');
+        if (!stream) return;
+        const existing = stream.querySelectorAll('[data-message-day]');
+        if (existing.length) stream.dataset.lastDay = existing[existing.length - 1].dataset.messageDay;
+        stream.scrollTop = stream.scrollHeight;
+        state.messageTimer = window.setInterval(() => pollMessages(false), 7000);
+    }
+
+    function initialisePage() {
+        initialiseMessages();
+    }
+
+    document.addEventListener('click', (event) => {
+        const link = event.target.closest('a[href]');
+        if (!link || !shouldEnhanceLink(link, event)) return;
+        event.preventDefault();
+        navigate(link.href);
+    });
+
+    document.addEventListener('submit', (event) => {
+        const form = event.target;
+        if (!(form instanceof HTMLFormElement) || !form.matches('[data-ajax-form]')) return;
+        event.preventDefault();
+        submitAjaxForm(form);
+    });
+
+    let searchTimer;
+    document.addEventListener('input', (event) => {
+        if (!event.target.matches('[data-ajax-search]')) return;
+        window.clearTimeout(searchTimer);
+        searchTimer = window.setTimeout(() => event.target.form?.requestSubmit(), 350);
+    });
+
+    window.addEventListener('popstate', () => navigate(window.location.href, { push: false }));
+    document.addEventListener('visibilitychange', () => { if (!document.hidden) pollMessages(false); });
+    window.TrinovaPortal = { navigate, showToast, refreshMessages: pollMessages };
+
+    initialisePage();
+})();

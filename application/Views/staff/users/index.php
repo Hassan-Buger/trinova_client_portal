@@ -15,7 +15,7 @@
                 <button onclick="document.getElementById('newUserModal').style.display='none'" style="background:none;border:none;font-size:24px;cursor:pointer;color:#8a9a94">&times;</button>
             </div>
 
-            <form action="/staff/users/create" method="POST">
+            <form action="/staff/users/create" method="POST" data-ajax-form>
                 <input type="hidden" name="csrf_token" value="<?= htmlspecialchars(\Application\Core\Session::csrfToken()) ?>">
                 
                 <div style="margin-bottom:16px">
@@ -90,7 +90,7 @@
                                 <?= $u['last_login_at'] ? date('d M Y, H:i', strtotime($u['last_login_at'])) : 'Never' ?>
                             </td>
                             <td style="padding:16px;text-align:right">
-                                <form action="/staff/users/toggle-status" method="POST" style="margin:0;display:inline-block">
+                                <form action="/staff/users/toggle-status" method="POST" data-ajax-form style="margin:0;display:inline-block">
                                     <input type="hidden" name="csrf_token" value="<?= htmlspecialchars(\Application\Core\Session::csrfToken()) ?>">
                                     <input type="hidden" name="user_id" value="<?= $u['id'] ?>">
                                     <input type="hidden" name="status" value="<?= $u['status'] === 'active' ? 'suspended' : 'active' ?>">

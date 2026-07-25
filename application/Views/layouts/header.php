@@ -9,7 +9,7 @@ $pillOff = 'padding:8px 18px;border-radius:999px;font-weight:700;font-size:13.5p
 ?>
 <header class="tn-topbar" style="display:flex;align-items:center;gap:16px;padding:18px 32px;position:sticky;top:0;background:rgba(238,244,241,.82);backdrop-filter:blur(10px);z-index:5">
     <div style="min-width:0">
-        <h1 class="tn-pagetitle" style="margin:0;font-size:23px;font-weight:800;letter-spacing:-.02em"><?= htmlspecialchars($pageTitle ?? 'Dashboard') ?></h1>
+        <h1 id="portal-page-title" class="tn-pagetitle" style="margin:0;font-size:23px;font-weight:800;letter-spacing:-.02em"><?= htmlspecialchars($pageTitle ?? 'Dashboard') ?></h1>
     </div>
     <div style="flex:1"></div>
     <button style="width:44px;height:44px;border-radius:14px;border:1px solid rgba(20,60,50,.08);background:#fff;display:flex;align-items:center;justify-content:center;cursor:pointer;color:#5f726c;position:relative">

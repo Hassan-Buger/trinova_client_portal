@@ -54,7 +54,7 @@
         <h3 style="margin:0 0 8px;font-size:18px;font-weight:800;color:#213330">Request Detail Update</h3>
         <p style="margin:0 0 16px;color:#61756e;font-size:14px">Need to update your address, phone number, or add a new business? Let our team know below.</p>
 
-        <form action="/client/profile/request-update" method="POST">
+        <form action="/client/profile/request-update" method="POST" data-ajax-form>
             <input type="hidden" name="csrf_token" value="<?= htmlspecialchars(\Application\Core\Session::csrfToken()) ?>">
             <textarea name="update_notes" rows="3" placeholder="e.g. Please update my registered phone number to 07700 900555" required style="width:100%;padding:14px 16px;border:1.5px solid #e0e9e5;border-radius:15px;font-size:14px;background:#fbfdfc;margin-bottom:16px;resize:vertical"></textarea>
             <button type="submit" style="background:#0d9488;color:#fff;border:none;padding:12px 24px;border-radius:14px;font-weight:700;font-size:14px;cursor:pointer">Send Update Request</button>

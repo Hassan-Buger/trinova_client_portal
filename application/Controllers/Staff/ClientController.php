@@ -27,11 +27,20 @@ class ClientController extends Controller
 
     public function index(Request $request, Response $response): void
     {
-        $clients = $this->clientModel->getAllWithUsers();
+        $query = $request->getQueryParams();
+        $search = trim((string) ($query['q'] ?? ''));
+        $page = max(1, (int) ($query['page'] ?? 1));
+        $perPage = (int) ($query['per_page'] ?? 10);
+        if (!in_array($perPage, [10, 20, 50], true)) {
+            $perPage = 10;
+        }
+        $pagination = $this->clientModel->paginate($search, $page, $perPage);
 
         $this->render('staff/clients/index', [
             'pageTitle' => 'Clients Overview',
-            'clients'   => $clients,
+            'clients'   => $pagination['items'],
+            'search' => $search,
+            'pagination' => $pagination,
         ], 'main');
     }
 

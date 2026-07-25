@@ -22,7 +22,7 @@
                     In-depth annual accounts review, tax planning consultation, or business advice session (45 minutes).
                 </p>
             </div>
-            <form action="/client/meetings/book" method="POST" style="margin:0">
+            <form action="/client/meetings/book" method="POST" data-ajax-form style="margin:0">
                 <input type="hidden" name="csrf_token" value="<?= htmlspecialchars(\Application\Core\Session::csrfToken()) ?>">
                 <input type="hidden" name="meeting_type" value="existing_client_meeting">
                 <button type="submit" style="width:100%;background:#0d9488;color:#fff;border:none;padding:14px;border-radius:14px;font-weight:700;font-size:14.5px;cursor:pointer;box-shadow:0 8px 18px -8px rgba(13,148,136,.7)">
@@ -44,7 +44,7 @@
                     Quick phone query regarding payroll, VAT calculation, or urgent accounting question (15 minutes).
                 </p>
             </div>
-            <form action="/client/meetings/book" method="POST" style="margin:0">
+            <form action="/client/meetings/book" method="POST" data-ajax-form style="margin:0">
                 <input type="hidden" name="csrf_token" value="<?= htmlspecialchars(\Application\Core\Session::csrfToken()) ?>">
                 <input type="hidden" name="meeting_type" value="telephone_call">
                 <button type="submit" style="width:100%;background:#ef8f3c;color:#fff;border:none;padding:14px;border-radius:14px;font-weight:700;font-size:14.5px;cursor:pointer;box-shadow:0 8px 16px -8px rgba(239,143,60,.9)">

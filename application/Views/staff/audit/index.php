@@ -8,7 +8,7 @@
 
     <!-- Filter Bar -->
     <div style="background:#fff;border-radius:24px;padding:20px 24px;box-shadow:0 1px 2px rgba(16,54,45,.04),0 14px 34px -24px rgba(16,54,45,.4);margin-bottom:24px">
-        <form action="/staff/audit" method="GET" style="margin:0;display:flex;align-items:center;gap:16px;flex-wrap:wrap">
+        <form action="/staff/audit" method="GET" data-ajax-form style="margin:0;display:flex;align-items:center;gap:16px;flex-wrap:wrap">
             <div>
                 <label style="display:block;font-size:12px;font-weight:700;color:#7d8e88;margin-bottom:4px">Action Type</label>
                 <select name="action" onchange="this.form.submit()" style="padding:10px 14px;border:1.5px solid #e0e9e5;border-radius:12px;font-size:13.5px;background:#fbfdfc">

@@ -15,7 +15,7 @@
                 <button onclick="document.getElementById('newDeadlineModal').style.display='none'" style="background:none;border:none;font-size:24px;cursor:pointer;color:#8a9a94">&times;</button>
             </div>
 
-            <form action="/staff/deadlines/create" method="POST">
+            <form action="/staff/deadlines/create" method="POST" data-ajax-form>
                 <input type="hidden" name="csrf_token" value="<?= htmlspecialchars(\Application\Core\Session::csrfToken()) ?>">
                 
                 <div style="margin-bottom:16px">
@@ -81,7 +81,7 @@
                                     <?= date('d M Y', strtotime($d['due_date'])) ?>
                                 </td>
                                 <td style="padding:16px">
-                                    <form action="/staff/deadlines/update-status" method="POST" style="margin:0;display:inline-block">
+                                    <form action="/staff/deadlines/update-status" method="POST" data-ajax-form style="margin:0;display:inline-block">
                                         <input type="hidden" name="csrf_token" value="<?= htmlspecialchars(\Application\Core\Session::csrfToken()) ?>">
                                         <input type="hidden" name="deadline_id" value="<?= $d['id'] ?>">
                                         <select name="status" onchange="this.form.submit()" style="padding:6px 12px;border-radius:10px;font-size:12.5px;font-weight:700;border:1px solid #e0e9e5;background:#fbfdfc;cursor:pointer">

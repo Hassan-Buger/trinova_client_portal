@@ -7,7 +7,14 @@
             <p style="margin:4px 0 0;color:#61756e;font-size:14px">Manage practice client accounts, AML status, and entity profiles.</p>
         </div>
         <div style="display:flex;align-items:center;gap:12px">
-            <input type="text" id="clientSearch" onkeyup="filterClients()" placeholder="🔍 Search clients..." style="padding:11px 16px;border:1.5px solid #e0e9e5;border-radius:14px;font-size:14px;background:#fff;min-width:240px">
+            <form action="/staff/clients" method="GET" data-ajax-form style="display:flex;align-items:center;gap:8px;margin:0">
+                <input type="search" name="q" value="<?= htmlspecialchars($search ?? '') ?>" data-ajax-search placeholder="Search clients…" aria-label="Search clients" style="padding:11px 16px;border:1.5px solid #e0e9e5;border-radius:14px;font-size:14px;background:#fff;min-width:240px">
+                <select name="per_page" onchange="this.form.requestSubmit()" aria-label="Results per page" style="padding:11px 12px;border:1.5px solid #e0e9e5;border-radius:14px;background:#fff;color:#61756e">
+                    <?php foreach ([10, 20, 50] as $size): ?>
+                        <option value="<?= $size ?>" <?= (int)($pagination['per_page'] ?? 10) === $size ? 'selected' : '' ?>><?= $size ?> / page</option>
+                    <?php endforeach; ?>
+                </select>
+            </form>
             <button onclick="document.getElementById('newClientModal').style.display='flex'" style="background:#0d9488;color:#fff;padding:12px 22px;border-radius:14px;font-weight:700;font-size:14px;cursor:pointer;border:none;box-shadow:0 8px 18px -8px rgba(13,148,136,.7)">+ Create Client Account</button>
         </div>
     </div>
@@ -20,7 +27,7 @@
                 <button onclick="document.getElementById('newClientModal').style.display='none'" style="background:none;border:none;font-size:24px;cursor:pointer;color:#8a9a94">&times;</button>
             </div>
 
-            <form action="/staff/clients/create" method="POST">
+            <form action="/staff/clients/create" method="POST" data-ajax-form>
                 <input type="hidden" name="csrf_token" value="<?= htmlspecialchars(\Application\Core\Session::csrfToken()) ?>">
                 
                 <div style="margin-bottom:16px">
@@ -125,6 +132,9 @@
                 </tr>
             </thead>
             <tbody>
+                <?php if (empty($clients)): ?>
+                    <tr><td colspan="5" style="padding:42px 16px;text-align:center;color:#7d8e88">No clients match the current search.</td></tr>
+                <?php endif; ?>
                 <?php foreach ($clients as $c): ?>
                     <tr class="client-row" id="client-row-<?= $c['id'] ?>" style="border-bottom:1px solid rgba(20,60,50,.06);transition:all .3s ease">
                         <td style="padding:16px;font-weight:700;font-size:15px" class="client-name"><?= htmlspecialchars($c['name']) ?></td>
@@ -146,19 +156,29 @@
                 <?php endforeach; ?>
             </tbody>
         </table>
+        <?php if (($pagination['total'] ?? 0) > 0): ?>
+            <?php
+            $currentPage = (int) $pagination['page'];
+            $totalPages = (int) $pagination['total_pages'];
+            $queryBase = ['q' => $search ?? '', 'per_page' => $pagination['per_page']];
+            ?>
+            <div style="display:flex;align-items:center;justify-content:space-between;padding:14px 16px 8px;gap:12px;flex-wrap:wrap;color:#61756e;font-size:13px">
+                <span>Showing <?= (($currentPage - 1) * $pagination['per_page']) + 1 ?>–<?= min($pagination['total'], $currentPage * $pagination['per_page']) ?> of <?= $pagination['total'] ?> clients</span>
+                <div style="display:flex;gap:8px;align-items:center">
+                    <?php if ($currentPage > 1): ?>
+                        <a href="/staff/clients?<?= http_build_query($queryBase + ['page' => $currentPage - 1]) ?>" style="padding:8px 12px;border-radius:10px;background:#eef4f1;color:#0d9488;font-weight:700">Previous</a>
+                    <?php endif; ?>
+                    <span style="padding:8px 10px;font-weight:700">Page <?= $currentPage ?> of <?= $totalPages ?></span>
+                    <?php if ($currentPage < $totalPages): ?>
+                        <a href="/staff/clients?<?= http_build_query($queryBase + ['page' => $currentPage + 1]) ?>" style="padding:8px 12px;border-radius:10px;background:#eef4f1;color:#0d9488;font-weight:700">Next</a>
+                    <?php endif; ?>
+                </div>
+            </div>
+        <?php endif; ?>
     </div>
 </div>
 
 <script>
-function filterClients() {
-    let input = document.getElementById('clientSearch').value.toLowerCase();
-    let rows = document.querySelectorAll('.client-row');
-    rows.forEach(row => {
-        let text = row.innerText.toLowerCase();
-        row.style.display = text.includes(input) ? '' : 'none';
-    });
-}
-
 function openResetModal(id, name) {
     document.getElementById('reset_client_id').value = id;
     document.getElementById('reset_client_name').innerText = name;

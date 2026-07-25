@@ -84,7 +84,7 @@
                 <button onclick="document.getElementById('addEntityModal').style.display='none'" style="background:none;border:none;font-size:24px;cursor:pointer;color:#8a9a94">&times;</button>
             </div>
 
-            <form action="/staff/clients/add-entity" method="POST">
+            <form action="/staff/clients/add-entity" method="POST" data-ajax-form>
                 <input type="hidden" name="csrf_token" value="<?= htmlspecialchars(\Application\Core\Session::csrfToken()) ?>">
                 <input type="hidden" name="client_id" value="<?= $client['id'] ?>">
 

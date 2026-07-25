@@ -73,8 +73,8 @@ $app->router->post('/activate', [ActivationController::class, 'processActivation
 $app->router->get('/documents/download/{id}', [ClientDocumentController::class, 'download'])->middleware([AuthMiddleware::class, SessionTimeoutMiddleware::class]);
 
 // --- EXPLICIT STAFF CLIENT ACTION ROUTES ---
-$app->router->post('/staff/clients/reset-password', [StaffClientController::class, 'resetPassword'])->middleware([AuthMiddleware::class, SessionTimeoutMiddleware::class, RoleMiddleware::class . ':staff']);
-$app->router->post('/staff/clients/delete', [StaffClientController::class, 'delete'])->middleware([AuthMiddleware::class, SessionTimeoutMiddleware::class, RoleMiddleware::class . ':staff']);
+$app->router->post('/staff/clients/reset-password', [StaffClientController::class, 'resetPassword'])->middleware([AuthMiddleware::class, SessionTimeoutMiddleware::class, RoleMiddleware::class . ':staff', CsrfMiddleware::class]);
+$app->router->post('/staff/clients/delete', [StaffClientController::class, 'delete'])->middleware([AuthMiddleware::class, SessionTimeoutMiddleware::class, RoleMiddleware::class . ':staff', CsrfMiddleware::class]);
 
 // --- SECURED CLIENT ROUTES ---
 $app->router->group([
@@ -88,6 +88,7 @@ $app->router->group([
     $r->get('/documents/trinova', [ClientDocumentController::class, 'trinovaDocs']);
     $r->get('/documents/download/{id}', [ClientDocumentController::class, 'download']);
     $r->get('/messages', [ClientMessageController::class, 'index']);
+    $r->get('/messages/feed', [ClientMessageController::class, 'feed']);
     $r->post('/messages/send', [ClientMessageController::class, 'send'])->middleware([CsrfMiddleware::class]);
     $r->get('/requests', [ClientRequestController::class, 'index']);
     $r->get('/deadlines', [ClientDeadlineController::class, 'index']);
@@ -117,6 +118,7 @@ $app->router->group([
     $r->post('/requests/create', [StaffRequestController::class, 'create'])->middleware([CsrfMiddleware::class]);
     $r->post('/requests/update-status', [StaffRequestController::class, 'updateStatus'])->middleware([CsrfMiddleware::class]);
     $r->get('/messages', [StaffMessageController::class, 'index']);
+    $r->get('/messages/feed', [StaffMessageController::class, 'feed']);
     $r->post('/messages/send', [StaffMessageController::class, 'send'])->middleware([CsrfMiddleware::class]);
     $r->get('/deadlines', [StaffDeadlineController::class, 'index']);
     $r->post('/deadlines/create', [StaffDeadlineController::class, 'create'])->middleware([CsrfMiddleware::class]);
@@ -134,4 +136,4 @@ header('Referrer-Policy: same-origin');
 header('X-XSS-Protection: 1; mode=block');
 
 // Boot application
-$app.run();
+$app->run();
