@@ -7,6 +7,76 @@
         <button onclick="document.getElementById('dispatchModal').style.display='flex'" style="background:#41556f;color:#fff;padding:12px 22px;border-radius:14px;font-weight:700;font-size:14px;cursor:pointer;border:none;box-shadow:0 8px 18px -8px rgba(65,85,111,.7)">+ Dispatch Document to Client</button>
     </div>
 
+    <?php
+    $activeFilterLabels = [];
+    if (($filters['search'] ?? '') !== '') $activeFilterLabels[] = 'Search: ' . $filters['search'];
+    if (!empty($filters['client_id'])) {
+        foreach ($clients as $filterClient) {
+            if ((int)$filterClient['id'] === (int)$filters['client_id']) {
+                $activeFilterLabels[] = 'Client: ' . $filterClient['name'];
+                break;
+            }
+        }
+    }
+    if (($filters['direction'] ?? '') !== '') $activeFilterLabels[] = $filters['direction'] === 'client_upload' ? 'Client uploads' : 'From TriNova';
+    if (($filters['status'] ?? '') !== '') $activeFilterLabels[] = 'Status: ' . $filters['status'];
+    if (($filters['file_type'] ?? '') !== '') $activeFilterLabels[] = 'Type: ' . ucfirst($filters['file_type']);
+    if (($filters['date_from'] ?? '') !== '') $activeFilterLabels[] = 'From: ' . $filters['date_from'];
+    if (($filters['date_to'] ?? '') !== '') $activeFilterLabels[] = 'To: ' . $filters['date_to'];
+    ?>
+
+    <form action="/staff/documents" method="GET" data-ajax-form style="background:#fff;border-radius:22px;padding:18px;margin-bottom:20px;box-shadow:0 1px 2px rgba(16,54,45,.04),0 14px 34px -24px rgba(16,54,45,.3)">
+        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:12px">
+            <input type="search" name="q" value="<?= htmlspecialchars($filters['search'] ?? '') ?>" data-ajax-search placeholder="Search filename, client, description…" aria-label="Search documents" style="padding:11px 14px;border:1.5px solid #e0e9e5;border-radius:13px;background:#fbfdfc;font-size:13.5px">
+            <select name="client_id" onchange="this.form.requestSubmit()" aria-label="Filter by client" style="padding:11px 12px;border:1.5px solid #e0e9e5;border-radius:13px;background:#fbfdfc;color:#3a4d47">
+                <option value="">All clients</option>
+                <?php foreach ($clients as $filterClient): ?>
+                    <option value="<?= (int)$filterClient['id'] ?>" <?= (int)($filters['client_id'] ?? 0) === (int)$filterClient['id'] ? 'selected' : '' ?>><?= htmlspecialchars($filterClient['name']) ?></option>
+                <?php endforeach; ?>
+            </select>
+            <select name="direction" onchange="this.form.requestSubmit()" aria-label="Filter by direction" style="padding:11px 12px;border:1.5px solid #e0e9e5;border-radius:13px;background:#fbfdfc;color:#3a4d47">
+                <option value="">All directions</option>
+                <option value="client_upload" <?= ($filters['direction'] ?? '') === 'client_upload' ? 'selected' : '' ?>>Client uploads</option>
+                <option value="from_trinova" <?= ($filters['direction'] ?? '') === 'from_trinova' ? 'selected' : '' ?>>From TriNova</option>
+            </select>
+            <select name="status" onchange="this.form.requestSubmit()" aria-label="Filter by status" style="padding:11px 12px;border:1.5px solid #e0e9e5;border-radius:13px;background:#fbfdfc;color:#3a4d47">
+                <option value="">All statuses</option>
+                <?php foreach ($statuses as $status): ?>
+                    <option value="<?= htmlspecialchars($status) ?>" <?= ($filters['status'] ?? '') === $status ? 'selected' : '' ?>><?= htmlspecialchars($status) ?></option>
+                <?php endforeach; ?>
+            </select>
+            <select name="file_type" onchange="this.form.requestSubmit()" aria-label="Filter by file type" style="padding:11px 12px;border:1.5px solid #e0e9e5;border-radius:13px;background:#fbfdfc;color:#3a4d47">
+                <option value="">All file types</option>
+                <?php foreach (['pdf' => 'PDF', 'word' => 'Word', 'spreadsheet' => 'Spreadsheet', 'image' => 'Image', 'archive' => 'ZIP archive', 'text' => 'Text', 'other' => 'Other'] as $typeValue => $typeLabel): ?>
+                    <option value="<?= $typeValue ?>" <?= ($filters['file_type'] ?? '') === $typeValue ? 'selected' : '' ?>><?= $typeLabel ?></option>
+                <?php endforeach; ?>
+            </select>
+            <input type="date" name="date_from" value="<?= htmlspecialchars($filters['date_from'] ?? '') ?>" onchange="this.form.requestSubmit()" aria-label="Uploaded from date" title="Uploaded from" style="padding:10px 12px;border:1.5px solid #e0e9e5;border-radius:13px;background:#fbfdfc;color:#3a4d47">
+            <input type="date" name="date_to" value="<?= htmlspecialchars($filters['date_to'] ?? '') ?>" onchange="this.form.requestSubmit()" aria-label="Uploaded to date" title="Uploaded to" style="padding:10px 12px;border:1.5px solid #e0e9e5;border-radius:13px;background:#fbfdfc;color:#3a4d47">
+            <div style="display:flex;gap:8px">
+                <select name="sort" onchange="this.form.requestSubmit()" aria-label="Sort documents" style="flex:1;padding:11px 12px;border:1.5px solid #e0e9e5;border-radius:13px;background:#fbfdfc;color:#3a4d47">
+                    <option value="newest" <?= ($filters['sort'] ?? '') === 'newest' ? 'selected' : '' ?>>Newest first</option>
+                    <option value="oldest" <?= ($filters['sort'] ?? '') === 'oldest' ? 'selected' : '' ?>>Oldest first</option>
+                    <option value="client_asc" <?= ($filters['sort'] ?? '') === 'client_asc' ? 'selected' : '' ?>>Client A–Z</option>
+                    <option value="filename_asc" <?= ($filters['sort'] ?? '') === 'filename_asc' ? 'selected' : '' ?>>Filename A–Z</option>
+                </select>
+                <select name="per_page" onchange="this.form.requestSubmit()" aria-label="Results per page" style="width:105px;padding:11px 9px;border:1.5px solid #e0e9e5;border-radius:13px;background:#fbfdfc;color:#3a4d47">
+                    <?php foreach ([10, 20, 50] as $pageSize): ?>
+                        <option value="<?= $pageSize ?>" <?= (int)($pagination['per_page'] ?? 20) === $pageSize ? 'selected' : '' ?>><?= $pageSize ?> / page</option>
+                    <?php endforeach; ?>
+                </select>
+            </div>
+        </div>
+        <?php if ($activeFilterLabels): ?>
+            <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-top:14px">
+                <?php foreach ($activeFilterLabels as $filterLabel): ?>
+                    <span style="padding:5px 10px;border-radius:999px;background:#e6ecf5;color:#41556f;font-size:11.5px;font-weight:700"><?= htmlspecialchars($filterLabel) ?></span>
+                <?php endforeach; ?>
+                <a href="/staff/documents" style="margin-left:auto;color:#e07d24;font-size:12.5px;font-weight:800">Reset filters</a>
+            </div>
+        <?php endif; ?>
+    </form>
+
     <!-- Dispatch Document Modal -->
     <div id="dispatchModal" style="display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(20,40,35,.45);backdrop-filter:blur(6px);z-index:99;align-items:center;justify-content:center;padding:20px">
         <div style="background:#fff;border-radius:24px;width:100%;max-width:540px;padding:32px;box-shadow:0 24px 60px -28px rgba(0,0,0,.4);animation:tnpop .25s ease">
@@ -49,7 +119,9 @@
     <!-- Documents Table -->
     <div style="background:#fff;border-radius:24px;padding:26px;box-shadow:0 1px 2px rgba(16,54,45,.04),0 14px 34px -24px rgba(16,54,45,.4)">
         <?php if (empty($documents)): ?>
-            <div style="padding:48px 24px;text-align:center;color:#8a9a94">No documents recorded in the repository.</div>
+            <div style="padding:48px 24px;text-align:center;color:#8a9a94">
+                <?= $activeFilterLabels ? 'No documents match the selected filters.' : 'No documents recorded in the repository.' ?>
+            </div>
         <?php else: ?>
             <div style="overflow-x:auto">
                 <table style="width:100%;border-collapse:collapse;text-align:left">
@@ -58,6 +130,7 @@
                             <th style="padding:12px 16px;font-weight:700">Client</th>
                             <th style="padding:12px 16px;font-weight:700">Filename</th>
                             <th style="padding:12px 16px;font-weight:700">Direction</th>
+                            <th style="padding:12px 16px;font-weight:700">Status</th>
                             <th style="padding:12px 16px;font-weight:700">Uploaded By</th>
                             <th style="padding:12px 16px;font-weight:700">Date</th>
                             <th style="padding:12px 16px;font-weight:700;text-align:right">Action</th>
@@ -82,6 +155,12 @@
                                         <span style="padding:4px 10px;border-radius:999px;font-size:11.5px;font-weight:700;background:#e6ecf5;color:#41556f">From TriNova</span>
                                     <?php endif; ?>
                                 </td>
+                                <td style="padding:16px">
+                                    <?php $statusReady = in_array(strtolower((string)$doc['status']), ['ready', 'completed'], true); ?>
+                                    <span style="padding:4px 10px;border-radius:999px;font-size:11.5px;font-weight:700;white-space:nowrap;<?= $statusReady ? 'background:#e2f3ea;color:#3f9d6d' : 'background:#fff8ee;color:#e07d24' ?>">
+                                        <?= htmlspecialchars($doc['status'] ?? 'Ready') ?>
+                                    </span>
+                                </td>
                                 <td style="padding:16px;color:#61756e;font-size:13.5px">
                                     <?= htmlspecialchars($doc['uploaded_by_name'] ?? 'User') ?>
                                 </td>
@@ -97,6 +176,36 @@
                         <?php endforeach; ?>
                     </tbody>
                 </table>
+            </div>
+        <?php endif; ?>
+
+        <?php if (($pagination['total'] ?? 0) > 0): ?>
+            <?php
+            $currentPage = (int)$pagination['page'];
+            $totalPages = (int)$pagination['total_pages'];
+            $documentQuery = array_filter([
+                'q' => $filters['search'] ?? '',
+                'client_id' => $filters['client_id'] ?? 0,
+                'direction' => $filters['direction'] ?? '',
+                'status' => $filters['status'] ?? '',
+                'file_type' => $filters['file_type'] ?? '',
+                'date_from' => $filters['date_from'] ?? '',
+                'date_to' => $filters['date_to'] ?? '',
+                'sort' => $filters['sort'] ?? 'newest',
+                'per_page' => $pagination['per_page'],
+            ], static fn($value) => $value !== '' && $value !== 0);
+            ?>
+            <div style="display:flex;align-items:center;justify-content:space-between;padding-top:18px;margin-top:12px;border-top:1px solid #eef4f1;gap:12px;flex-wrap:wrap;color:#61756e;font-size:13px">
+                <span>Showing <?= (($currentPage - 1) * $pagination['per_page']) + 1 ?>–<?= min($pagination['total'], $currentPage * $pagination['per_page']) ?> of <?= $pagination['total'] ?> documents</span>
+                <div style="display:flex;gap:8px;align-items:center">
+                    <?php if ($currentPage > 1): ?>
+                        <a href="/staff/documents?<?= http_build_query($documentQuery + ['page' => $currentPage - 1]) ?>" style="padding:8px 12px;border-radius:10px;background:#eef4f1;color:#0d9488;font-weight:700">Previous</a>
+                    <?php endif; ?>
+                    <span style="padding:8px 10px;font-weight:700">Page <?= $currentPage ?> of <?= $totalPages ?></span>
+                    <?php if ($currentPage < $totalPages): ?>
+                        <a href="/staff/documents?<?= http_build_query($documentQuery + ['page' => $currentPage + 1]) ?>" style="padding:8px 12px;border-radius:10px;background:#eef4f1;color:#0d9488;font-weight:700">Next</a>
+                    <?php endif; ?>
+                </div>
             </div>
         <?php endif; ?>
     </div>
