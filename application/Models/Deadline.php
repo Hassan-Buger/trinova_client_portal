@@ -18,6 +18,11 @@ class Deadline extends Model
         return $stmt->fetchAll();
     }
 
+    public function getUpcomingByClient(int $clientId): array
+    {
+        return $this->getAllByClient($clientId);
+    }
+
     public function getAllWithDetails(): array
     {
         $stmt = $this->db->prepare("
