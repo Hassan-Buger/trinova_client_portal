@@ -1,11 +1,11 @@
 <div class="tn-screen" style="max-width:1120px">
     <div id="toastSuccess" style="display:none;max-width:1120px;margin-bottom:16px;padding:14px 18px;background:#e2f3ea;color:#3f9d6d;border-radius:16px;font-weight:600;font-size:14px;box-shadow:0 4px 14px rgba(63,157,109,.15);animation:tnpop .3s ease"></div>
 
-    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:22px;flex-wrap:wrap;gap:16px">
+    <div class="tn-client-toolbar" style="display:flex;align-items:center;justify-content:space-between;margin-bottom:22px;flex-wrap:wrap;gap:16px">
         <div>
             <p style="margin:0;color:#61756e;font-size:14px">Manage practice client accounts, AML status, and entity profiles.</p>
         </div>
-        <div style="display:flex;align-items:center;gap:12px">
+        <div class="tn-client-toolbar-actions" style="display:flex;align-items:center;gap:12px">
             <form action="/staff/clients" method="GET" data-ajax-form style="display:flex;align-items:center;gap:8px;margin:0">
                 <input type="search" name="q" value="<?= htmlspecialchars($search ?? '') ?>" data-ajax-search placeholder="Search clients…" aria-label="Search clients" style="padding:11px 16px;border:1.5px solid #e0e9e5;border-radius:14px;font-size:14px;background:#fff;min-width:240px">
                 <select name="per_page" onchange="this.form.requestSubmit()" aria-label="Results per page" style="padding:11px 12px;border:1.5px solid #e0e9e5;border-radius:14px;background:#fff;color:#61756e">
@@ -14,7 +14,7 @@
                     <?php endforeach; ?>
                 </select>
             </form>
-            <button onclick="document.getElementById('newClientModal').style.display='flex'" style="background:#0d9488;color:#fff;padding:12px 22px;border-radius:14px;font-weight:700;font-size:14px;cursor:pointer;border:none;box-shadow:0 8px 18px -8px rgba(13,148,136,.7)">+ Create Client Account</button>
+            <button class="tn-create-client-button" onclick="document.getElementById('newClientModal').style.display='flex'" style="background:#0d9488;color:#fff;padding:12px 22px;border-radius:14px;font-weight:700;font-size:14px;cursor:pointer;border:none;box-shadow:0 8px 18px -8px rgba(13,148,136,.7)">+ Create Client Account</button>
         </div>
     </div>
 
@@ -66,7 +66,7 @@
     </div>
 
     <!-- Clients Table -->
-    <div style="background:#fff;border-radius:24px;padding:12px;box-shadow:0 1px 2px rgba(16,54,45,.04),0 14px 34px -24px rgba(16,54,45,.4)">
+    <div class="tn-client-list" style="background:#fff;border-radius:24px;padding:12px;box-shadow:0 1px 2px rgba(16,54,45,.04),0 14px 34px -24px rgba(16,54,45,.4)">
         <table id="clientsTable" style="width:100%;border-collapse:collapse;text-align:left">
             <thead>
                 <tr style="border-bottom:1px solid rgba(20,60,50,.08);color:#8a9a94;font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.05em">
@@ -79,19 +79,19 @@
             </thead>
             <tbody>
                 <?php if (empty($clients)): ?>
-                    <tr><td colspan="5" style="padding:42px 16px;text-align:center;color:#7d8e88">No clients match the current search.</td></tr>
+                    <tr class="tn-client-empty"><td colspan="5" style="padding:42px 16px;text-align:center;color:#7d8e88">No clients match the current search.</td></tr>
                 <?php endif; ?>
                 <?php foreach ($clients as $c): ?>
                     <tr class="client-row" id="client-row-<?= $c['id'] ?>" style="border-bottom:1px solid rgba(20,60,50,.06);transition:all .3s ease">
-                        <td style="padding:16px;font-weight:700;font-size:15px" class="client-name"><?= htmlspecialchars($c['name']) ?></td>
-                        <td style="padding:16px;color:#61756e;font-size:14px" class="client-email"><?= htmlspecialchars($c['email']) ?></td>
-                        <td style="padding:16px;color:#61756e;font-size:14px"><?= htmlspecialchars($c['phone'] ?? '—') ?></td>
-                        <td style="padding:16px">
+                        <td data-label="Client" style="padding:16px;font-weight:700;font-size:15px" class="client-name"><?= htmlspecialchars($c['name']) ?></td>
+                        <td data-label="Email" style="padding:16px;color:#61756e;font-size:14px" class="client-email"><?= htmlspecialchars($c['email']) ?></td>
+                        <td data-label="Phone" style="padding:16px;color:#61756e;font-size:14px"><?= htmlspecialchars($c['phone'] ?? '—') ?></td>
+                        <td data-label="AML Status" style="padding:16px">
                             <span style="font-size:11.5px;font-weight:700;padding:5px 12px;border-radius:999px;white-space:nowrap;display:inline-block;<?= $c['aml_status'] === 'Complete' ? 'background:#e2f3ea;color:#3f9d6d;' : 'background:#fdecdc;color:#e07d24;' ?>">
                                 <?= htmlspecialchars($c['aml_status']) ?>
                             </span>
                         </td>
-                        <td style="padding:16px;text-align:right">
+                        <td data-label="Action" style="padding:16px;text-align:right">
                             <div style="display:inline-flex;align-items:center;gap:10px">
                                 <a href="/staff/clients/<?= $c['id'] ?>" style="font-weight:700;font-size:13px;color:#0d9488;background:#eef4f1;padding:7px 13px;border-radius:10px">View Profile &rarr;</a>
                             </div>

@@ -64,6 +64,22 @@
             .tn-toast-stack { right:12px;left:12px;bottom:90px; }
             .tn-toast { min-width:0;max-width:none;width:100%; }
             .tn-notification-panel { position:fixed;right:12px;top:70px;width:calc(100vw - 24px); }
+            .tn-client-toolbar { align-items:stretch !important;flex-direction:column; }
+            .tn-client-toolbar-actions { width:100%;flex-wrap:wrap; }
+            .tn-client-toolbar-actions form { width:100%; }
+            .tn-client-toolbar-actions input[type="search"] { min-width:0 !important;flex:1;width:100%; }
+            .tn-client-toolbar-actions select { flex:0 0 108px; }
+            .tn-create-client-button { width:100%; }
+            .tn-client-list { padding:0 !important;background:transparent !important;box-shadow:none !important; }
+            #clientsTable, #clientsTable tbody { display:block;width:100%; }
+            #clientsTable thead { display:none; }
+            #clientsTable .client-row { display:block;background:#fff;border:0 !important;border-radius:20px;margin-bottom:12px;padding:11px 8px;box-shadow:0 10px 28px -24px rgba(16,54,45,.65); }
+            #clientsTable .client-row td { display:grid;grid-template-columns:88px minmax(0,1fr);align-items:center;gap:10px;padding:8px 10px !important;text-align:left !important;overflow-wrap:anywhere; }
+            #clientsTable .client-row td::before { content:attr(data-label);color:#8a9a94;font-size:10.5px;font-weight:800;text-transform:uppercase;letter-spacing:.05em; }
+            #clientsTable .client-row td:last-child > div { display:block !important; }
+            #clientsTable .client-row td:last-child a { display:block;text-align:center;padding:10px 13px !important; }
+            #clientsTable .tn-client-empty { display:block;background:#fff;border-radius:20px; }
+            #clientsTable .tn-client-empty td { display:block !important;width:100%; }
         }
     </style>
 </head>
@@ -108,6 +124,6 @@ $role = \Application\Core\Session::get('role');
     </div>
 <?php endif; ?>
 
-<script src="/assets/js/app.js" defer></script>
+<script src="/assets/js/app.js?v=<?= (int)@filemtime(dirname(__DIR__, 3) . '/public/assets/js/app.js') ?>" defer></script>
 </body>
 </html>
