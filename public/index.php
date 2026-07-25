@@ -100,5 +100,11 @@ $app->router->group([
     $r->get('/users', [StaffUserAdminController::class, 'index']);
 });
 
+// Security response headers
+header('X-Frame-Options: SAMEORIGIN');
+header('X-Content-Type-Options: nosniff');
+header('Referrer-Policy: same-origin');
+header('X-XSS-Protection: 1; mode=block');
+
 // Boot application
 $app->run();
