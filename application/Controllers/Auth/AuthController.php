@@ -49,7 +49,36 @@ class AuthController extends Controller
 
         $user = $this->userModel->findByEmail($email);
 
+        if ($user) {
+            // Check 15-minute account lockout
+            if (!empty($user['locked_until']) && strtotime($user['locked_until']) > time()) {
+                $minsLeft = ceil((strtotime($user['locked_until']) - time()) / 60);
+                AuditService::log('failed_login_locked', 'users', $user['id']);
+                Session::setFlash('error', "Account locked due to 5 failed login attempts. Please try again in {$minsLeft} minutes or reset your password.");
+                $response->redirect('/login');
+                return;
+            }
+
+            // Check if client is pending activation
+            if ($user['status'] === 'pending_activation') {
+                Session::setFlash('error', 'Your account is pending email activation. Please check your welcome email to verify your address and create your password.');
+                $response->redirect('/login');
+                return;
+            }
+        }
+
         if (!$user || !password_verify($password, $user['password_hash'])) {
+            if ($user) {
+                $attempts = $this->userModel->incrementFailedLogin((int)$user['id']);
+                if ($attempts >= 5) {
+                    $lockedUntil = date('Y-m-d H:i:s', strtotime('+15 minutes'));
+                    $this->userModel->lockAccount((int)$user['id'], $lockedUntil);
+                    AuditService::log('account_locked', 'users', $user['id']);
+                    Session::setFlash('error', 'Account locked for 15 minutes due to 5 consecutive failed login attempts.');
+                    $response->redirect('/login');
+                    return;
+                }
+            }
             AuditService::log('failed_login', 'users', $user['id'] ?? null, null);
             Session::setFlash('error', 'Invalid email or password. Please try again.');
             $response->redirect('/login');
@@ -62,6 +91,9 @@ class AuthController extends Controller
             $response->redirect('/login');
             return;
         }
+
+        // Reset failed login counter on success
+        $this->userModel->resetLoginAttempts((int)$user['id']);
 
         // Initialize Session
         Session::start();

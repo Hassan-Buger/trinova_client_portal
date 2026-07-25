@@ -102,6 +102,108 @@ class User extends Model
         return $stmt->execute(['status' => $status, 'id' => $id]);
     }
 
+    public function storeVerificationCode(string $email, string $code, string $expiresAt): bool
+    {
+        $stmt = $this->db->prepare("
+            UPDATE users
+            SET verification_code = :code, verification_code_expires_at = :expires_at
+            WHERE email = :email
+        ");
+        return $stmt->execute([
+            'code'       => $code,
+            'expires_at' => $expiresAt,
+            'email'      => $email,
+        ]);
+    }
+
+    public function findByVerificationCode(string $email, string $code): ?array
+    {
+        $stmt = $this->db->prepare("
+            SELECT * FROM users
+            WHERE email = :email
+              AND verification_code = :code
+              AND verification_code_expires_at > NOW()
+            LIMIT 1
+        ");
+        $stmt->execute(['email' => $email, 'code' => $code]);
+        return $stmt->fetch() ?: null;
+    }
+
+    public function clearVerificationCode(int $id): void
+    {
+        $stmt = $this->db->prepare("
+            UPDATE users
+            SET verification_code = NULL, verification_code_expires_at = NULL
+            WHERE id = :id
+        ");
+        $stmt->execute(['id' => $id]);
+    }
+
+    public function storeActivationToken(int $id, string $token): bool
+    {
+        $stmt = $this->db->prepare("
+            UPDATE users
+            SET activation_token = :token, status = 'pending_activation'
+            WHERE id = :id
+        ");
+        return $stmt->execute(['token' => $token, 'id' => $id]);
+    }
+
+    public function findByActivationToken(string $token): ?array
+    {
+        $stmt = $this->db->prepare("
+            SELECT * FROM users
+            WHERE activation_token = :token
+              AND status = 'pending_activation'
+            LIMIT 1
+        ");
+        $stmt->execute(['token' => $token]);
+        return $stmt->fetch() ?: null;
+    }
+
+    public function activateAccount(int $id, string $passwordHash): bool
+    {
+        $stmt = $this->db->prepare("
+            UPDATE users
+            SET password_hash = :hash, status = 'active', activation_token = NULL
+            WHERE id = :id
+        ");
+        return $stmt->execute(['hash' => $passwordHash, 'id' => $id]);
+    }
+
+    public function incrementFailedLogin(int $id): int
+    {
+        $stmt = $this->db->prepare("
+            UPDATE users
+            SET failed_login_attempts = failed_login_attempts + 1
+            WHERE id = :id
+        ");
+        $stmt->execute(['id' => $id]);
+
+        $user = $this->findById($id);
+        return (int)($user['failed_login_attempts'] ?? 0);
+    }
+
+    public function lockAccount(int $id, string $lockedUntil): void
+    {
+        $stmt = $this->db->prepare("
+            UPDATE users
+            SET locked_until = :locked_until, failed_login_attempts = 0
+            WHERE id = :id
+        ");
+        $stmt->execute(['locked_until' => $lockedUntil, 'id' => $id]);
+    }
+
+    public function resetLoginAttempts(int $id): void
+    {
+        $stmt = $this->db->prepare("
+            UPDATE users
+            SET failed_login_attempts = 0, locked_until = NULL
+            WHERE id = :id
+        ");
+        $stmt->execute(['id' => $id]);
+    }
+
     public function delete(int $id): bool
     {
         $stmt = $this->db->prepare("DELETE FROM users WHERE id = :id");

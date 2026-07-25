@@ -8,6 +8,7 @@ use Application\Core\Response;
 use Application\Core\Session;
 use Application\Models\User;
 use Application\Services\AuditService;
+use Application\Services\NotificationService;
 
 class PasswordResetController extends Controller
 {
@@ -39,64 +40,70 @@ class PasswordResetController extends Controller
 
         $user = $this->userModel->findByEmail($email);
         if ($user) {
-            $token = bin2hex(random_bytes(32));
-            $expiresAt = date('Y-m-d H:i:s', strtotime('+1 hour'));
+            $code = (string) random_int(100000, 999999);
+            $expiresAt = date('Y-m-d H:i:s', strtotime('+15 minutes'));
 
-            $this->userModel->createResetToken($email, $token, $expiresAt);
-            AuditService::log('password_reset_request', 'users', $user['id'], $user['id']);
+            $this->userModel->storeVerificationCode($email, $code, $expiresAt);
+            AuditService::log('password_reset_code_sent', 'users', $user['id'], $user['id']);
+
+            NotificationService::sendVerificationCodeEmail($email, $user['name'], $code);
         }
 
-        // Always show success message to prevent user enumeration
-        Session::setFlash('success', 'If an account exists for that email, a secure reset link has been generated.');
-        $response->redirect('/password/reset');
+        Session::setFlash('success', 'A 6-digit verification code has been dispatched to your email address.');
+        $response->redirect('/password/verify?email=' . urlencode($email));
     }
 
-    public function showResetConfirm(Request $request, Response $response, string $token): void
+    public function showVerifyForm(Request $request, Response $response): void
     {
-        $user = $this->userModel->findByResetToken($token);
+        $email = strtolower(trim($request->input('email') ?? ''));
 
-        if (!$user) {
-            Session::setFlash('error', 'Invalid or expired password reset link.');
-            $response->redirect('/login');
-            return;
-        }
-
-        $this->render('auth/reset-confirm', [
-            'pageTitle' => 'Set New Password — TriNova Portal',
-            'token'     => $token,
+        $this->render('auth/verify-code', [
+            'pageTitle' => 'Enter Verification Code — TriNova Portal',
+            'email'     => $email,
             'error'     => Session::getFlash('error'),
+            'success'   => Session::getFlash('success'),
         ], 'main');
     }
 
-    public function processReset(Request $request, Response $response): void
+    public function processCodeVerify(Request $request, Response $response): void
     {
-        $token = $request->input('token') ?? '';
-        $password = $request->input('password') ?? '';
+        $email           = strtolower(trim($request->input('email') ?? ''));
+        $code            = trim($request->input('code') ?? '');
+        $password        = $request->input('password') ?? '';
         $passwordConfirm = $request->input('password_confirm') ?? '';
+
+        if (empty($email) || empty($code)) {
+            Session::setFlash('error', 'Email address and 6-digit verification code are required.');
+            $response->redirect('/password/verify?email=' . urlencode($email));
+            return;
+        }
 
         if (empty($password) || strlen($password) < 8) {
             Session::setFlash('error', 'Password must be at least 8 characters long.');
-            $response->redirect("/password/reset/{$token}");
+            $response->redirect('/password/verify?email=' . urlencode($email));
             return;
         }
 
         if ($password !== $passwordConfirm) {
             Session::setFlash('error', 'Passwords do not match.');
-            $response->redirect("/password/reset/{$token}");
+            $response->redirect('/password/verify?email=' . urlencode($email));
             return;
         }
 
-        $user = $this->userModel->findByResetToken($token);
+        $user = $this->userModel->findByVerificationCode($email, $code);
         if (!$user) {
-            Session::setFlash('error', 'Invalid or expired password reset token.');
-            $response->redirect('/login');
+            Session::setFlash('error', 'Invalid or expired 6-digit verification code. Please request a new code.');
+            $response->redirect('/password/verify?email=' . urlencode($email));
             return;
         }
 
-        $hash = password_hash($password, PASSWORD_ARGON2ID);
-        $this->userModel->updatePassword($user['id'], $hash);
+        $hash = password_hash($password, PASSWORD_BCRYPT);
+        $this->userModel->updatePassword((int)$user['id'], $hash);
+        $this->userModel->clearVerificationCode((int)$user['id']);
+        $this->userModel->resetLoginAttempts((int)$user['id']);
 
         AuditService::log('password_reset_complete', 'users', $user['id'], $user['id']);
+        NotificationService::sendPasswordChangedAlert($user['email'], $user['name']);
 
         Session::setFlash('success', 'Your password has been reset successfully. Please sign in with your new password.');
         $response->redirect('/login');

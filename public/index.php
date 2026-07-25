@@ -13,6 +13,7 @@ use Application\Middleware\RoleMiddleware;
 use Application\Middleware\SessionTimeoutMiddleware;
 use Application\Controllers\Auth\AuthController;
 use Application\Controllers\Auth\PasswordResetController;
+use Application\Controllers\Auth\ActivationController;
 use Application\Controllers\Client\DashboardController as ClientDashboardController;
 use Application\Controllers\Client\DocumentController as ClientDocumentController;
 use Application\Controllers\Client\MessageController as ClientMessageController;
@@ -54,8 +55,11 @@ $app->router->get('/logout', [AuthController::class, 'logout']);
 
 $app->router->get('/password/reset', [PasswordResetController::class, 'showRequestForm']);
 $app->router->post('/password/reset', [PasswordResetController::class, 'sendResetLink'])->middleware([CsrfMiddleware::class]);
-$app->router->get('/password/reset/{token}', [PasswordResetController::class, 'showResetConfirm']);
-$app->router->post('/password/reset/confirm', [PasswordResetController::class, 'processReset'])->middleware([CsrfMiddleware::class]);
+$app->router->get('/password/verify', [PasswordResetController::class, 'showVerifyForm']);
+$app->router->post('/password/verify', [PasswordResetController::class, 'processCodeVerify'])->middleware([CsrfMiddleware::class]);
+
+$app->router->get('/activate', [ActivationController::class, 'showActivationForm']);
+$app->router->post('/activate', [ActivationController::class, 'processActivation'])->middleware([CsrfMiddleware::class]);
 
 // --- SHARED DOWNLOAD ROUTE (accessible by all authenticated users: staff & clients) ---
 $app->router->get('/documents/download/{id}', [ClientDocumentController::class, 'download'])->middleware([AuthMiddleware::class, SessionTimeoutMiddleware::class]);

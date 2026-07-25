@@ -90,14 +90,17 @@ class ClientController extends Controller
             return;
         }
 
-        $hash = password_hash('password123', PASSWORD_BCRYPT);
+        $dummyHash = password_hash(bin2hex(random_bytes(16)), PASSWORD_BCRYPT);
         $userId = $userModel->create([
             'name'          => $name,
             'email'         => $email,
-            'password_hash' => $hash,
+            'password_hash' => $dummyHash,
             'role'          => 'client',
-            'status'        => 'active',
+            'status'        => 'pending_activation',
         ]);
+
+        $activationToken = bin2hex(random_bytes(32));
+        $userModel->storeActivationToken($userId, $activationToken);
 
         $clientId = $this->clientModel->create([
             'user_id'    => $userId,
@@ -106,9 +109,13 @@ class ClientController extends Controller
             'aml_status' => $aml,
         ]);
 
+        $appUrl = \Application\Config\App::get('url', 'https://white-bison-201906.hostingersite.com');
+        $activationLink = rtrim($appUrl, '/') . '/activate?token=' . urlencode($activationToken);
+
         \Application\Services\AuditService::log('client_created', 'clients', $clientId);
-        \Application\Services\NotificationService::sendPromptEmail($email, 'Welcome to TriNova Client Portal', "Your client account has been created. Default password: password123");
-        \Application\Core\Session::setFlash('success', "Client account '{$name}' created successfully.");
+        \Application\Services\NotificationService::sendWelcomeActivationEmail($email, $name, $activationLink);
+
+        \Application\Core\Session::setFlash('success', "Client account for '{$name}' created! A welcome activation email has been dispatched.");
         $response->redirect('/staff/clients');
     }
 
