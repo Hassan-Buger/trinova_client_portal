@@ -18,4 +18,11 @@ class Message extends Model
         $row = $stmt->fetch();
         return (int) ($row['total'] ?? 0);
     }
+
+    public function getTotalUnreadCountForStaff(): int
+    {
+        $stmt = $this->db->query("SELECT COUNT(*) AS total FROM messages WHERE read_at IS NULL");
+        $row = $stmt->fetch();
+        return (int) ($row['total'] ?? 0);
+    }
 }

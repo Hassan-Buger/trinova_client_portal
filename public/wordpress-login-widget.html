@@ -1,0 +1,106 @@
+<!-- 
+  TriNova Client Portal - WordPress Integration Widget 
+  Copy and paste this HTML/CSS snippet into your WordPress page, header, or HTML widget area.
+-->
+
+<style>
+.trinova-portal-widget-card {
+    font-family: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
+    background: #ffffff;
+    border: 1px solid rgba(20, 60, 50, 0.08);
+    border-radius: 20px;
+    padding: 28px;
+    box-shadow: 0 10px 30px -10px rgba(16, 54, 45, 0.08);
+    max-width: 420px;
+    margin: 20px auto;
+    text-align: center;
+}
+
+.trinova-portal-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    background: #dff1ee;
+    color: #0d9488;
+    font-weight: 700;
+    font-size: 12px;
+    padding: 4px 12px;
+    border-radius: 999px;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    margin-bottom: 12px;
+}
+
+.trinova-portal-title {
+    font-size: 22px;
+    font-weight: 800;
+    color: #213330;
+    margin: 0 0 8px 0;
+    letter-spacing: -0.02em;
+}
+
+.trinova-portal-desc {
+    color: #61756e;
+    font-size: 14px;
+    margin: 0 0 20px 0;
+    line-height: 1.5;
+}
+
+.trinova-portal-btn-primary {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    width: 100%;
+    background: #0d9488;
+    color: #ffffff !important;
+    text-decoration: none !important;
+    font-weight: 700;
+    font-size: 15px;
+    padding: 14px 20px;
+    border-radius: 14px;
+    transition: all 0.2s ease;
+    box-shadow: 0 4px 14px rgba(13, 148, 136, 0.25);
+}
+
+.trinova-portal-btn-primary:hover {
+    background: #0f766e;
+    transform: translateY(-1px);
+    box-shadow: 0 6px 18px rgba(13, 148, 136, 0.35);
+}
+
+.trinova-portal-footer-text {
+    margin-top: 14px;
+    font-size: 12.5px;
+    color: #8a9a94;
+}
+
+.trinova-portal-footer-text a {
+    color: #0d9488;
+    text-decoration: underline;
+}
+</style>
+
+<div class="trinova-portal-widget-card">
+    <div class="trinova-portal-badge">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+            <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
+            <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
+        </svg>
+        Secure Access
+    </div>
+    <h3 class="trinova-portal-title">TriNova Client Portal</h3>
+    <p class="trinova-portal-desc">Upload documents securely, view compliance deadlines, and communicate directly with our accounting team.</p>
+    
+    <a href="/login" class="trinova-portal-btn-primary" target="_blank" rel="noopener">
+        <span>Access Client Portal</span>
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+            <line x1="5" y1="12" x2="19" y2="12"></line>
+            <polyline points="12 5 19 12 12 19"></polyline>
+        </svg>
+    </a>
+    
+    <div class="trinova-portal-footer-text">
+        Need help logging in? <a href="mailto:support@trinova.co.uk">Contact Support</a>
+    </div>
+</div>

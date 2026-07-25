@@ -29,4 +29,11 @@ class Document extends Model
         ]);
         return $stmt->fetchAll();
     }
+
+    public function getRecentCount(): int
+    {
+        $stmt = $this->db->query("SELECT COUNT(*) AS total FROM documents");
+        $row = $stmt->fetch();
+        return (int) ($row['total'] ?? 0);
+    }
 }

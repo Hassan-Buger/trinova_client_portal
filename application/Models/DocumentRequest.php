@@ -17,4 +17,15 @@ class DocumentRequest extends Model
         $stmt->execute(['client_id' => $clientId]);
         return $stmt->fetchAll();
     }
+
+    public function getOverdueCount(): int
+    {
+        $stmt = $this->db->query("
+            SELECT COUNT(*) AS total 
+            FROM document_requests 
+            WHERE due_date < CURDATE() AND status != 'Completed'
+        ");
+        $row = $stmt->fetch();
+        return (int) ($row['total'] ?? 0);
+    }
 }

@@ -44,4 +44,15 @@ class Client extends Model
         $stmt->execute();
         return $stmt->fetchAll();
     }
+
+    public function getAmlActionRequiredCount(): int
+    {
+        $stmt = $this->db->query("
+            SELECT COUNT(*) AS total 
+            FROM clients 
+            WHERE aml_status = 'Action Required'
+        ");
+        $row = $stmt->fetch();
+        return (int) ($row['total'] ?? 0);
+    }
 }
