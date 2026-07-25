@@ -119,6 +119,10 @@ class ClientController extends Controller
         $newPassword = trim($body['new_password'] ?? '');
 
         if ($clientId <= 0 || empty($newPassword)) {
+            if ($request->isAjax()) {
+                $response->json(['success' => false, 'message' => 'Client ID and new password are required.'], 400);
+                return;
+            }
             \Application\Core\Session::setFlash('error', 'Client ID and new password are required.');
             $response->redirect('/staff/clients');
             return;
@@ -126,6 +130,10 @@ class ClientController extends Controller
 
         $client = $this->clientModel->findById($clientId);
         if (!$client) {
+            if ($request->isAjax()) {
+                $response->json(['success' => false, 'message' => 'Client account not found.'], 404);
+                return;
+            }
             \Application\Core\Session::setFlash('error', 'Client not found.');
             $response->redirect('/staff/clients');
             return;
@@ -136,7 +144,14 @@ class ClientController extends Controller
         $userModel->updatePassword((int)$client['user_id'], $hash);
 
         \Application\Services\AuditService::log('staff_reset_client_password', 'users', $client['user_id']);
-        \Application\Core\Session::setFlash('success', "Password for client '{$client['name']}' reset successfully.");
+        
+        $msg = "Password for client '{$client['name']}' updated successfully.";
+        if ($request->isAjax()) {
+            $response->json(['success' => true, 'message' => $msg]);
+            return;
+        }
+
+        \Application\Core\Session::setFlash('success', $msg);
         $response->redirect('/staff/clients/' . $clientId);
     }
 
@@ -146,6 +161,10 @@ class ClientController extends Controller
         $clientId = (int)($body['client_id'] ?? 0);
 
         if ($clientId <= 0) {
+            if ($request->isAjax()) {
+                $response->json(['success' => false, 'message' => 'Invalid client ID.'], 400);
+                return;
+            }
             \Application\Core\Session::setFlash('error', 'Invalid client ID.');
             $response->redirect('/staff/clients');
             return;
@@ -156,7 +175,13 @@ class ClientController extends Controller
             $name = $client['name'];
             $this->clientModel->delete($clientId);
             \Application\Services\AuditService::log('client_deleted', 'clients', $clientId);
-            \Application\Core\Session::setFlash('success', "Client account '{$name}' removed successfully.");
+
+            $msg = "Client account '{$name}' removed successfully.";
+            if ($request->isAjax()) {
+                $response->json(['success' => true, 'message' => $msg]);
+                return;
+            }
+            \Application\Core\Session::setFlash('success', $msg);
         }
 
         $response->redirect('/staff/clients');

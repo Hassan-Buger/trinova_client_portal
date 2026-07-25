@@ -57,8 +57,12 @@ $app->router->post('/password/reset', [PasswordResetController::class, 'sendRese
 $app->router->get('/password/reset/{token}', [PasswordResetController::class, 'showResetConfirm']);
 $app->router->post('/password/reset/confirm', [PasswordResetController::class, 'processReset'])->middleware([CsrfMiddleware::class]);
 
-// --- SHARED SECURED FILE STREAMING ROUTE ---
+// --- SHARED DOWNLOAD ROUTE (accessible by all authenticated users: staff & clients) ---
 $app->router->get('/documents/download/{id}', [ClientDocumentController::class, 'download'])->middleware([AuthMiddleware::class, SessionTimeoutMiddleware::class]);
+
+// --- EXPLICIT STAFF CLIENT ACTION ROUTES ---
+$app->router->post('/staff/clients/reset-password', [StaffClientController::class, 'resetPassword'])->middleware([AuthMiddleware::class, SessionTimeoutMiddleware::class, RoleMiddleware::class . ':staff']);
+$app->router->post('/staff/clients/delete', [StaffClientController::class, 'delete'])->middleware([AuthMiddleware::class, SessionTimeoutMiddleware::class, RoleMiddleware::class . ':staff']);
 
 // --- SECURED CLIENT ROUTES ---
 $app->router->group([
