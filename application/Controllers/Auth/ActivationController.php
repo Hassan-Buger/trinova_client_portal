@@ -21,7 +21,7 @@ class ActivationController extends Controller
 
     public function showActivationForm(Request $request, Response $response): void
     {
-        $token = trim($request->input('token') ?? '');
+        $token = trim($request->input('token') ?? $_GET['token'] ?? '');
 
         if (empty($token)) {
             Session::setFlash('error', 'Invalid activation link.');
@@ -48,7 +48,7 @@ class ActivationController extends Controller
 
     public function processActivation(Request $request, Response $response): void
     {
-        $token           = trim($request->input('token') ?? '');
+        $token           = trim($request->input('token') ?? $_POST['token'] ?? $_GET['token'] ?? '');
         $password        = $request->input('password') ?? '';
         $passwordConfirm = $request->input('password_confirm') ?? '';
 

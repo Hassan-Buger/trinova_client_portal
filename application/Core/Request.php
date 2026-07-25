@@ -16,6 +16,14 @@ class Request
         if ($position !== false) {
             $uri = substr($uri, 0, $position);
         }
+
+        $uri = rawurldecode($uri);
+        $scriptName = $_SERVER['SCRIPT_NAME'] ?? '';
+        $scriptDir = str_replace('\\', '/', dirname($scriptName));
+        if ($scriptDir !== '/' && $scriptDir !== '.' && strpos($uri, $scriptDir) === 0) {
+            $uri = substr($uri, strlen($scriptDir));
+        }
+
         return rtrim($uri, '/') ?: '/';
     }
 
