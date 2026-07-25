@@ -127,7 +127,7 @@
                         <td style="padding:16px;color:#61756e;font-size:14px" class="client-email"><?= htmlspecialchars($c['email']) ?></td>
                         <td style="padding:16px;color:#61756e;font-size:14px"><?= htmlspecialchars($c['phone'] ?? '—') ?></td>
                         <td style="padding:16px">
-                            <span style="font-size:11.5px;font-weight:700;padding:5px 12px;border-radius:999px;<?= $c['aml_status'] === 'Complete' ? 'background:#e2f3ea;color:#3f9d6d;' : 'background:#fdecdc;color:#e07d24;' ?>">
+                            <span style="font-size:11.5px;font-weight:700;padding:5px 12px;border-radius:999px;white-space:nowrap;display:inline-block;<?= $c['aml_status'] === 'Complete' ? 'background:#e2f3ea;color:#3f9d6d;' : 'background:#fdecdc;color:#e07d24;' ?>">
                                 <?= htmlspecialchars($c['aml_status']) ?>
                             </span>
                         </td>

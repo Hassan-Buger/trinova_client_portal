@@ -30,6 +30,19 @@ class Document extends Model
         return $stmt->fetchAll();
     }
 
+    public function getByClientId(int $clientId): array
+    {
+        $stmt = $this->db->prepare("
+            SELECT d.*, u.name AS uploaded_by_name, u.role AS uploaded_by_role
+            FROM documents d
+            LEFT JOIN users u ON u.id = d.uploaded_by_user_id
+            WHERE d.client_id = :client_id
+            ORDER BY d.created_at DESC
+        ");
+        $stmt->execute(['client_id' => $clientId]);
+        return $stmt->fetchAll();
+    }
+
     public function getRecentCount(): int
     {
         $stmt = $this->db->query("SELECT COUNT(*) AS total FROM documents");
