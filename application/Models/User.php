@@ -72,4 +72,33 @@ class User extends Model
         $stmt->execute();
         return $stmt->fetchAll();
     }
+
+    public function getAll(): array
+    {
+        $stmt = $this->db->prepare("SELECT id, name, email, role, status, created_at, last_login_at FROM users ORDER BY role ASC, name ASC");
+        $stmt->execute();
+        return $stmt->fetchAll();
+    }
+
+    public function create(array $data): int
+    {
+        $stmt = $this->db->prepare("
+            INSERT INTO users (name, email, password_hash, role, status)
+            VALUES (:name, :email, :password_hash, :role, :status)
+        ");
+        $stmt->execute([
+            'name'          => $data['name'],
+            'email'         => $data['email'],
+            'password_hash' => $data['password_hash'],
+            'role'          => $data['role'] ?? 'client',
+            'status'        => $data['status'] ?? 'active',
+        ]);
+        return (int) $this->db->lastInsertId();
+    }
+
+    public function updateStatus(int $id, string $status): bool
+    {
+        $stmt = $this->db->prepare("UPDATE users SET status = :status WHERE id = :id");
+        return $stmt->execute(['status' => $status, 'id' => $id]);
+    }
 }

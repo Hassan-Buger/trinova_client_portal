@@ -8,7 +8,8 @@ $nav = [
     ['href' => '/staff/messages', 'label' => 'Messages', 'icon' => 'chat'],
     ['href' => '/staff/requests', 'label' => 'Requests', 'icon' => 'upload'],
     ['href' => '/staff/deadlines', 'label' => 'Deadlines', 'icon' => 'cal'],
-    ['href' => '/staff/users', 'label' => 'Settings', 'icon' => 'shield'],
+    ['href' => '/staff/audit', 'label' => 'Audit Log', 'icon' => 'shield'],
+    ['href' => '/staff/users', 'label' => 'User Admin', 'icon' => 'user'],
 ];
 
 function renderStaffIcon(string $ic): string {

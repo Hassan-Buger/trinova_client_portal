@@ -44,4 +44,31 @@ class Client extends Model
         $stmt->execute();
         return $stmt->fetchAll();
     }
+
+    public function getAmlActionRequiredCount(): int
+    {
+        $stmt = $this->db->query("
+            SELECT COUNT(*) AS total 
+            FROM clients 
+            WHERE aml_status = 'Action Required'
+        ");
+        $row = $stmt->fetch();
+        return (int) ($row['total'] ?? 0);
+    }
+
+    public function create(array $data): int
+    {
+        $stmt = $this->db->prepare("
+            INSERT INTO clients (user_id, phone, address, aml_status, notes)
+            VALUES (:user_id, :phone, :address, :aml_status, :notes)
+        ");
+        $stmt->execute([
+            'user_id'    => $data['user_id'],
+            'phone'      => $data['phone'] ?? null,
+            'address'    => $data['address'] ?? null,
+            'aml_status' => $data['aml_status'] ?? 'Action Required',
+            'notes'      => $data['notes'] ?? null,
+        ]);
+        return (int) $this->db->lastInsertId();
+    }
 }

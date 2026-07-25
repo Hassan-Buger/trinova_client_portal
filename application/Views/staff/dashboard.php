@@ -27,19 +27,19 @@
     <!-- Staff Stat Grid -->
     <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:16px;margin-bottom:24px">
         <div style="background:#fff;border-radius:22px;padding:22px;box-shadow:0 1px 2px rgba(16,54,45,.04),0 14px 34px -24px rgba(16,54,45,.4)">
-            <div style="font-size:32px;font-weight:800;letter-spacing:-.02em">14</div>
+            <div style="font-size:32px;font-weight:800;letter-spacing:-.02em"><?= (int)($recentUploadsCount ?? 0) ?></div>
             <div style="color:#61756e;font-size:13.5px;font-weight:600;margin-top:2px">Recent uploads</div>
         </div>
         <div style="background:#fff;border-radius:22px;padding:22px;box-shadow:0 1px 2px rgba(16,54,45,.04),0 14px 34px -24px rgba(16,54,45,.4)">
-            <div style="font-size:32px;font-weight:800;letter-spacing:-.02em">3</div>
+            <div style="font-size:32px;font-weight:800;letter-spacing:-.02em"><?= (int)($unreadMessagesCount ?? 0) ?></div>
             <div style="color:#61756e;font-size:13.5px;font-weight:600;margin-top:2px">Unread messages</div>
         </div>
         <div style="background:#fff;border-radius:22px;padding:22px;box-shadow:0 1px 2px rgba(16,54,45,.04),0 14px 34px -24px rgba(16,54,45,.4)">
-            <div style="font-size:32px;font-weight:800;letter-spacing:-.02em;color:#e07d24">5</div>
+            <div style="font-size:32px;font-weight:800;letter-spacing:-.02em;color:#e07d24"><?= (int)($overdueRequestsCount ?? 0) ?></div>
             <div style="color:#61756e;font-size:13.5px;font-weight:600;margin-top:2px">Overdue requests</div>
         </div>
         <div style="background:#fff;border-radius:22px;padding:22px;box-shadow:0 1px 2px rgba(16,54,45,.04),0 14px 34px -24px rgba(16,54,45,.4)">
-            <div style="font-size:32px;font-weight:800;letter-spacing:-.02em;color:#e07d24">2</div>
+            <div style="font-size:32px;font-weight:800;letter-spacing:-.02em;color:#e07d24"><?= (int)($amlActionCount ?? 0) ?></div>
             <div style="color:#61756e;font-size:13.5px;font-weight:600;margin-top:2px">AML actions</div>
         </div>
     </div>

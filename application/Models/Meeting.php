@@ -17,4 +17,18 @@ class Meeting extends Model
         $stmt->execute(['client_id' => $clientId]);
         return $stmt->fetchAll();
     }
+
+    public function create(array $data): int
+    {
+        $stmt = $this->db->prepare("
+            INSERT INTO meetings (client_id, type, external_booking_reference)
+            VALUES (:client_id, :type, :external_booking_reference)
+        ");
+        $stmt->execute([
+            'client_id'                  => $data['client_id'],
+            'type'                       => $data['type'],
+            'external_booking_reference' => $data['external_booking_reference'] ?? null,
+        ]);
+        return (int) $this->db->lastInsertId();
+    }
 }

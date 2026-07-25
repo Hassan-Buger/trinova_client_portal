@@ -21,28 +21,104 @@ class DocumentController extends Controller
 
     public function showUpload(Request $request, Response $response): void
     {
-        $this->render('client/stub', [
-            'pageTitle'   => 'Upload Documents',
-            'featureName' => 'Document Uploads',
-            'description' => 'Drag-and-drop file upload with plain-text description field will be built in the Sunday Phase.'
+        $this->render('client/documents/upload', [
+            'pageTitle' => 'Upload Documents',
         ], 'main');
+    }
+
+    public function processUpload(Request $request, Response $response): void
+    {
+        $clientId = Session::get('client_id');
+        $userId   = Session::get('user_id');
+
+        if (!$clientId || !$userId) {
+            Session::setFlash('error', 'Session expired. Please log in again.');
+            $response->redirect('/login');
+            return;
+        }
+
+        if (empty($_FILES['file']['name'])) {
+            Session::setFlash('error', 'Please select a file to upload.');
+            $response->redirect('/client/documents/upload');
+            return;
+        }
+
+        $file        = $_FILES['file'];
+        $filename    = basename($file['name']);
+        $description = trim($request->getBody()['description'] ?? '');
+        $requestId   = (int)($request->getBody()['request_id'] ?? 0);
+
+        // Validation: File size limit 25MB
+        if ($file['size'] > 25 * 1024 * 1024) {
+            Session::setFlash('error', 'File size exceeds maximum allowed limit (25MB).');
+            $response->redirect('/client/documents/upload');
+            return;
+        }
+
+        // Extension check
+        $ext = strtolower(pathinfo($filename, PATHINFO_EXTENSION));
+        $allowed = ['pdf', 'doc', 'docx', 'xls', 'xlsx', 'csv', 'png', 'jpg', 'jpeg', 'zip', 'txt'];
+        if (!in_array($ext, $allowed, true)) {
+            Session::setFlash('error', 'Disallowed file type. Allowed formats: PDF, DOC, XLS, CSV, Images, ZIP.');
+            $response->redirect('/client/documents/upload');
+            return;
+        }
+
+        $targetDir = App::get('storage_dir') . '/uploads';
+        if (!is_dir($targetDir)) {
+            mkdir($targetDir, 0755, true);
+        }
+
+        $storedName = bin2hex(random_bytes(16)) . '.' . $ext;
+        $targetFile = $targetDir . '/' . $storedName;
+
+        if (!move_uploaded_file($file['tmp_name'], $targetFile)) {
+            Session::setFlash('error', 'Failed to store uploaded file. Please try again.');
+            $response->redirect('/client/documents/upload');
+            return;
+        }
+
+        $docId = $this->documentModel->create([
+            'client_id'           => $clientId,
+            'uploaded_by_user_id' => $userId,
+            'direction'           => 'client_upload',
+            'filename'            => $filename,
+            'stored_path'         => $storedName,
+            'description'        => $description,
+            'status'              => 'Uploaded',
+        ]);
+
+        AuditService::log('upload', 'documents', $docId);
+
+        // If tied to a document request, update status to Uploaded
+        if ($requestId > 0) {
+            $reqModel = new \Application\Models\DocumentRequest();
+            $reqModel->updateStatus($requestId, 'Uploaded');
+        }
+
+        Session::setFlash('success', "Document '{$filename}' uploaded successfully!");
+        $response->redirect('/client/documents/my-uploads');
     }
 
     public function myUploads(Request $request, Response $response): void
     {
-        $this->render('client/stub', [
-            'pageTitle'   => 'My Uploads',
-            'featureName' => 'Upload History',
-            'description' => 'Client upload history and document status tracking will be built in the Sunday Phase.'
+        $clientId = Session::get('client_id');
+        $documents = $clientId ? $this->documentModel->getByClientAndDirection($clientId, 'client_upload') : [];
+
+        $this->render('client/documents/my-uploads', [
+            'pageTitle' => 'My Uploads',
+            'documents' => $documents,
         ], 'main');
     }
 
     public function trinovaDocs(Request $request, Response $response): void
     {
-        $this->render('client/stub', [
-            'pageTitle'   => 'Documents from TriNova',
-            'featureName' => 'TriNova Documents',
-            'description' => 'Shared documents from TriNova team with secure download links will be built in the Sunday Phase.'
+        $clientId = Session::get('client_id');
+        $documents = $clientId ? $this->documentModel->getByClientAndDirection($clientId, 'from_trinova') : [];
+
+        $this->render('client/documents/trinova-docs', [
+            'pageTitle' => 'Documents from TriNova',
+            'documents' => $documents,
         ], 'main');
     }
 
