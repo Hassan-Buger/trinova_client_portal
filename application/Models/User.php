@@ -173,35 +173,47 @@ class User extends Model
 
     public function incrementFailedLogin(int $id): int
     {
-        $stmt = $this->db->prepare("
-            UPDATE users
-            SET failed_login_attempts = failed_login_attempts + 1
-            WHERE id = :id
-        ");
-        $stmt->execute(['id' => $id]);
+        try {
+            $stmt = $this->db->prepare("
+                UPDATE users
+                SET failed_login_attempts = failed_login_attempts + 1
+                WHERE id = :id
+            ");
+            $stmt->execute(['id' => $id]);
 
-        $user = $this->findById($id);
-        return (int)($user['failed_login_attempts'] ?? 0);
+            $user = $this->findById($id);
+            return (int)($user['failed_login_attempts'] ?? 0);
+        } catch (\Throwable $e) {
+            return 0;
+        }
     }
 
     public function lockAccount(int $id, string $lockedUntil): void
     {
-        $stmt = $this->db->prepare("
-            UPDATE users
-            SET locked_until = :locked_until, failed_login_attempts = 0
-            WHERE id = :id
-        ");
-        $stmt->execute(['locked_until' => $lockedUntil, 'id' => $id]);
+        try {
+            $stmt = $this->db->prepare("
+                UPDATE users
+                SET locked_until = :locked_until, failed_login_attempts = 0
+                WHERE id = :id
+            ");
+            $stmt->execute(['locked_until' => $lockedUntil, 'id' => $id]);
+        } catch (\Throwable $e) {
+            // Silently ignore if column does not exist yet
+        }
     }
 
     public function resetLoginAttempts(int $id): void
     {
-        $stmt = $this->db->prepare("
-            UPDATE users
-            SET failed_login_attempts = 0, locked_until = NULL
-            WHERE id = :id
-        ");
-        $stmt->execute(['id' => $id]);
+        try {
+            $stmt = $this->db->prepare("
+                UPDATE users
+                SET failed_login_attempts = 0, locked_until = NULL
+                WHERE id = :id
+            ");
+            $stmt->execute(['id' => $id]);
+        } catch (\Throwable $e) {
+            // Silently ignore if column does not exist yet
+        }
     }
 
     public function delete(int $id): bool
