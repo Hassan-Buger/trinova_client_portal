@@ -63,15 +63,19 @@ $app->router->group([
 ], function($r) {
     $r->get('/dashboard', [ClientDashboardController::class, 'index']);
     $r->get('/documents/upload', [ClientDocumentController::class, 'showUpload']);
+    $r->post('/documents/upload', [ClientDocumentController::class, 'processUpload'])->middleware([CsrfMiddleware::class]);
     $r->get('/documents/my-uploads', [ClientDocumentController::class, 'myUploads']);
     $r->get('/documents/trinova', [ClientDocumentController::class, 'trinovaDocs']);
     $r->get('/documents/download/{id}', [ClientDocumentController::class, 'download']);
     $r->get('/messages', [ClientMessageController::class, 'index']);
+    $r->post('/messages/send', [ClientMessageController::class, 'send'])->middleware([CsrfMiddleware::class]);
     $r->get('/requests', [ClientRequestController::class, 'index']);
     $r->get('/deadlines', [ClientDeadlineController::class, 'index']);
     $r->get('/meetings/book', [ClientMeetingController::class, 'index']);
+    $r->post('/meetings/book', [ClientMeetingController::class, 'book'])->middleware([CsrfMiddleware::class]);
     $r->get('/aml', [ClientProfileController::class, 'aml']);
     $r->get('/profile/details', [ClientProfileController::class, 'details']);
+    $r->post('/profile/request-update', [ClientProfileController::class, 'requestUpdate'])->middleware([CsrfMiddleware::class]);
 });
 
 // --- SECURED STAFF ROUTES ---
@@ -84,9 +88,15 @@ $app->router->group([
     $r->get('/clients', [StaffClientController::class, 'index']);
     $r->get('/clients/{id}', [StaffClientController::class, 'show']);
     $r->get('/documents', [StaffDocumentController::class, 'index']);
+    $r->post('/documents/upload', [StaffDocumentController::class, 'upload'])->middleware([CsrfMiddleware::class]);
     $r->get('/requests', [StaffRequestController::class, 'index']);
+    $r->post('/requests/create', [StaffRequestController::class, 'create'])->middleware([CsrfMiddleware::class]);
+    $r->post('/requests/update-status', [StaffRequestController::class, 'updateStatus'])->middleware([CsrfMiddleware::class]);
     $r->get('/messages', [StaffMessageController::class, 'index']);
+    $r->post('/messages/send', [StaffMessageController::class, 'send'])->middleware([CsrfMiddleware::class]);
     $r->get('/deadlines', [StaffDeadlineController::class, 'index']);
+    $r->post('/deadlines/create', [StaffDeadlineController::class, 'create'])->middleware([CsrfMiddleware::class]);
+    $r->post('/deadlines/update-status', [StaffDeadlineController::class, 'updateStatus'])->middleware([CsrfMiddleware::class]);
     $r->get('/users', [StaffUserAdminController::class, 'index']);
 });
 

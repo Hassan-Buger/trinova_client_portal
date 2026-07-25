@@ -2,26 +2,34 @@
 
 namespace Application\Services;
 
-use Application\Core\Database;
-use PDO;
-
 class NotificationService
 {
-    public static function sendPromptEmail(int $userId, string $type, string $subject, string $messageBody): bool
+    /**
+     * Dispatch an automated prompt email without confidential contents.
+     */
+    public static function sendPromptEmail(string $toEmail, string $subject, string $messageBody): bool
     {
-        // Insert notification record in database
-        $db = Database::getInstance();
-        $stmt = $db->prepare("
-            INSERT INTO notifications (user_id, type, related_entity, sent_at, created_at)
-            VALUES (:user_id, :type, :related_entity, NOW(), NOW())
-        ");
-        $stmt->execute([
-            'user_id'        => $userId,
-            'type'           => $type,
-            'related_entity' => $subject
-        ]);
+        // Non-confidential email template footer
+        $footer = "\n\n---\nTriNova Accounting Client Portal Notification\nLog in at https://portal.trinova.co.uk to view details securely.";
+        $fullBody = $messageBody . $footer;
 
-        // Email dispatch stub (In production, uses Mailer SDK with confidential-free login prompts)
+        // In local/prototype environment, log the email dispatch to storage/logs/mail.log
+        $logFile = dirname(__DIR__, 2) . '/storage/logs/mail.log';
+        $logDir  = dirname($logFile);
+
+        if (!is_dir($logDir)) {
+            mkdir($logDir, 0755, true);
+        }
+
+        $logEntry = sprintf(
+            "[%s] MAIL DISPATCH -> To: %s | Subject: %s\nBody:\n%s\n----------------------------------------\n",
+            date('Y-m-d H:i:s'),
+            $toEmail,
+            $subject,
+            $fullBody
+        );
+
+        file_put_contents($logFile, $logEntry, FILE_APPEND);
         return true;
     }
 }
