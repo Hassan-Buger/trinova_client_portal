@@ -6,6 +6,7 @@ use Application\Core\Controller;
 use Application\Core\Request;
 use Application\Core\Response;
 use Application\Core\Session;
+use Application\Models\Client;
 use Application\Models\User;
 use Application\Services\AuditService;
 use Application\Services\NotificationService;
@@ -71,14 +72,22 @@ class UserAdminController extends Controller
         $role  = trim($body['role'] ?? 'client');
         $pass  = trim($body['password'] ?? 'password123');
 
-        if (empty($name) || empty($email) || !filter_var($email, FILTER_VALIDATE_EMAIL)) {
-            Session::setFlash('error', 'Valid name and email address are required.');
+        if (empty($name) || empty($email) || !filter_var($email, FILTER_VALIDATE_EMAIL) || !in_array($role, ['client', 'staff'], true) || strlen($pass) < 8) {
+            $message = 'Enter a valid name, email, account role, and password of at least 8 characters.';
+            if ($request->isAjax()) {
+                $response->json(['success' => false, 'message' => $message], 422);
+            }
+            Session::setFlash('error', $message);
             $response->redirect('/staff/users');
             return;
         }
 
         if ($this->userModel->findByEmail($email)) {
-            Session::setFlash('error', "An account with email '{$email}' already exists.");
+            $message = "An account with email '{$email}' already exists.";
+            if ($request->isAjax()) {
+                $response->json(['success' => false, 'message' => $message], 409);
+            }
+            Session::setFlash('error', $message);
             $response->redirect('/staff/users');
             return;
         }
@@ -92,9 +101,31 @@ class UserAdminController extends Controller
             'status'        => 'active',
         ]);
 
+        if ($role === 'client') {
+            try {
+                (new Client())->create([
+                    'user_id' => $userId,
+                    'aml_status' => 'Action Required',
+                ]);
+            } catch (\Throwable $e) {
+                $this->userModel->delete($userId);
+                $message = 'The client profile could not be created. No user account was saved.';
+                if ($request->isAjax()) {
+                    $response->json(['success' => false, 'message' => $message], 500);
+                }
+                Session::setFlash('error', $message);
+                $response->redirect('/staff/users');
+                return;
+            }
+        }
+
         AuditService::log('user_provisioned', 'users', $userId);
         NotificationService::sendPromptEmail($email, 'Welcome to TriNova Accounting Portal', "An account has been provisioned for you as {$role}. Default password: {$pass}");
-        Session::setFlash('success', "User account '{$name}' created successfully.");
+        $message = "User account '{$name}' created successfully.";
+        if ($request->isAjax()) {
+            $response->json(['success' => true, 'message' => $message, 'redirect' => '/staff/users'], 201);
+        }
+        Session::setFlash('success', $message);
         $response->redirect('/staff/users');
     }
 

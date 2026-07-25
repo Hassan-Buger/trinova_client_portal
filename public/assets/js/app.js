@@ -109,6 +109,18 @@
                 return;
             }
 
+            const contentType = response.headers.get('Content-Type') || '';
+            if (!contentType.includes('application/json')) {
+                const html = await response.text();
+                if (response.ok && html.trim().startsWith('<')) {
+                    const parsed = new DOMParser().parseFromString(html, 'text/html');
+                    const nextContent = parsed.getElementById('portal-content');
+                    if (nextContent && applyPage({ html: nextContent.innerHTML, title: parsed.title }, response.url || window.location.href, false)) {
+                        return;
+                    }
+                }
+                throw new Error('The server returned an unexpected response. Please refresh and try again.');
+            }
             const payload = await response.json();
             if (!response.ok || !payload.success || !applyPage(payload, response.url || url, options.push !== false)) {
                 throw new Error(payload.message || 'Unable to load this page.');
@@ -160,6 +172,18 @@
             if (new URL(response.url).pathname.endsWith('/login')) {
                 window.location.assign(response.url);
                 return;
+            }
+            const contentType = response.headers.get('Content-Type') || '';
+            if (!contentType.includes('application/json')) {
+                const html = await response.text();
+                if (response.ok && html.trim().startsWith('<')) {
+                    const parsed = new DOMParser().parseFromString(html, 'text/html');
+                    const nextContent = parsed.getElementById('portal-content');
+                    if (nextContent && applyPage({ html: nextContent.innerHTML, title: parsed.title }, response.url || window.location.href, false)) {
+                        return;
+                    }
+                }
+                throw new Error('The server returned an unexpected response. Please refresh and try again.');
             }
             const payload = await response.json();
             if (!response.ok || payload.success === false) throw new Error(payload.message || 'The operation could not be completed.');
