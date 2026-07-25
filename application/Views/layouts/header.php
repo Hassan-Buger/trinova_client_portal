@@ -12,10 +12,6 @@ $pillOff = 'padding:8px 18px;border-radius:999px;font-weight:700;font-size:13.5p
         <h1 class="tn-pagetitle" style="margin:0;font-size:23px;font-weight:800;letter-spacing:-.02em"><?= htmlspecialchars($pageTitle ?? 'Dashboard') ?></h1>
     </div>
     <div style="flex:1"></div>
-    <div style="display:flex;background:#fff;border:1px solid rgba(20,60,50,.08);border-radius:999px;padding:4px;box-shadow:0 1px 2px rgba(16,54,45,.04)">
-        <a href="/client/dashboard" style="<?= $role === 'client' ? $pillOn : $pillOff ?>">Client</a>
-        <a href="/staff/dashboard" style="<?= $role === 'staff' ? $pillOn : $pillOff ?>">Staff</a>
-    </div>
     <button style="width:44px;height:44px;border-radius:14px;border:1px solid rgba(20,60,50,.08);background:#fff;display:flex;align-items:center;justify-content:center;cursor:pointer;color:#5f726c;position:relative">
         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
             <path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"></path>

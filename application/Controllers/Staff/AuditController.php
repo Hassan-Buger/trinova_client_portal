@@ -18,8 +18,9 @@ class AuditController extends Controller
 
     public function index(Request $request, Response $response): void
     {
-        $actionFilter = trim($request->getQueryParams()['action'] ?? '');
-        $limit        = (int)($request->getQueryParams()['limit'] ?? 50);
+        $queryParams = method_exists($request, 'getQueryParams') ? $request->getQueryParams() : $_GET;
+        $actionFilter = trim($queryParams['action'] ?? $request->input('action', ''));
+        $limit        = (int)($queryParams['limit'] ?? $request->input('limit', 50));
         if ($limit <= 0) $limit = 50;
 
         $logs = $this->auditModel->getAllFiltered($actionFilter ?: null, $limit);
