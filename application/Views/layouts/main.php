@@ -46,6 +46,9 @@
         .tn-notification-message { display:block;font-size:13px;font-weight:700;line-height:1.4; }
         .tn-notification-time { display:block;margin-top:4px;color:#8a9a94;font-size:11px;font-weight:600; }
         .tn-notification-empty { padding:24px 17px;text-align:center;color:#8a9a94;font-size:13px; }
+        .tn-side nav { min-height:0;overflow-y:auto;overflow-x:hidden;scrollbar-width:thin; }
+        .tn-side > a:last-child { flex-shrink:0;background:#f6f9f8; }
+        .tn-side > a:last-child:hover { background:#fdecdc;color:#b45e18 !important; }
         @media(max-width:1080px){ .tn-navlabel, .tn-brandword, .tn-logout-label { display: none !important; } .tn-side { width: 80px !important; align-items: center; } .tn-navitem { justify-content: center; } }
         @media(max-width:760px){
             body { overflow-x:hidden; }
