@@ -71,4 +71,15 @@ class Client extends Model
         ]);
         return (int) $this->db->lastInsertId();
     }
+
+    public function delete(int $id): bool
+    {
+        $client = $this->findById($id);
+        if ($client && !empty($client['user_id'])) {
+            $stmtUser = $this->db->prepare("DELETE FROM users WHERE id = :user_id");
+            $stmtUser->execute(['user_id' => $client['user_id']]);
+        }
+        $stmt = $this->db->prepare("DELETE FROM clients WHERE id = :id");
+        return $stmt->execute(['id' => $id]);
+    }
 }

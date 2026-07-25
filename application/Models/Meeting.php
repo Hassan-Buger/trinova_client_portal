@@ -18,6 +18,11 @@ class Meeting extends Model
         return $stmt->fetchAll();
     }
 
+    public function getByClientId(int $clientId): array
+    {
+        return $this->getByClient($clientId);
+    }
+
     public function create(array $data): int
     {
         $stmt = $this->db->prepare("

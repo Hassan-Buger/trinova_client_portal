@@ -47,12 +47,24 @@ class ClientController extends Controller
         $outstanding = $this->requestModel->getOutstandingByClientId($id);
         $deadlines = $this->deadlineModel->getAllByClient($id);
 
+        $auditModel = new \Application\Models\AuditLog();
+        $auditLogs = $auditModel->getByUserId((int)$client['user_id'], 20);
+
+        $documentModel = new \Application\Models\Document();
+        $documents = $documentModel->getByClientId($id);
+
+        $meetingModel = new \Application\Models\Meeting();
+        $meetings = $meetingModel->getByClientId($id);
+
         $this->render('staff/clients/show', [
             'pageTitle'   => "Client: {$client['name']}",
             'client'      => $client,
             'entities'    => $entities,
             'outstanding' => $outstanding,
             'deadlines'   => $deadlines,
+            'auditLogs'   => $auditLogs,
+            'documents'   => $documents,
+            'meetings'    => $meetings,
         ], 'main');
     }
 
@@ -97,6 +109,56 @@ class ClientController extends Controller
         \Application\Services\AuditService::log('client_created', 'clients', $clientId);
         \Application\Services\NotificationService::sendPromptEmail($email, 'Welcome to TriNova Client Portal', "Your client account has been created. Default password: password123");
         \Application\Core\Session::setFlash('success', "Client account '{$name}' created successfully.");
+        $response->redirect('/staff/clients');
+    }
+
+    public function resetPassword(Request $request, Response $response): void
+    {
+        $body        = $request->getBody();
+        $clientId    = (int)($body['client_id'] ?? 0);
+        $newPassword = trim($body['new_password'] ?? '');
+
+        if ($clientId <= 0 || empty($newPassword)) {
+            \Application\Core\Session::setFlash('error', 'Client ID and new password are required.');
+            $response->redirect('/staff/clients');
+            return;
+        }
+
+        $client = $this->clientModel->findById($clientId);
+        if (!$client) {
+            \Application\Core\Session::setFlash('error', 'Client not found.');
+            $response->redirect('/staff/clients');
+            return;
+        }
+
+        $userModel = new \Application\Models\User();
+        $hash = password_hash($newPassword, PASSWORD_BCRYPT);
+        $userModel->updatePassword((int)$client['user_id'], $hash);
+
+        \Application\Services\AuditService::log('staff_reset_client_password', 'users', $client['user_id']);
+        \Application\Core\Session::setFlash('success', "Password for client '{$client['name']}' reset successfully.");
+        $response->redirect('/staff/clients/' . $clientId);
+    }
+
+    public function delete(Request $request, Response $response): void
+    {
+        $body     = $request->getBody();
+        $clientId = (int)($body['client_id'] ?? 0);
+
+        if ($clientId <= 0) {
+            \Application\Core\Session::setFlash('error', 'Invalid client ID.');
+            $response->redirect('/staff/clients');
+            return;
+        }
+
+        $client = $this->clientModel->findById($clientId);
+        if ($client) {
+            $name = $client['name'];
+            $this->clientModel->delete($clientId);
+            \Application\Services\AuditService::log('client_deleted', 'clients', $clientId);
+            \Application\Core\Session::setFlash('success', "Client account '{$name}' removed successfully.");
+        }
+
         $response->redirect('/staff/clients');
     }
 

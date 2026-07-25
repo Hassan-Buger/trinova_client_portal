@@ -42,4 +42,17 @@ class AuditLog extends Model
         $stmt->execute($params);
         return $stmt->fetchAll();
     }
+
+    public function getByUserId(int $userId, int $limit = 20): array
+    {
+        $limitVal = (int)$limit;
+        $stmt = $this->db->prepare("
+            SELECT * FROM audit_log
+            WHERE user_id = :user_id
+            ORDER BY created_at DESC
+            LIMIT {$limitVal}
+        ");
+        $stmt->execute(['user_id' => $userId]);
+        return $stmt->fetchAll();
+    }
 }
