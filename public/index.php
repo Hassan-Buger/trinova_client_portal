@@ -91,6 +91,7 @@ $app->router->group([
     $r->post('/clients/add-entity', [StaffClientController::class, 'addEntity'])->middleware([CsrfMiddleware::class]);
     $r->get('/documents', [StaffDocumentController::class, 'index']);
     $r->post('/documents/upload', [StaffDocumentController::class, 'upload'])->middleware([CsrfMiddleware::class]);
+    $r->get('/documents/download/{id}', [StaffDocumentController::class, 'download']);
     $r->get('/requests', [StaffRequestController::class, 'index']);
     $r->post('/requests/create', [StaffRequestController::class, 'create'])->middleware([CsrfMiddleware::class]);
     $r->post('/requests/update-status', [StaffRequestController::class, 'updateStatus'])->middleware([CsrfMiddleware::class]);

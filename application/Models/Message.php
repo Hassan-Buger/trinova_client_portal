@@ -58,12 +58,11 @@ class Message extends Model
     {
         // If recipient is client, mark staff messages as read. If recipient is staff, mark client messages as read.
         $stmt = $this->db->prepare("
-            UPDATE messages m
-            JOIN users u ON u.id = m.sender_id
-            SET m.read_at = NOW()
-            WHERE m.client_id = :client_id 
-              AND m.read_at IS NULL 
-              AND u.role != :recipient_role
+            UPDATE messages
+            SET read_at = NOW()
+            WHERE client_id = :client_id 
+              AND read_at IS NULL 
+              AND sender_id IN (SELECT id FROM users WHERE role != :recipient_role)
         ");
         $stmt->execute([
             'client_id'      => $clientId,

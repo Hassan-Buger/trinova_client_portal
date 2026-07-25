@@ -9,24 +9,25 @@ class AuditLog extends Model
 {
     public function getRecentActivity(int $limit = 10): array
     {
+        $limitVal = (int)$limit;
         $stmt = $this->db->prepare("
             SELECT a.*, u.name AS user_name, u.role AS user_role
             FROM audit_log a
-            JOIN users u ON u.id = a.user_id
+            LEFT JOIN users u ON u.id = a.user_id
             ORDER BY a.created_at DESC
-            LIMIT :limit
+            LIMIT {$limitVal}
         ");
-        $stmt->bindValue(':limit', $limit, PDO::PARAM_INT);
         $stmt->execute();
         return $stmt->fetchAll();
     }
 
     public function getAllFiltered(?string $action = null, int $limit = 50): array
     {
+        $limitVal = (int)$limit;
         $sql = "
             SELECT a.*, u.name AS user_name, u.role AS user_role, u.email AS user_email
             FROM audit_log a
-            JOIN users u ON u.id = a.user_id
+            LEFT JOIN users u ON u.id = a.user_id
         ";
         $params = [];
 
@@ -35,14 +36,10 @@ class AuditLog extends Model
             $params['action'] = $action;
         }
 
-        $sql .= " ORDER BY a.created_at DESC LIMIT :limit";
+        $sql .= " ORDER BY a.created_at DESC LIMIT {$limitVal}";
 
         $stmt = $this->db->prepare($sql);
-        foreach ($params as $k => $v) {
-            $stmt->bindValue(":$k", $v);
-        }
-        $stmt->bindValue(':limit', $limit, PDO::PARAM_INT);
-        $stmt->execute();
+        $stmt->execute($params);
         return $stmt->fetchAll();
     }
 }

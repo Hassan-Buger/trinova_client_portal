@@ -78,4 +78,28 @@ class DocumentController extends Controller
         Session::setFlash('success', "Document '{$filename}' dispatched to client account successfully.");
         $response->redirect('/staff/documents');
     }
+
+    public function download(Request $request, Response $response, int $id): void
+    {
+        $doc = $this->documentModel->find($id);
+        if (!$doc) {
+            $response->setStatusCode(404);
+            die('Document Not Found.');
+        }
+
+        $filePath = App::get('storage_dir') . '/uploads/' . $doc['stored_path'];
+        if (!file_exists($filePath)) {
+            $response->setStatusCode(404);
+            die('File artifact missing from storage directory.');
+        }
+
+        AuditService::log('download', 'documents', $doc['id']);
+
+        header('Content-Description: File Transfer');
+        header('Content-Type: application/octet-stream');
+        header('Content-Disposition: attachment; filename="' . basename($doc['filename']) . '"');
+        header('Content-Length: ' . filesize($filePath));
+        readfile($filePath);
+        exit;
+    }
 }

@@ -45,7 +45,7 @@ class ClientController extends Controller
 
         $entities = $this->entityModel->getByClientId($id);
         $outstanding = $this->requestModel->getOutstandingByClientId($id);
-        $deadlines = $this->deadlineModel->getUpcomingByClient($id);
+        $deadlines = $this->deadlineModel->getAllByClient($id);
 
         $this->render('staff/clients/show', [
             'pageTitle'   => "Client: {$client['name']}",
@@ -97,7 +97,7 @@ class ClientController extends Controller
         \Application\Services\AuditService::log('client_created', 'clients', $clientId);
         \Application\Services\NotificationService::sendPromptEmail($email, 'Welcome to TriNova Client Portal', "Your client account has been created. Default password: password123");
         \Application\Core\Session::setFlash('success', "Client account '{$name}' created successfully.");
-        $response->redirect('/staff/clients/' . $clientId);
+        $response->redirect('/staff/clients');
     }
 
     public function addEntity(Request $request, Response $response): void
