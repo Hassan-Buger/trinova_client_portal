@@ -8,6 +8,7 @@ use Application\Core\Response;
 use Application\Core\Session;
 use Application\Models\Client;
 use Application\Models\Deadline;
+use Application\Models\ClientEntity;
 use Application\Services\AuditService;
 
 class DeadlineController extends Controller
@@ -24,7 +25,7 @@ class DeadlineController extends Controller
     public function index(Request $request, Response $response): void
     {
         $query = $request->getQueryParams();
-        $types = ['VAT', 'Payroll', 'Accounts', 'Corporation Tax', 'Self Assessment', 'Confirmation Statement'];
+        $types = $this->deadlineModel->getDistinctTypes();
         $statuses = ['Pending', 'Overdue', 'Completed'];
         $filters = [
             'search' => trim((string)($query['q'] ?? '')),
@@ -40,11 +41,13 @@ class DeadlineController extends Controller
         $perPage = in_array($requestedPerPage, [10, 20, 50], true) ? $requestedPerPage : 20;
         $pagination = $this->deadlineModel->paginateWithDetails($filters, max(1, (int)($query['page'] ?? 1)), $perPage);
         $clients   = $this->clientModel->getAllWithUsers();
+        $entities  = (new ClientEntity())->getAllWithClient();
 
         $this->render('staff/deadlines/index', [
             'pageTitle' => 'Practice Compliance Deadlines',
             'deadlines' => $pagination['items'],
             'clients'   => $clients,
+            'entities' => $entities,
             'types' => $types,
             'statuses' => $statuses,
             'filters' => $filters,
@@ -63,12 +66,17 @@ class DeadlineController extends Controller
     {
         $body     = $request->getBody();
         $clientId = (int)($body['client_id'] ?? 0);
+        $entityId = (int)($body['entity_id'] ?? 0);
         $type     = trim($body['type'] ?? '');
         $dueDate  = trim($body['due_date'] ?? '');
+        $returnTo = trim((string)($body['return_to'] ?? '/staff/deadlines'));
+        if (!preg_match('#^/staff/clients/\d+$#', $returnTo)) $returnTo = '/staff/deadlines';
 
-        if ($clientId > 0 && !empty($type) && !empty($dueDate)) {
+        $entity = $entityId > 0 ? (new ClientEntity())->findById($entityId) : null;
+        if ($entity && (int)$entity['client_id'] === $clientId && !empty($type) && $this->validDate($dueDate)) {
             $id = $this->deadlineModel->create([
                 'client_id' => $clientId,
+                'entity_id' => $entityId,
                 'type'      => $type,
                 'due_date'  => $dueDate,
                 'status'    => 'Pending',
@@ -78,7 +86,7 @@ class DeadlineController extends Controller
             Session::setFlash('success', 'Compliance deadline added.');
         }
 
-        $response->redirect('/staff/deadlines');
+        $response->redirect($returnTo);
     }
 
     public function updateStatus(Request $request, Response $response): void

@@ -20,7 +20,7 @@
 
     <!-- Create Client Modal -->
     <div id="newClientModal" style="display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(20,40,35,.45);backdrop-filter:blur(6px);z-index:99;align-items:center;justify-content:center;padding:20px">
-        <div style="background:#fff;border-radius:24px;width:100%;max-width:520px;padding:32px;box-shadow:0 24px 60px -28px rgba(0,0,0,.4);animation:tnpop .25s ease">
+        <div style="background:#fff;border-radius:24px;width:100%;max-width:620px;max-height:92vh;overflow:auto;padding:32px;box-shadow:0 24px 60px -28px rgba(0,0,0,.4);animation:tnpop .25s ease">
             <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px">
                 <h3 style="margin:0;font-size:20px;font-weight:800">Create Client Account</h3>
                 <button onclick="document.getElementById('newClientModal').style.display='none'" style="background:none;border:none;font-size:24px;cursor:pointer;color:#8a9a94">&times;</button>
@@ -56,6 +56,16 @@
                         <option value="Complete">Complete</option>
                     </select>
                 </div>
+
+                <fieldset style="border:1px solid #e0e9e5;border-radius:16px;padding:16px;margin:0 0 20px">
+                    <legend style="padding:0 8px;font-size:13px;font-weight:800;color:#41556f">Initial linked entity (optional)</legend>
+                    <input name="entity_name" placeholder="Entity name" style="width:100%;padding:11px;margin-bottom:9px;border:1px solid #e0e9e5;border-radius:11px">
+                    <input name="entity_type" list="entityTypes" placeholder="Entity type, e.g. Limited Company" style="width:100%;padding:11px;margin-bottom:9px;border:1px solid #e0e9e5;border-radius:11px">
+                    <datalist id="entityTypes"><option value="Limited Company"><option value="Personal Tax Return"><option value="Sole Trader"><option value="Partnership"><option value="Other"></datalist>
+                    <div data-entity-fields style="display:grid;grid-template-columns:1fr 1fr;gap:9px"><input name="company_number" placeholder="Company number"><input name="vat_number" placeholder="VAT number"><input name="ct_utr" placeholder="Corporation Tax UTR"><input name="personal_utr" placeholder="Personal UTR"><input type="date" name="accounting_year_end" title="Accounting year end"><input name="tax_year" placeholder="Tax year, e.g. 2026/27"></div>
+                    <div style="margin-top:12px;font-size:12px;font-weight:800;color:#61756e">Important dates for this entity</div>
+                    <?php foreach ([['Accounts Due',''],['Corporation Tax Due',''],['Next VAT Return Due','']] as $row): ?><div data-deadline-row style="display:grid;grid-template-columns:1fr 145px;gap:8px;margin-top:8px"><input name="deadline_type[]" value="<?= $row[0] ?>" placeholder="Date type"><input type="date" name="deadline_due_date[]"></div><?php endforeach; ?>
+                </fieldset>
 
                 <div style="display:flex;justify-content:flex-end;gap:12px">
                     <button type="button" onclick="document.getElementById('newClientModal').style.display='none'" style="background:#f0f5f3;color:#5f726c;border:none;padding:12px 20px;border-radius:12px;font-weight:700;font-size:14px;cursor:pointer">Cancel</button>

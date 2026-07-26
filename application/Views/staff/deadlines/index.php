@@ -32,26 +32,11 @@
             <form action="/staff/deadlines/create" method="POST" data-ajax-form>
                 <input type="hidden" name="csrf_token" value="<?= htmlspecialchars(\Application\Core\Session::csrfToken()) ?>">
                 
-                <div style="margin-bottom:16px">
-                    <label style="display:block;font-size:13px;font-weight:700;color:#3a4d47;margin-bottom:6px">Client</label>
-                    <select name="client_id" required style="width:100%;padding:13px 16px;border:1.5px solid #e0e9e5;border-radius:14px;font-size:14px;background:#fbfdfc">
-                        <option value="">-- Select Client --</option>
-                        <?php foreach ($clients as $c): ?>
-                            <option value="<?= $c['id'] ?>"><?= htmlspecialchars($c['name']) ?> (<?= htmlspecialchars($c['email']) ?>)</option>
-                        <?php endforeach; ?>
-                    </select>
-                </div>
+                <div style="margin-bottom:16px"><label style="display:block;font-size:13px;font-weight:700;color:#3a4d47;margin-bottom:6px">Client entity</label><input type="hidden" name="client_id" id="deadlineClientId"><select name="entity_id" required onchange="document.getElementById('deadlineClientId').value=this.options[this.selectedIndex].dataset.client" style="width:100%;padding:13px 16px;border:1.5px solid #e0e9e5;border-radius:14px;font-size:14px;background:#fbfdfc"><option value="">-- Select Entity --</option><?php foreach($entities as $entity): ?><option value="<?= (int)$entity['id'] ?>" data-client="<?= (int)$entity['client_id'] ?>"><?= htmlspecialchars($entity['client_name'].' — '.$entity['company_name']) ?></option><?php endforeach; ?></select></div>
 
                 <div style="margin-bottom:16px">
                     <label style="display:block;font-size:13px;font-weight:700;color:#3a4d47;margin-bottom:6px">Deadline Type</label>
-                    <select name="type" required style="width:100%;padding:13px 16px;border:1.5px solid #e0e9e5;border-radius:14px;font-size:14px;background:#fbfdfc">
-                        <option value="VAT">VAT Return</option>
-                        <option value="Payroll">Payroll</option>
-                        <option value="Accounts">Annual Accounts</option>
-                        <option value="Corporation Tax">Corporation Tax</option>
-                        <option value="Self Assessment">Self Assessment</option>
-                        <option value="Confirmation Statement">Confirmation Statement</option>
-                    </select>
+                    <input name="type" list="deadlineTypes" required placeholder="e.g. Accounts Due" style="width:100%;padding:13px 16px;border:1.5px solid #e0e9e5;border-radius:14px;font-size:14px;background:#fbfdfc"><datalist id="deadlineTypes"><?php foreach(array_unique(array_merge($types,['Accounts Due','Corporation Tax Due','Next VAT Return Due','Tax Return Due','Payment Due','Payment on Account'])) as $type): ?><option value="<?= htmlspecialchars($type) ?>"><?php endforeach; ?></datalist>
                 </div>
 
                 <div style="margin-bottom:24px">
@@ -77,7 +62,7 @@
                     <thead>
                         <tr style="border-bottom:2px solid #eef4f1;color:#7d8e88;font-size:12.5px;text-transform:uppercase;letter-spacing:.05em">
                             <th style="padding:12px 16px;font-weight:700">Client</th>
-                            <th style="padding:12px 16px;font-weight:700">Type</th>
+                            <th style="padding:12px 16px;font-weight:700">Entity</th><th style="padding:12px 16px;font-weight:700">Type</th>
                             <th style="padding:12px 16px;font-weight:700">Due Date</th>
                             <th style="padding:12px 16px;font-weight:700">Status</th>
                         </tr>
@@ -89,6 +74,8 @@
                                     <?= htmlspecialchars($d['client_name'] ?? 'Client') ?>
                                 </td>
                                 <td style="padding:16px;font-weight:700;color:#41556f">
+                                    <?= htmlspecialchars($d['entity_name'] ?? 'Entity') ?>
+                                </td><td style="padding:16px;font-weight:700;color:#41556f">
                                     <?= htmlspecialchars($d['type']) ?>
                                 </td>
                                 <td style="padding:16px;color:#213330;font-weight:600">

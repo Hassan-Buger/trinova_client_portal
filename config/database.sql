@@ -51,8 +51,10 @@ CREATE TABLE IF NOT EXISTS `client_entities` (
   `id` INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
   `client_id` INT UNSIGNED NOT NULL,
   `company_name` VARCHAR(150) NOT NULL,
+  `entity_type` VARCHAR(80) NOT NULL DEFAULT 'Other',
   `company_number` VARCHAR(30) NULL,
   `tax_reference` VARCHAR(50) NULL,
+  `attributes` JSON NULL,
   `created_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
   CONSTRAINT `fk_entities_client` FOREIGN KEY (`client_id`) REFERENCES `clients` (`id`) ON DELETE CASCADE,
   INDEX `idx_entities_client` (`client_id`)
@@ -107,11 +109,13 @@ CREATE TABLE IF NOT EXISTS `messages` (
 CREATE TABLE IF NOT EXISTS `deadlines` (
   `id` INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
   `client_id` INT UNSIGNED NOT NULL,
-  `type` ENUM('VAT', 'Payroll', 'Accounts', 'Corporation Tax', 'Self Assessment', 'Confirmation Statement') NOT NULL,
+  `entity_id` INT UNSIGNED NOT NULL,
+  `type` VARCHAR(100) NOT NULL,
   `due_date` DATE NOT NULL,
   `status` ENUM('Pending', 'Overdue', 'Completed') NOT NULL DEFAULT 'Pending',
   `created_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
   CONSTRAINT `fk_deadlines_client` FOREIGN KEY (`client_id`) REFERENCES `clients` (`id`) ON DELETE CASCADE,
+  CONSTRAINT `fk_deadlines_entity` FOREIGN KEY (`entity_id`) REFERENCES `client_entities` (`id`) ON DELETE CASCADE,
   INDEX `idx_deadlines_client_date` (`client_id`, `due_date`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
@@ -168,17 +172,17 @@ INSERT INTO `users` (`id`, `name`, `email`, `password_hash`, `role`, `status`) V
 INSERT INTO `clients` (`id`, `user_id`, `phone`, `address`, `aml_status`, `notes`) VALUES
 (1, 5, '07700 900000', '1 Example Street, Exampletown EX1 1AA', 'Complete', 'Fictional test client record. Use for non-production testing only.');
 
-INSERT INTO `client_entities` (`id`, `client_id`, `company_name`, `company_number`, `tax_reference`) VALUES
-(1, 1, 'Example Test Company Ltd', '00000000', 'TEST-REF-001'),
-(2, 1, 'Example Test Services Ltd', '00000001', 'TEST-REF-002'),
-(3, 1, 'Personal Tax Test Record', NULL, 'TEST-REF-003');
+INSERT INTO `client_entities` (`id`, `client_id`, `company_name`, `entity_type`, `company_number`, `tax_reference`, `attributes`) VALUES
+(1, 1, 'Example Test Company Ltd', 'Limited Company', '00000000', 'TEST-REF-001', JSON_OBJECT('vat_number','GB000000000','accounting_year_end','2026-03-31')),
+(2, 1, 'Example Test Services Ltd', 'Sole Trader', '00000001', 'TEST-REF-002', JSON_OBJECT()),
+(3, 1, 'Personal Tax Test Record', 'Personal Tax Return', NULL, 'TEST-REF-003', JSON_OBJECT('tax_year','2026/27'));
 
-INSERT INTO `deadlines` (`id`, `client_id`, `type`, `due_date`, `status`) VALUES
-(1, 1, 'Payroll', '2026-07-26', 'Pending'),
-(2, 1, 'VAT', '2026-08-07', 'Pending'),
-(3, 1, 'Confirmation Statement', '2026-09-03', 'Pending'),
-(4, 1, 'Corporation Tax', '2026-10-01', 'Pending'),
-(5, 1, 'Self Assessment', '2027-01-31', 'Pending');
+INSERT INTO `deadlines` (`id`, `client_id`, `entity_id`, `type`, `due_date`, `status`) VALUES
+(1, 1, 1, 'Payroll', '2026-07-26', 'Pending'),
+(2, 1, 1, 'Next VAT Return Due', '2026-08-07', 'Pending'),
+(3, 1, 1, 'Confirmation Statement', '2026-09-03', 'Pending'),
+(4, 1, 1, 'Corporation Tax Due', '2026-10-01', 'Pending'),
+(5, 1, 3, 'Tax Return Due', '2027-01-31', 'Pending');
 
 INSERT INTO `document_requests` (`id`, `client_id`, `created_by_user_id`, `title`, `description`, `due_date`, `status`) VALUES
 (1, 1, 3, 'June bank statements', 'Upload PDF statements for June accounts', '2026-07-28', 'Awaiting Client'),

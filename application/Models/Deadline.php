@@ -7,12 +7,19 @@ use PDO;
 
 class Deadline extends Model
 {
+    public function getDistinctTypes(): array
+    {
+        return $this->db->query("SELECT DISTINCT type FROM deadlines ORDER BY type")->fetchAll(PDO::FETCH_COLUMN);
+    }
+
     public function getAllByClient(int $clientId): array
     {
         $stmt = $this->db->prepare("
-            SELECT * FROM deadlines
-            WHERE client_id = :client_id
-            ORDER BY due_date ASC
+            SELECT d.*, e.company_name AS entity_name, e.entity_type
+            FROM deadlines d
+            JOIN client_entities e ON e.id = d.entity_id
+            WHERE d.client_id = :client_id
+            ORDER BY e.company_name ASC, d.due_date ASC
         ");
         $stmt->execute(['client_id' => $clientId]);
         return $stmt->fetchAll();
@@ -23,11 +30,25 @@ class Deadline extends Model
         return $this->getAllByClient($clientId);
     }
 
+    public function getGroupedByClient(int $clientId): array
+    {
+        $grouped = [];
+        foreach ($this->getAllByClient($clientId) as $deadline) {
+            $id = (int)$deadline['entity_id'];
+            if (!isset($grouped[$id])) {
+                $grouped[$id] = ['entity_id'=>$id, 'entity_name'=>$deadline['entity_name'], 'entity_type'=>$deadline['entity_type'], 'deadlines'=>[]];
+            }
+            $grouped[$id]['deadlines'][] = $deadline;
+        }
+        return array_values($grouped);
+    }
+
     public function getAllWithDetails(): array
     {
         $stmt = $this->db->prepare("
-            SELECT d.*, c_user.name AS client_name
+            SELECT d.*, c_user.name AS client_name, e.company_name AS entity_name, e.entity_type
             FROM deadlines d
+            JOIN client_entities e ON e.id = d.entity_id
             JOIN clients c ON c.id = d.client_id
             JOIN users c_user ON c_user.id = c.user_id
             ORDER BY d.due_date ASC
@@ -39,11 +60,12 @@ class Deadline extends Model
     public function create(array $data): int
     {
         $stmt = $this->db->prepare("
-            INSERT INTO deadlines (client_id, type, due_date, status)
-            VALUES (:client_id, :type, :due_date, :status)
+            INSERT INTO deadlines (client_id, entity_id, type, due_date, status)
+            VALUES (:client_id, :entity_id, :type, :due_date, :status)
         ");
         $stmt->execute([
             'client_id' => $data['client_id'],
+            'entity_id' => $data['entity_id'],
             'type'      => $data['type'],
             'due_date'  => $data['due_date'],
             'status'    => $data['status'] ?? 'Pending',
@@ -93,7 +115,7 @@ class Deadline extends Model
             $where[] = "d.due_date >= CURRENT_DATE() AND d.status <> 'Completed'";
         }
 
-        $joins = 'JOIN clients c ON c.id = d.client_id JOIN users c_user ON c_user.id = c.user_id';
+        $joins = 'JOIN client_entities e ON e.id=d.entity_id JOIN clients c ON c.id = d.client_id JOIN users c_user ON c_user.id = c.user_id';
         $whereSql = $where ? 'WHERE ' . implode(' AND ', $where) : '';
         $countStmt = $this->db->prepare("SELECT COUNT(*) FROM deadlines d {$joins} {$whereSql}");
         $countStmt->execute($params);
@@ -103,7 +125,7 @@ class Deadline extends Model
         $offset = ($page - 1) * $perPage;
         $sorts = ['due_asc' => 'd.due_date ASC', 'due_desc' => 'd.due_date DESC', 'newest' => 'd.created_at DESC', 'client_asc' => 'c_user.name ASC, d.due_date ASC'];
         $orderBy = $sorts[$filters['sort'] ?? 'due_asc'] ?? $sorts['due_asc'];
-        $stmt = $this->db->prepare("SELECT d.*, c_user.name AS client_name FROM deadlines d {$joins} {$whereSql} ORDER BY {$orderBy} LIMIT {$perPage} OFFSET {$offset}");
+        $stmt = $this->db->prepare("SELECT d.*, c_user.name AS client_name, e.company_name AS entity_name, e.entity_type FROM deadlines d {$joins} {$whereSql} ORDER BY {$orderBy} LIMIT {$perPage} OFFSET {$offset}");
         $stmt->execute($params);
         return ['items' => $stmt->fetchAll(), 'total' => $total, 'page' => $page, 'per_page' => $perPage, 'total_pages' => $totalPages];
     }

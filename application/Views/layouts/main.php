@@ -49,6 +49,11 @@
         .tn-notification-time { display:block;margin-top:4px;color:#8a9a94;font-size:11px;font-weight:600; }
         .tn-notification-empty { padding:24px 17px;text-align:center;color:#8a9a94;font-size:13px; }
         .tn-side nav { min-height:0;overflow-y:auto;overflow-x:hidden;scrollbar-width:thin; }
+        [data-entity-fields] input,
+        [data-deadline-row] input,
+        form[action="/staff/deadlines/create"] input:not([type="hidden"]) { width:100%;min-width:0;padding:11px 12px;border:1px solid #dfe9e5;border-radius:11px;background:#fbfdfc;color:#213330;font-size:13px; }
+        [data-entity-fields] input:focus,
+        [data-deadline-row] input:focus { background:#fff; }
         .tn-brand-logo { display:block;width:178px;max-width:100%;height:52px;object-fit:contain;object-position:left center; }
         .tn-auth-logo { display:block;width:230px;max-width:78vw;height:auto;margin:0 auto 26px; }
         .tn-side > a:last-child { flex-shrink:0;background:#f6f9f8; }
@@ -77,6 +82,7 @@
             .tn-client-toolbar-actions input[type="search"] { min-width:0 !important;flex:1;width:100%; }
             .tn-client-toolbar-actions select { flex:0 0 108px; }
             .tn-create-client-button { width:100%; }
+            [data-entity-fields], [data-deadline-row], form[action="/staff/deadlines/create"] { grid-template-columns:1fr !important; }
             .tn-client-list { padding:0 !important;background:transparent !important;box-shadow:none !important; }
             #clientsTable, #clientsTable tbody { display:block;width:100%; }
             #clientsTable thead { display:none; }

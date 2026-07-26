@@ -54,7 +54,12 @@ class ClientController extends Controller
 
         $entities = $this->entityModel->getByClientId($id);
         $outstanding = $this->requestModel->getOutstandingByClientId($id);
-        $deadlines = $this->deadlineModel->getAllByClient($id);
+        $deadlineGroups = $this->deadlineModel->getGroupedByClient($id);
+        $groupedByEntity = [];
+        foreach ($deadlineGroups as $group) $groupedByEntity[(int)$group['entity_id']] = $group;
+        $deadlineGroups = array_map(static function(array $entity) use ($groupedByEntity): array {
+            return $groupedByEntity[(int)$entity['id']] ?? ['entity_id'=>(int)$entity['id'], 'entity_name'=>$entity['company_name'], 'entity_type'=>$entity['entity_type'], 'deadlines'=>[]];
+        }, $entities);
 
         $auditModel = new \Application\Models\AuditLog();
         $auditLogs = $auditModel->getByUserId((int)$client['user_id'], 20);
@@ -70,7 +75,7 @@ class ClientController extends Controller
             'client'      => $client,
             'entities'    => $entities,
             'outstanding' => $outstanding,
-            'deadlines'   => $deadlines,
+            'deadlineGroups' => $deadlineGroups,
             'auditLogs'   => $auditLogs,
             'documents'   => $documents,
             'meetings'    => $meetings,
@@ -117,6 +122,19 @@ class ClientController extends Controller
             'address'    => $address,
             'aml_status' => $aml,
         ]);
+
+        $entityName = trim((string)($body['entity_name'] ?? ''));
+        if ($entityName !== '') {
+            $entityId = $this->entityModel->create([
+                'client_id' => $clientId,
+                'company_name' => $entityName,
+                'entity_type' => trim((string)($body['entity_type'] ?? 'Other')) ?: 'Other',
+                'company_number' => trim((string)($body['company_number'] ?? '')) ?: null,
+                'tax_reference' => trim((string)($body['tax_reference'] ?? '')) ?: null,
+                'attributes' => $this->entityAttributes($body),
+            ]);
+            $this->createInlineDeadlines($clientId, $entityId, $body);
+        }
 
         $appUrl = \Application\Config\App::get('url', 'https://white-bison-201906.hostingersite.com');
         $activationLink = rtrim($appUrl, '/') . '/activate?token=' . urlencode($activationToken);
@@ -222,22 +240,59 @@ class ClientController extends Controller
     {
         $body        = $request->getBody();
         $clientId    = (int)($body['client_id'] ?? 0);
-        $companyName = trim($body['company_name'] ?? '');
+        $companyName = trim($body['entity_name'] ?? $body['company_name'] ?? '');
         $companyNum  = trim($body['company_number'] ?? '');
         $taxRef      = trim($body['tax_reference'] ?? '');
 
         if ($clientId > 0 && !empty($companyName)) {
-            $this->entityModel->create([
+            $entityId = $this->entityModel->create([
                 'client_id'      => $clientId,
                 'company_name'   => $companyName,
+                'entity_type'    => trim((string)($body['entity_type'] ?? 'Other')) ?: 'Other',
                 'company_number' => $companyNum,
                 'tax_reference'  => $taxRef,
+                'attributes'     => $this->entityAttributes($body),
             ]);
+            $this->createInlineDeadlines($clientId, $entityId, $body);
 
             \Application\Services\AuditService::log('entity_added', 'client_entities', $clientId);
             \Application\Core\Session::setFlash('success', "Business entity '{$companyName}' linked to client.");
         }
 
         $response->redirect('/staff/clients/' . $clientId);
+    }
+
+    private function entityAttributes(array $body): array
+    {
+        $map = [
+            'vat_number' => 'VAT registration number',
+            'ct_utr' => 'Corporation Tax UTR',
+            'accounting_year_end' => 'Accounting year end',
+            'personal_utr' => 'Personal UTR',
+            'tax_year' => 'Tax year',
+        ];
+        $attributes = [];
+        foreach ($map as $key => $label) {
+            $value = trim((string)($body[$key] ?? ''));
+            if ($value !== '') $attributes[$key] = ['label'=>$label, 'value'=>$value];
+        }
+        $customLabel = trim((string)($body['custom_attribute_label'] ?? ''));
+        $customValue = trim((string)($body['custom_attribute_value'] ?? ''));
+        if ($customLabel !== '' && $customValue !== '') {
+            $attributes['custom_' . substr(hash('sha256', strtolower($customLabel)), 0, 12)] = ['label'=>$customLabel, 'value'=>$customValue];
+        }
+        return $attributes;
+    }
+
+    private function createInlineDeadlines(int $clientId, int $entityId, array $body): void
+    {
+        $types = is_array($body['deadline_type'] ?? null) ? $body['deadline_type'] : [];
+        $dates = is_array($body['deadline_due_date'] ?? null) ? $body['deadline_due_date'] : [];
+        foreach ($types as $index => $type) {
+            $type = trim((string)$type);
+            $date = trim((string)($dates[$index] ?? ''));
+            if ($type === '' || !preg_match('/^\d{4}-\d{2}-\d{2}$/', $date)) continue;
+            $this->deadlineModel->create(['client_id'=>$clientId, 'entity_id'=>$entityId, 'type'=>$type, 'due_date'=>$date, 'status'=>'Pending']);
+        }
     }
 }
