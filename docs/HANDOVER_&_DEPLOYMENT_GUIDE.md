@@ -94,11 +94,11 @@ The default database seed includes accounts for all 4 named practice staff membe
 
 | Role | Name | Email | Default Password |
 | :--- | :--- | :--- | :--- |
-| **Staff** | Kirsty | `kirsty@trinova.co.uk` | `password123` |
-| **Staff** | Jane | `jane@trinova.co.uk` | `password123` |
-| **Staff** | Emma | `emma@trinova.co.uk` | `password123` |
-| **Staff** | Jess | `jess@trinova.co.uk` | `password123` |
-| **Client** | Nick Powell | `nick@powellelectrical.co.uk` | `password123` |
+| **Staff** | Test Staff One | `staff.one@example.invalid` | `password123` |
+| **Staff** | Test Staff Two | `staff.two@example.invalid` | `password123` |
+| **Staff** | Test Staff Three | `staff.three@example.invalid` | `password123` |
+| **Staff** | Test Staff Four | `staff.four@example.invalid` | `password123` |
+| **Client** | Test Client Alpha | `test.client.alpha@example.invalid` | `password123` |
 
 > [!IMPORTANT]
 > **Production Mandatory Step**: Password hashes should be updated immediately upon production launch via the password reset flow.

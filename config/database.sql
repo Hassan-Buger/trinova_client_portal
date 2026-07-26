@@ -159,19 +159,19 @@ CREATE TABLE IF NOT EXISTS `notifications` (
 -- $2y$12$uUgV4QcXGo9b9eOEO3/rmuHsKgbwXBm06PfvEgIchptJEsOTFv4ee
 
 INSERT INTO `users` (`id`, `name`, `email`, `password_hash`, `role`, `status`) VALUES
-(1, 'Kirsty', 'kirsty@trinova.co.uk', '$2y$12$uUgV4QcXGo9b9eOEO3/rmuHsKgbwXBm06PfvEgIchptJEsOTFv4ee', 'staff', 'active'),
-(2, 'Jane', 'jane@trinova.co.uk', '$2y$12$uUgV4QcXGo9b9eOEO3/rmuHsKgbwXBm06PfvEgIchptJEsOTFv4ee', 'staff', 'active'),
-(3, 'Emma', 'emma@trinova.co.uk', '$2y$12$uUgV4QcXGo9b9eOEO3/rmuHsKgbwXBm06PfvEgIchptJEsOTFv4ee', 'staff', 'active'),
-(4, 'Jess', 'jess@trinova.co.uk', '$2y$12$uUgV4QcXGo9b9eOEO3/rmuHsKgbwXBm06PfvEgIchptJEsOTFv4ee', 'staff', 'active'),
-(5, 'Nick Powell', 'nick@powellelectrical.co.uk', '$2y$12$uUgV4QcXGo9b9eOEO3/rmuHsKgbwXBm06PfvEgIchptJEsOTFv4ee', 'client', 'active');
+(1, 'Test Staff One', 'staff.one@example.invalid', '$2y$12$uUgV4QcXGo9b9eOEO3/rmuHsKgbwXBm06PfvEgIchptJEsOTFv4ee', 'staff', 'active'),
+(2, 'Test Staff Two', 'staff.two@example.invalid', '$2y$12$uUgV4QcXGo9b9eOEO3/rmuHsKgbwXBm06PfvEgIchptJEsOTFv4ee', 'staff', 'active'),
+(3, 'Test Staff Three', 'staff.three@example.invalid', '$2y$12$uUgV4QcXGo9b9eOEO3/rmuHsKgbwXBm06PfvEgIchptJEsOTFv4ee', 'staff', 'active'),
+(4, 'Test Staff Four', 'staff.four@example.invalid', '$2y$12$uUgV4QcXGo9b9eOEO3/rmuHsKgbwXBm06PfvEgIchptJEsOTFv4ee', 'staff', 'active'),
+(5, 'Test Client Alpha', 'test.client.alpha@example.invalid', '$2y$12$uUgV4QcXGo9b9eOEO3/rmuHsKgbwXBm06PfvEgIchptJEsOTFv4ee', 'client', 'active');
 
 INSERT INTO `clients` (`id`, `user_id`, `phone`, `address`, `aml_status`, `notes`) VALUES
-(1, 5, '07700 900432', '14 Kiln Lane, Leeds LS1 4AB', 'Complete', 'Client prefers email for confirmations. Keep payroll reminders short.');
+(1, 5, '07700 900000', '1 Example Street, Exampletown EX1 1AA', 'Complete', 'Fictional test client record. Use for non-production testing only.');
 
 INSERT INTO `client_entities` (`id`, `client_id`, `company_name`, `company_number`, `tax_reference`) VALUES
-(1, 1, 'Powell Electrical Ltd', '08942104', '9482104821'),
-(2, 1, 'GGDC Ltd', '09214820', '8421048201'),
-(3, 1, 'Personal Tax', NULL, '4821049281');
+(1, 1, 'Example Test Company Ltd', '00000000', 'TEST-REF-001'),
+(2, 1, 'Example Test Services Ltd', '00000001', 'TEST-REF-002'),
+(3, 1, 'Personal Tax Test Record', NULL, 'TEST-REF-003');
 
 INSERT INTO `deadlines` (`id`, `client_id`, `type`, `due_date`, `status`) VALUES
 (1, 1, 'Payroll', '2026-07-26', 'Pending'),
@@ -185,10 +185,10 @@ INSERT INTO `document_requests` (`id`, `client_id`, `created_by_user_id`, `title
 (2, 1, 3, 'CIS certificates', 'Two subcontractor documents needed', '2026-07-30', 'Awaiting Client');
 
 INSERT INTO `documents` (`id`, `client_id`, `uploaded_by_user_id`, `direction`, `filename`, `stored_path`, `description`, `status`) VALUES
-(1, 1, 3, 'from_trinova', 'Draft accounts 2025.pdf', 'draft_accounts_2025_hash.pdf', 'Uploaded by Emma', 'New'),
+(1, 1, 3, 'from_trinova', 'Draft accounts 2025.pdf', 'draft_accounts_2025_hash.pdf', 'Uploaded by Test Staff Three', 'New'),
 (2, 1, 3, 'from_trinova', 'VAT return Q2.pdf', 'vat_return_q2_hash.pdf', 'Submitted copy', 'Ready');
 
 INSERT INTO `messages` (`id`, `client_id`, `sender_id`, `thread_id`, `body`, `read_at`) VALUES
-(1, 1, 3, 1, 'Hi Nick, could you send over the June payroll figures when you have a moment?', NOW()),
+(1, 1, 3, 1, 'Hello Test Client Alpha, could you send over the June payroll figures when convenient?', NOW()),
 (2, 1, 5, 1, 'Of course — I have just uploaded them to the portal.', NOW()),
-(3, 1, 3, 1, 'Perfect, got them. Thanks Nick, I will process these today.', NULL);
+(3, 1, 3, 1, 'Perfect, received. Thank you, Test Client Alpha. I will process these today.', NULL);

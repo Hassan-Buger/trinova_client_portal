@@ -21,7 +21,7 @@
       <form action="/password/reset" method="POST">
         <input type="hidden" name="csrf_token" value="<?= htmlspecialchars(\Application\Core\Session::csrfToken()) ?>">
         <label style="display:block;font-size:12.5px;font-weight:600;color:#3a4d47;margin-bottom:7px">Email address</label>
-        <input type="email" name="email" placeholder="you@example.co.uk" required style="width:100%;padding:14px 16px;border:1.5px solid #e0e9e5;border-radius:15px;font-size:15px;margin-bottom:24px;background:#fbfdfc">
+        <input type="email" name="email" placeholder="test.client@example.invalid" required style="width:100%;padding:14px 16px;border:1.5px solid #e0e9e5;border-radius:15px;font-size:15px;margin-bottom:24px;background:#fbfdfc">
         <button type="submit" style="width:100%;padding:15px;background:#0d9488;color:#fff;border:none;border-radius:15px;font-size:15.5px;font-weight:700;cursor:pointer;box-shadow:0 8px 18px -8px rgba(13,148,136,.7)">Send reset link</button>
       </form>
       <div style="text-align:center;margin-top:18px">

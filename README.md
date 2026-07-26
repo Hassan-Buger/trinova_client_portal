@@ -28,13 +28,13 @@ mysql -u root -p trinova_portal < config/database.sql
 ```
 
 Default Staff Accounts:
-- **Kirsty**: `kirsty@trinova.co.uk` / Password: `password123`
-- **Jane**: `jane@trinova.co.uk` / Password: `password123`
-- **Emma**: `emma@trinova.co.uk` / Password: `password123`
-- **Jess**: `jess@trinova.co.uk` / Password: `password123`
+- **Test Staff One**: `staff.one@example.invalid` / Password: `password123`
+- **Test Staff Two**: `staff.two@example.invalid` / Password: `password123`
+- **Test Staff Three**: `staff.three@example.invalid` / Password: `password123`
+- **Test Staff Four**: `staff.four@example.invalid` / Password: `password123`
 
 Default Client Account:
-- **Nick Powell**: `nick@powellelectrical.co.uk` / Password: `password123`
+- **Test Client Alpha**: `test.client.alpha@example.invalid` / Password: `password123`
 
 ### 4. Run Development Web Server
 ```bash

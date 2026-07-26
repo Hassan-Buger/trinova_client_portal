@@ -37,7 +37,7 @@
 
                 <div style="margin-bottom:16px">
                     <label style="display:block;font-size:13px;font-weight:700;color:#3a4d47;margin-bottom:6px">Email Address</label>
-                    <input type="email" name="email" placeholder="sarah@example.co.uk" required style="width:100%;padding:13px 16px;border:1.5px solid #e0e9e5;border-radius:14px;font-size:14px;background:#fbfdfc">
+                    <input type="email" name="email" placeholder="new.user@example.invalid" required style="width:100%;padding:13px 16px;border:1.5px solid #e0e9e5;border-radius:14px;font-size:14px;background:#fbfdfc">
                 </div>
 
                 <div style="margin-bottom:16px">

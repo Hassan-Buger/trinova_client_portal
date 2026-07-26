@@ -12,7 +12,7 @@
                 </div>
                 <div>
                     <div style="font-weight:800;font-size:15px;color:#213330">TriNova Accounting Team</div>
-                    <div style="font-size:12.5px;color:#7d8e88">Kirsty, Jane, Emma & Jess</div>
+                    <div style="font-size:12.5px;color:#7d8e88">Your assigned accounting team</div>
                 </div>
             </div>
             <span style="font-size:12px;font-weight:700;color:#3f9d6d;background:#e2f3ea;padding:4px 10px;border-radius:999px">&bull; Active Support</span>

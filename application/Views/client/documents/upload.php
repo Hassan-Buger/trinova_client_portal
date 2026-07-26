@@ -23,7 +23,7 @@
 
             <div style="margin-bottom:24px">
                 <label style="display:block;font-size:13.5px;font-weight:700;color:#3a4d47;margin-bottom:8px">Plain-Text Description (Optional)</label>
-                <textarea name="description" rows="3" placeholder="e.g. June Bank Statements for Powell Electrical Ltd" style="width:100%;padding:14px 16px;border:1.5px solid #e0e9e5;border-radius:15px;font-size:14px;background:#fbfdfc;resize:vertical"></textarea>
+                <textarea name="description" rows="3" placeholder="e.g. June bank statements for Example Test Company Ltd" style="width:100%;padding:14px 16px;border:1.5px solid #e0e9e5;border-radius:15px;font-size:14px;background:#fbfdfc;resize:vertical"></textarea>
             </div>
 
             <div style="display:flex;align-items:center;justify-content:space-between">

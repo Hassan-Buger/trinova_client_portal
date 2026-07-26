@@ -22,7 +22,7 @@
         <input type="hidden" name="csrf_token" value="<?= htmlspecialchars(\Application\Core\Session::csrfToken()) ?>">
         
         <label style="display:block;font-size:12.5px;font-weight:600;color:#3a4d47;margin-bottom:7px">Email address</label>
-        <input type="email" name="email" placeholder="nick@powellelectrical.co.uk" required style="width:100%;padding:14px 16px;border:1.5px solid #e0e9e5;border-radius:15px;font-size:15px;margin-bottom:16px;background:#fbfdfc">
+        <input type="email" name="email" placeholder="test.client.alpha@example.invalid" required style="width:100%;padding:14px 16px;border:1.5px solid #e0e9e5;border-radius:15px;font-size:15px;margin-bottom:16px;background:#fbfdfc">
         
         <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:7px">
             <label style="font-size:12.5px;font-weight:600;color:#3a4d47">Password</label>
