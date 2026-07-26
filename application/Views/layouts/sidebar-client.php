@@ -30,16 +30,8 @@ function renderNavIcon(string $ic): string {
 ?>
 
 <aside class="tn-side" style="width:262px;flex-shrink:0;background:#fff;border-right:1px solid rgba(20,60,50,.07);display:flex;flex-direction:column;padding:22px 16px;position:sticky;top:0;height:100vh">
-    <div style="display:flex;align-items:center;gap:11px;padding:4px 8px 22px">
-        <svg width="38" height="38" viewBox="0 0 40 40" fill="none">
-            <rect x="0" y="0" width="40" height="40" rx="12" fill="#0d9488"/>
-            <path d="M20 9 L30 28 L10 28 Z" fill="#fff" opacity="0.92"/>
-            <path d="M20 17 L26 28 L14 28 Z" fill="#ef8f3c"/>
-        </svg>
-        <div class="tn-brandword">
-            <div style="font-weight:800;font-size:15.5px;letter-spacing:-.01em;line-height:1.1">TriNova</div>
-            <div style="font-size:9.5px;color:#8a9a94;font-weight:700;letter-spacing:.16em;text-transform:uppercase">Client Hub</div>
-        </div>
+    <div class="tn-sidebar-brand" style="display:flex;align-items:center;padding:4px 8px 22px">
+        <img class="tn-brand-logo" src="/assets/images/trinova-accounting-logo.png" alt="TriNova Accounting">
     </div>
     <nav style="display:flex;flex-direction:column;gap:3px;flex:1">
         <?php foreach ($nav as $item): ?>
