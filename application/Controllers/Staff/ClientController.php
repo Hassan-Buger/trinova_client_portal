@@ -121,8 +121,15 @@ class ClientController extends Controller
         $appUrl = \Application\Config\App::get('url', 'https://white-bison-201906.hostingersite.com');
         $activationLink = rtrim($appUrl, '/') . '/activate?token=' . urlencode($activationToken);
 
+        $otp = (new \Application\Models\OtpChallenge())->issue($userId, $email, \Application\Models\OtpChallenge::ACTIVATION);
+        if (!$otp['ok'] || !\Application\Services\NotificationService::sendWelcomeActivationEmail($email, $name, $activationLink, $otp['code'])) {
+            (new \Application\Models\OtpChallenge())->invalidate($userId, \Application\Models\OtpChallenge::ACTIVATION);
+            \Application\Core\Session::setFlash('error', 'The account was created, but the verification email could not be sent. Use resend from the activation page.');
+            $response->redirect('/staff/clients');
+            return;
+        }
+
         \Application\Services\AuditService::log('client_created', 'clients', $clientId);
-        \Application\Services\NotificationService::sendWelcomeActivationEmail($email, $name, $activationLink);
 
         \Application\Core\Session::setFlash('success', "Client account for '{$name}' created! A welcome activation email has been dispatched.");
         $response->redirect('/staff/clients');
@@ -134,7 +141,7 @@ class ClientController extends Controller
         $clientId    = (int)($body['client_id'] ?? 0);
         $newPassword = trim($body['new_password'] ?? '');
 
-        if ($clientId <= 0 || empty($newPassword)) {
+        if ($clientId <= 0) {
             if ($request->isAjax()) {
                 $response->json(['success' => false, 'message' => 'Client ID and new password are required.'], 400);
                 return;
@@ -155,13 +162,20 @@ class ClientController extends Controller
             return;
         }
 
-        $userModel = new \Application\Models\User();
-        $hash = password_hash($newPassword, PASSWORD_BCRYPT);
-        $userModel->updatePassword((int)$client['user_id'], $hash);
+        $otpModel = new \Application\Models\OtpChallenge();
+        $otp = $otpModel->issue((int)$client['user_id'], $client['email'], \Application\Models\OtpChallenge::PASSWORD_RESET);
+        $resetToken=bin2hex(random_bytes(32)); (new \Application\Models\User())->createResetToken($client['email'],$resetToken,date('Y-m-d H:i:s',time()+600));
+        $resetLink=rtrim(\Application\Config\App::get('url'),'/').'/password/verify?token='.urlencode($resetToken);
+        if (!$otp['ok'] || !\Application\Services\NotificationService::sendVerificationCodeEmail($client['email'], $client['name'], $otp['code'], 'password reset', $resetLink)) {
+            $otpModel->invalidate((int)$client['user_id'], \Application\Models\OtpChallenge::PASSWORD_RESET);
+            $msg = 'We could not send the password-reset verification code. Please try again.';
+            if ($request->isAjax()) { $response->json(['success'=>false,'message'=>$msg],422); return; }
+            \Application\Core\Session::setFlash('error',$msg); $response->redirect('/staff/clients/'.$clientId); return;
+        }
 
         \Application\Services\AuditService::log('staff_reset_client_password', 'users', $client['user_id']);
         
-        $msg = "Password for client '{$client['name']}' updated successfully.";
+        $msg = "A password-reset verification code was sent to '{$client['name']}'.";
         if ($request->isAjax()) {
             $response->json(['success' => true, 'message' => $msg]);
             return;
