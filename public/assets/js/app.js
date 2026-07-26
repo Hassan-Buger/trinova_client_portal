@@ -317,8 +317,12 @@
         }
         items.forEach((item) => {
             const link = document.createElement('a');
-            link.className = 'tn-notification-item';
+            link.className = `tn-notification-item${item.is_read ? '' : ' is-unread'}`;
             link.href = item.url;
+            link.dataset.notificationId = String(item.id);
+            const title = document.createElement('strong');
+            title.className = 'tn-notification-title';
+            title.textContent = item.title || 'Portal update';
             const message = document.createElement('span');
             message.className = 'tn-notification-message';
             message.textContent = item.message;
@@ -327,7 +331,7 @@
             time.dateTime = item.created_at;
             time.textContent = notificationTime(item.created_at);
             time.title = new Intl.DateTimeFormat(undefined, { dateStyle: 'full', timeStyle: 'short' }).format(new Date(item.created_at));
-            link.append(message, time);
+            link.append(title, message, time);
             list.appendChild(link);
         });
     }
@@ -350,7 +354,7 @@
             if (!response.ok || payload.success === false) return;
             const items = Array.isArray(payload.notifications) ? payload.notifications : [];
             renderNotifications(items);
-            setNotificationCount(Number(payload.count) || 0);
+            setNotificationCount(Number(payload.unread_count ?? payload.count) || 0);
         } catch (_) {
             // Notifications are progressive enhancement; the portal remains usable without polling.
         }
@@ -375,6 +379,21 @@
         }
     }
 
+    async function markNotificationRead(id) {
+        const token = document.body.dataset.csrfToken || '';
+        const response = await fetch('/notifications/read-all', {
+            method: 'POST',
+            headers: {
+                'Accept': 'application/json',
+                'Content-Type': 'application/x-www-form-urlencoded;charset=UTF-8',
+                'X-Requested-With': 'XMLHttpRequest',
+            },
+            credentials: 'same-origin',
+            body: new URLSearchParams({ csrf_token: token, notification_id: String(id) }),
+        });
+        return response.ok;
+    }
+
     function initialiseNotifications() {
         const button = document.getElementById('portalNotificationButton');
         const panel = document.getElementById('portalNotificationPanel');
@@ -386,14 +405,21 @@
             button.setAttribute('aria-expanded', opening ? 'true' : 'false');
             if (opening) {
                 await loadNotifications();
-                await markNotificationsRead();
             }
         });
-        panel.addEventListener('click', (event) => {
-            if (event.target.closest('.tn-notification-item')) {
-                panel.hidden = true;
-                button.setAttribute('aria-expanded', 'false');
+        panel.addEventListener('click', async (event) => {
+            const item = event.target.closest('.tn-notification-item');
+            if (!item) return;
+            event.preventDefault();
+            event.stopPropagation();
+            const destination = item.href;
+            const id = Number(item.dataset.notificationId);
+            if (id > 0 && item.classList.contains('is-unread')) {
+                try { await markNotificationRead(id); } catch (_) { /* Navigate even if marking fails. */ }
             }
+            panel.hidden = true;
+            button.setAttribute('aria-expanded', 'false');
+            navigate(destination);
         });
         document.addEventListener('click', (event) => {
             if (!panel.hidden && !event.target.closest('.tn-notification-wrap')) {

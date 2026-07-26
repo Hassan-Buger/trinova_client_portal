@@ -132,6 +132,31 @@ class DocumentController extends Controller
             die('File artifact missing from storage directory.');
         }
 
+        if ((string)$request->input('preview', '') === '1') {
+            $extension = strtolower(pathinfo((string)$doc['filename'], PATHINFO_EXTENSION));
+            $contentTypes = [
+                'pdf' => 'application/pdf',
+                'png' => 'image/png',
+                'jpg' => 'image/jpeg',
+                'jpeg' => 'image/jpeg',
+                'txt' => 'text/plain; charset=utf-8',
+                'csv' => 'text/csv; charset=utf-8',
+            ];
+
+            // Unsupported browser-preview formats continue as downloads.
+            if (isset($contentTypes[$extension])) {
+                AuditService::log('view', 'documents', $doc['id']);
+                $safeFilename = str_replace(['"', "\r", "\n"], '', basename((string)$doc['filename']));
+                header('Content-Type: ' . $contentTypes[$extension]);
+                header('Content-Disposition: inline; filename="' . $safeFilename . '"');
+                header('Content-Length: ' . filesize($filePath));
+                header('Cache-Control: private, no-store, max-age=0');
+                header('X-Content-Type-Options: nosniff');
+                readfile($filePath);
+                exit;
+            }
+        }
+
         AuditService::log('download', 'documents', $doc['id']);
 
         header('Content-Description: File Transfer');

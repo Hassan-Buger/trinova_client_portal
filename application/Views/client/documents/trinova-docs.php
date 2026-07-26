@@ -38,7 +38,7 @@
                             <div style="display:flex;align-items:center;gap:7px">
                             <?php $previewable = in_array(strtolower(pathinfo((string)$doc['filename'], PATHINFO_EXTENSION)), ['pdf', 'png', 'jpg', 'jpeg', 'txt', 'csv'], true); ?>
                             <?php if ($previewable): ?>
-                                <a href="/documents/view/<?= $doc['id'] ?>" target="_blank" rel="noopener" style="background:#f0f5f3;color:#41556f;padding:9px 14px;border-radius:12px;font-weight:700;font-size:13px">View</a>
+                                <a href="/client/documents/download/<?= (int)$doc['id'] ?>?preview=1" target="_blank" rel="noopener" data-no-ajax style="background:#f0f5f3;color:#41556f;padding:9px 14px;border-radius:12px;font-weight:700;font-size:13px">View</a>
                             <?php endif; ?>
                             <a href="/documents/download/<?= $doc['id'] ?>" style="background:#0d9488;color:#fff;padding:9px 16px;border-radius:12px;font-weight:700;font-size:13px;display:inline-flex;align-items:center;gap:6px">
                                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">

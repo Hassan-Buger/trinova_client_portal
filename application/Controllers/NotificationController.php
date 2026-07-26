@@ -7,6 +7,9 @@ use Application\Core\Request;
 use Application\Core\Response;
 use Application\Core\Session;
 use Application\Models\Notification;
+use Application\Models\Client;
+use Application\Models\Document;
+use Application\Models\DocumentRequest;
 
 class NotificationController extends Controller
 {
@@ -23,16 +26,33 @@ class NotificationController extends Controller
         $role = (string)Session::get('role', 'client');
         $items = array_map(
             fn(array $item): array => $this->serialise($item, $role),
-            $this->notificationModel->getUnreadByUser($userId)
+            $this->notificationModel->getRecentByUser($userId)
         );
 
-        $response->json(['success' => true, 'count' => count($items), 'notifications' => $items]);
+        $unreadCount = $this->notificationModel->countUnreadByUser($userId);
+        $response->json(['success' => true, 'count' => $unreadCount, 'unread_count' => $unreadCount, 'notifications' => $items]);
+    }
+
+    public function read(Request $request, Response $response): void
+    {
+        $id = (int)$request->input('notification_id', 0);
+        if ($id <= 0 || !$this->notificationModel->markAsRead($id, (int)Session::get('user_id', 0))) {
+            $response->json(['success' => false, 'message' => 'Notification was not found.'], 404);
+            return;
+        }
+        $response->json(['success' => true]);
     }
 
     public function readAll(Request $request, Response $response): void
     {
-        $this->notificationModel->markAllAsRead((int)Session::get('user_id', 0));
-        $response->json(['success' => true, 'count' => 0]);
+        $userId = (int)Session::get('user_id', 0);
+        $notificationId = (int)$request->input('notification_id', 0);
+        if ($notificationId > 0) {
+            $this->notificationModel->markAsRead($notificationId, $userId);
+        } else {
+            $this->notificationModel->markAllAsRead($userId);
+        }
+        $response->json(['success' => true, 'count' => $this->notificationModel->countUnreadByUser($userId)]);
     }
 
     private function serialise(array $item, string $role): array
@@ -43,20 +63,39 @@ class NotificationController extends Controller
         $type = (string)$item['type'];
 
         $details = match ($type) {
-            'document_received' => ['A new document is ready for you', '/client/documents/trinova'],
-            'client_document_uploaded' => ['A client uploaded a new document', '/staff/documents'],
+            'document_request' => $this->requestDetails($relatedId),
+            'document_received' => ['New Document Available', 'A new document is ready for you', '/client/documents/trinova'],
+            'document_upload', 'client_document_uploaded' => $this->uploadDetails($relatedId),
             'message_received' => $role === 'staff'
-                ? ['You received a new client message', '/staff/messages' . ($relatedId > 0 ? '?client_id=' . $relatedId : '')]
-                : ['You received a new message from TriNova', '/client/messages'],
-            default => ['You have a new portal update', $role === 'staff' ? '/staff/dashboard' : '/client/dashboard'],
+                ? ['New Client Message', 'You received a new client message', '/staff/messages' . ($relatedId > 0 ? '?client_id=' . $relatedId : '')]
+                : ['New Message', 'You received a new message from TriNova', '/client/messages'],
+            default => ['Portal Update', 'You have a new portal update', $role === 'staff' ? '/staff/dashboard' : '/client/dashboard'],
         };
 
         return [
             'id' => (int)$item['id'],
             'type' => $type,
-            'message' => $details[0],
-            'url' => $details[1],
+            'title' => (string)($item['title'] ?? '') ?: $details[0],
+            'message' => (string)($item['message'] ?? '') ?: $details[1],
+            'url' => (string)($item['action_url'] ?? '') ?: $details[2],
+            'is_read' => empty($item['is_unread']),
             'created_at' => date(DATE_ATOM, strtotime((string)$item['created_at'])),
         ];
+    }
+
+    private function requestDetails(int $id): array
+    {
+        $request = $id > 0 ? (new DocumentRequest())->find($id) : null;
+        $title = trim((string)($request['title'] ?? ''));
+        return ['New Document Request', $title !== '' ? "Staff requested: {$title}" : 'Staff requested a new document.', '/client/requests'];
+    }
+
+    private function uploadDetails(int $id): array
+    {
+        $document = $id > 0 ? (new Document())->find($id) : null;
+        $filename = (string)($document['filename'] ?? 'a document');
+        $client = $document ? (new Client())->findById((int)$document['client_id']) : null;
+        $name = (string)($client['name'] ?? 'A client');
+        return ['New Document Uploaded', "{$name} uploaded {$filename}", '/staff/documents'];
     }
 }

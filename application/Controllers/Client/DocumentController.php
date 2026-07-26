@@ -93,9 +93,17 @@ class DocumentController extends Controller
         AuditService::log('upload', 'documents', $docId);
         try {
             $notificationModel = new Notification();
+            $clientName = (new \Application\Models\Client())->findById((int)$clientId)['name'] ?? 'A client';
             foreach ((new User())->getAllStaff() as $staff) {
                 if (($staff['status'] ?? '') === 'active') {
-                    $notificationModel->create((int)$staff['id'], 'client_document_uploaded', 'document:' . $docId);
+                    $notificationModel->create(
+                        (int)$staff['id'],
+                        'document_upload',
+                        'document:' . $docId,
+                        'New Document Uploaded',
+                        "{$clientName} uploaded {$filename}",
+                        '/staff/documents'
+                    );
                 }
             }
         } catch (\Throwable $e) {
@@ -108,7 +116,17 @@ class DocumentController extends Controller
             $reqModel->updateStatus($requestId, 'Uploaded');
         }
 
-        Session::setFlash('success', "Document '{$filename}' uploaded successfully!");
+        $successMessage = "Document '{$filename}' uploaded successfully!";
+        if ($request->isAjax()) {
+            $response->json([
+                'success' => true,
+                'message' => $successMessage,
+                'redirect' => '/client/documents/my-uploads',
+            ]);
+            return;
+        }
+
+        Session::setFlash('success', $successMessage);
         $response->redirect('/client/documents/my-uploads');
     }
 
@@ -136,6 +154,14 @@ class DocumentController extends Controller
 
     public function download(Request $request, Response $response, int $id): void
     {
+        // Reuse this established route for browser previews. Some deployments
+        // cache their front-controller route table, while this download route
+        // is already known to be available and working.
+        if ((string)$request->input('preview', '') === '1') {
+            $this->view($request, $response, $id);
+            return;
+        }
+
         [$doc, $filePath] = $this->resolveAuthorizedDocument($response, $id);
 
         // Log audit event
