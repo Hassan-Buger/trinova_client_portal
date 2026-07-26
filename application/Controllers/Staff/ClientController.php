@@ -27,11 +27,20 @@ class ClientController extends Controller
 
     public function index(Request $request, Response $response): void
     {
-        $clients = $this->clientModel->getAllWithUsers();
+        $query = $request->getQueryParams();
+        $search = trim((string) ($query['q'] ?? ''));
+        $page = max(1, (int) ($query['page'] ?? 1));
+        $perPage = (int) ($query['per_page'] ?? 10);
+        if (!in_array($perPage, [10, 20, 50], true)) {
+            $perPage = 10;
+        }
+        $pagination = $this->clientModel->paginate($search, $page, $perPage);
 
         $this->render('staff/clients/index', [
             'pageTitle' => 'Clients Overview',
-            'clients'   => $clients,
+            'clients'   => $pagination['items'],
+            'search' => $search,
+            'pagination' => $pagination,
         ], 'main');
     }
 
@@ -166,13 +175,14 @@ class ClientController extends Controller
     {
         $body     = $request->getBody();
         $clientId = (int)($body['client_id'] ?? 0);
+        $confirmation = trim((string)($body['confirm_delete'] ?? ''));
 
-        if ($clientId <= 0) {
+        if ($clientId <= 0 || $confirmation !== 'DELETE') {
             if ($request->isAjax()) {
-                $response->json(['success' => false, 'message' => 'Invalid client ID.'], 400);
+                $response->json(['success' => false, 'message' => 'Type DELETE to confirm permanent client removal.'], 422);
                 return;
             }
-            \Application\Core\Session::setFlash('error', 'Invalid client ID.');
+            \Application\Core\Session::setFlash('error', 'Type DELETE to confirm permanent client removal.');
             $response->redirect('/staff/clients');
             return;
         }
@@ -185,7 +195,7 @@ class ClientController extends Controller
 
             $msg = "Client account '{$name}' removed successfully.";
             if ($request->isAjax()) {
-                $response->json(['success' => true, 'message' => $msg]);
+                $response->json(['success' => true, 'message' => $msg, 'redirect' => '/staff/clients']);
                 return;
             }
             \Application\Core\Session::setFlash('success', $msg);

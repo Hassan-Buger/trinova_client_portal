@@ -23,14 +23,40 @@ class DeadlineController extends Controller
 
     public function index(Request $request, Response $response): void
     {
-        $deadlines = $this->deadlineModel->getAllWithDetails();
+        $query = $request->getQueryParams();
+        $types = ['VAT', 'Payroll', 'Accounts', 'Corporation Tax', 'Self Assessment', 'Confirmation Statement'];
+        $statuses = ['Pending', 'Overdue', 'Completed'];
+        $filters = [
+            'search' => trim((string)($query['q'] ?? '')),
+            'client_id' => max(0, (int)($query['client_id'] ?? 0)),
+            'type' => in_array(($query['type'] ?? ''), $types, true) ? $query['type'] : '',
+            'status' => in_array(($query['status'] ?? ''), $statuses, true) ? $query['status'] : '',
+            'due_from' => $this->validDate($query['due_from'] ?? '') ? $query['due_from'] : '',
+            'due_to' => $this->validDate($query['due_to'] ?? '') ? $query['due_to'] : '',
+            'timing' => in_array(($query['timing'] ?? ''), ['overdue', 'upcoming'], true) ? $query['timing'] : '',
+            'sort' => in_array(($query['sort'] ?? ''), ['due_asc', 'due_desc', 'newest', 'client_asc'], true) ? $query['sort'] : 'due_asc',
+        ];
+        $requestedPerPage = (int)($query['per_page'] ?? 20);
+        $perPage = in_array($requestedPerPage, [10, 20, 50], true) ? $requestedPerPage : 20;
+        $pagination = $this->deadlineModel->paginateWithDetails($filters, max(1, (int)($query['page'] ?? 1)), $perPage);
         $clients   = $this->clientModel->getAllWithUsers();
 
         $this->render('staff/deadlines/index', [
             'pageTitle' => 'Practice Compliance Deadlines',
-            'deadlines' => $deadlines,
+            'deadlines' => $pagination['items'],
             'clients'   => $clients,
+            'types' => $types,
+            'statuses' => $statuses,
+            'filters' => $filters,
+            'pagination' => $pagination,
         ], 'main');
+    }
+
+    private function validDate(mixed $value): bool
+    {
+        if (!is_string($value) || !preg_match('/^\d{4}-\d{2}-\d{2}$/', $value)) return false;
+        $date = \DateTimeImmutable::createFromFormat('!Y-m-d', $value);
+        return $date !== false && $date->format('Y-m-d') === $value;
     }
 
     public function create(Request $request, Response $response): void

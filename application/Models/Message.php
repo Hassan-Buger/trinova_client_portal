@@ -39,6 +39,23 @@ class Message extends Model
         return $stmt->fetchAll();
     }
 
+    public function getByClientAfterId(int $clientId, int $afterId, int $limit = 100): array
+    {
+        $limit = max(1, min($limit, 100));
+        $stmt = $this->db->prepare("
+            SELECT m.*, u.name AS sender_name, u.role AS sender_role
+            FROM messages m
+            LEFT JOIN users u ON u.id = m.sender_id
+            WHERE m.client_id = :client_id AND m.id > :after_id
+            ORDER BY m.id ASC
+            LIMIT {$limit}
+        ");
+        $stmt->bindValue(':client_id', $clientId, PDO::PARAM_INT);
+        $stmt->bindValue(':after_id', $afterId, PDO::PARAM_INT);
+        $stmt->execute();
+        return $stmt->fetchAll();
+    }
+
     public function create(array $data): int
     {
         $stmt = $this->db->prepare("

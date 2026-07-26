@@ -8,6 +8,7 @@ use Application\Core\Response;
 use Application\Core\Session;
 use Application\Models\Client;
 use Application\Models\Message;
+use Application\Models\Notification;
 use Application\Services\AuditService;
 use Application\Services\NotificationService;
 
@@ -43,6 +44,21 @@ class MessageController extends Controller
         ], 'main');
     }
 
+    public function feed(Request $request, Response $response): void
+    {
+        $clientId = (int) ($request->getQueryParams()['client_id'] ?? 0);
+        if ($clientId <= 0 || !$this->clientModel->findById($clientId)) {
+            $response->json(['success' => false, 'message' => 'Client thread was not found.'], 404);
+        }
+
+        $afterId = max(0, (int) ($request->getQueryParams()['after_id'] ?? 0));
+        $this->messageModel->markAsReadForRecipient($clientId, 'staff');
+        $response->json([
+            'success' => true,
+            'messages' => $this->serialiseMessages($this->messageModel->getByClientAfterId($clientId, $afterId)),
+        ]);
+    }
+
     public function send(Request $request, Response $response): void
     {
         $body        = $request->getBody();
@@ -50,7 +66,7 @@ class MessageController extends Controller
         $senderId    = Session::get('user_id');
         $messageText = trim($body['body'] ?? '');
 
-        if ($clientId > 0 && $senderId && !empty($messageText)) {
+        if ($clientId > 0 && $senderId && !empty($messageText) && $this->clientModel->findById($clientId)) {
             $msgId = $this->messageModel->create([
                 'client_id' => $clientId,
                 'sender_id' => $senderId,
@@ -60,13 +76,38 @@ class MessageController extends Controller
             AuditService::log('staff_message_sent', 'messages', $msgId);
             
             $client = $this->clientModel->findById($clientId);
+            try {
+                if ($client && !empty($client['user_id'])) {
+                    (new Notification())->create((int)$client['user_id'], 'message_received', 'message:' . $msgId);
+                }
+            } catch (\Throwable $e) {
+                // The message remains successful if notification storage is unavailable.
+            }
             if ($client && !empty($client['email'])) {
                 NotificationService::sendPromptEmail($client['email'], 'New Message from TriNova Accounting', 'A member of the TriNova team has sent you a message on your portal.');
             }
 
             Session::setFlash('success', 'Message dispatched to client thread.');
+        } elseif ($request->isAjax()) {
+            $response->json(['success' => false, 'message' => 'Choose a valid client and enter a message.'], 422);
+        }
+
+        if ($request->isAjax()) {
+            $response->json(['success' => true, 'message' => 'Message dispatched to client thread.']);
         }
 
         $response->redirect('/staff/messages?client_id=' . $clientId);
+    }
+
+    private function serialiseMessages(array $messages): array
+    {
+        return array_map(static fn(array $message): array => [
+            'id' => (int) $message['id'],
+            'sender_name' => $message['sender_name'] ?? 'User',
+            'sender_role' => $message['sender_role'] ?? '',
+            'body' => $message['body'] ?? '',
+            'created_at' => date(DATE_ATOM, strtotime($message['created_at'])),
+            'read_at' => $message['read_at'] ?? null,
+        ], $messages);
     }
 }

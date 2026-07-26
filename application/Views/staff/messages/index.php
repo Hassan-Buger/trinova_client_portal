@@ -1,6 +1,5 @@
 <div class="tn-screen" style="max-width:1120px">
     <div style="margin-bottom:24px">
-        <h2 style="margin:0 0 6px;font-size:26px;font-weight:800;letter-spacing:-.02em">Staff Messaging Console</h2>
         <p style="margin:0;color:#61756e;font-size:14.5px">Select a client thread to read conversation history and send responses.</p>
     </div>
 
@@ -13,7 +12,7 @@
                 $isSelected = ((int)$c['id'] === (int)$selectedClientId);
                 $itemBg = $isSelected ? 'background:#e6ecf5;border-color:transparent;' : 'background:#fbfdfc;border-color:rgba(20,60,50,.08);';
                 ?>
-                <a href="/staff/messages?client_id=<?= $c['id'] ?>" style="display:block;padding:14px;border-radius:16px;border:1px solid;<?= $itemBg ?>text-decoration:none;transition:all .15s">
+                <a href="/staff/messages?client_id=<?= $c['id'] ?>" data-ajax-link style="display:block;padding:14px;border-radius:16px;border:1px solid;<?= $itemBg ?>text-decoration:none;transition:all .15s">
                     <div style="font-weight:700;font-size:14.5px;color:#213330"><?= htmlspecialchars($c['name']) ?></div>
                     <div style="font-size:12.5px;color:#7d8e88;margin-top:2px"><?= htmlspecialchars($c['email']) ?></div>
                 </a>
@@ -33,33 +32,36 @@
                     <span style="font-size:12px;font-weight:700;color:#41556f;background:#e6ecf5;padding:4px 10px;border-radius:999px">Shared Access</span>
                 </div>
 
-                <div style="flex:1;padding:24px;overflow-y:auto;display:flex;flex-direction:column;gap:14px;background:#fcfdfe">
+                <div data-message-thread data-current-role="staff" data-feed-url="/staff/messages/feed?client_id=<?= (int) $activeClient['id'] ?>" style="flex:1;padding:24px;overflow-y:auto;display:flex;flex-direction:column;gap:14px;background:#fcfdfe;max-height:560px">
                     <?php if (empty($messages)): ?>
-                        <div style="padding:48px 0;text-align:center;color:#8a9a94;font-size:14px">No messages in this client thread yet.</div>
+                        <div data-empty-thread style="padding:48px 0;text-align:center;color:#8a9a94;font-size:14px">No messages in this client thread yet.</div>
                     <?php else: ?>
+                        <?php $lastMessageDay = null; ?>
                         <?php foreach ($messages as $msg): ?>
                             <?php
                             $isStaff = ($msg['sender_role'] === 'staff');
-                            $bubbleBg = $isStaff ? '#41556f' : '#ffffff';
-                            $textColor = $isStaff ? '#ffffff' : '#213330';
-                            $align = $isStaff ? 'align-self:flex-end;border-bottom-right-radius:4px;' : 'align-self:flex-start;border-bottom-left-radius:4px;border:1px solid rgba(20,60,50,.08);';
+                            $messageDay = date('Y-m-d', strtotime($msg['created_at']));
                             ?>
-                            <div style="max-width:78%;<?= $align ?>border-radius:18px;padding:15px 18px;box-shadow:0 2px 8px rgba(16,54,45,.04);background:<?= $bubbleBg ?>">
-                                <div style="font-size:12px;font-weight:700;margin-bottom:5px;<?= $isStaff ? 'color:rgba(255,255,255,.85);' : 'color:#5f726c;' ?>">
-                                    <?= htmlspecialchars($msg['sender_name'] ?? 'User') ?> &middot; <?= date('H:i, d M', strtotime($msg['created_at'])) ?>
+                            <?php if ($messageDay !== $lastMessageDay): ?>
+                                <div class="tn-message-day"><?= date('l, d M Y', strtotime($msg['created_at'])) ?></div>
+                                <?php $lastMessageDay = $messageDay; ?>
+                            <?php endif; ?>
+                            <article class="tn-message-bubble <?= $isStaff ? 'is-mine' : 'is-theirs' ?>" data-message-id="<?= (int) $msg['id'] ?>" data-message-day="<?= $messageDay ?>">
+                                <div class="tn-message-meta" title="<?= htmlspecialchars(date('l, d F Y \a\t H:i', strtotime($msg['created_at']))) ?>">
+                                    <?= htmlspecialchars($msg['sender_name'] ?? 'User') ?> &middot; <?= date('H:i', strtotime($msg['created_at'])) ?>
                                 </div>
-                                <div style="font-size:14px;line-height:1.45;color:<?= $textColor ?>;white-space:pre-wrap"><?= htmlspecialchars($msg['body']) ?></div>
-                            </div>
+                                <div class="tn-message-body"><?= htmlspecialchars($msg['body']) ?></div>
+                            </article>
                         <?php endforeach; ?>
                     <?php endif; ?>
                 </div>
 
                 <div style="padding:18px 24px;border-top:1px solid #eef4f1;background:#fff">
-                    <form action="/staff/messages/send" method="POST" style="margin:0;display:flex;gap:12px">
+                    <form action="/staff/messages/send" method="POST" data-ajax-form data-message-form data-ajax-refresh="false" style="margin:0;display:flex;gap:12px">
                         <input type="hidden" name="csrf_token" value="<?= htmlspecialchars(\Application\Core\Session::csrfToken()) ?>">
                         <input type="hidden" name="client_id" value="<?= $activeClient['id'] ?>">
                         <textarea name="body" rows="2" placeholder="Write response to <?= htmlspecialchars($activeClient['name']) ?>..." required style="flex:1;padding:12px 16px;border:1.5px solid #e0e9e5;border-radius:14px;font-size:14px;background:#fbfdfc;resize:none"></textarea>
-                        <button type="submit" style="background:#41556f;color:#fff;border:none;padding:0 22px;border-radius:14px;font-weight:700;font-size:14px;cursor:pointer;white-space:nowrap">Send Reply</button>
+                        <button type="submit" data-loading-text="Sending…" style="background:#41556f;color:#fff;border:none;padding:0 22px;border-radius:14px;font-weight:700;font-size:14px;cursor:pointer;white-space:nowrap">Send Reply</button>
                     </form>
                 </div>
             <?php endif; ?>

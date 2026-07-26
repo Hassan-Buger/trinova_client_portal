@@ -8,6 +8,8 @@ use Application\Core\Request;
 use Application\Core\Response;
 use Application\Core\Session;
 use Application\Models\Document;
+use Application\Models\Notification;
+use Application\Models\User;
 use Application\Services\AuditService;
 
 class DocumentController extends Controller
@@ -89,6 +91,16 @@ class DocumentController extends Controller
         ]);
 
         AuditService::log('upload', 'documents', $docId);
+        try {
+            $notificationModel = new Notification();
+            foreach ((new User())->getAllStaff() as $staff) {
+                if (($staff['status'] ?? '') === 'active') {
+                    $notificationModel->create((int)$staff['id'], 'client_document_uploaded', 'document:' . $docId);
+                }
+            }
+        } catch (\Throwable $e) {
+            // Notifications must never prevent a successful document upload.
+        }
 
         // If tied to a document request, update status to Uploaded
         if ($requestId > 0) {
@@ -124,26 +136,7 @@ class DocumentController extends Controller
 
     public function download(Request $request, Response $response, int $id): void
     {
-        $doc = $this->documentModel->find($id);
-        $clientId = Session::get('client_id');
-        $userRole = Session::get('role');
-
-        if (!$doc) {
-            $response->setStatusCode(404);
-            die('Document Not Found.');
-        }
-
-        // Security check: Clients can only download their own documents; Staff has unrestricted access
-        if ($userRole === 'client' && $clientId && (int)$doc['client_id'] !== (int)$clientId) {
-            $response->setStatusCode(403);
-            die('Access Denied: You do not have permission to download this document.');
-        }
-
-        $filePath = App::get('storage_dir') . '/uploads/' . $doc['stored_path'];
-        if (!file_exists($filePath)) {
-            $response->setStatusCode(404);
-            die('File artifact missing from storage directory.');
-        }
+        [$doc, $filePath] = $this->resolveAuthorizedDocument($response, $id);
 
         // Log audit event
         AuditService::log('download', 'documents', $doc['id']);
@@ -157,5 +150,58 @@ class DocumentController extends Controller
         header('Pragma: public');
         readfile($filePath);
         exit;
+    }
+
+    public function view(Request $request, Response $response, int $id): void
+    {
+        [$doc, $filePath] = $this->resolveAuthorizedDocument($response, $id);
+        $extension = strtolower(pathinfo((string)$doc['filename'], PATHINFO_EXTENSION));
+        $contentTypes = [
+            'pdf' => 'application/pdf',
+            'png' => 'image/png',
+            'jpg' => 'image/jpeg',
+            'jpeg' => 'image/jpeg',
+            'txt' => 'text/plain; charset=utf-8',
+            'csv' => 'text/csv; charset=utf-8',
+        ];
+
+        if (!isset($contentTypes[$extension])) {
+            $response->redirect('/documents/download/' . $id);
+            return;
+        }
+
+        AuditService::log('view', 'documents', $doc['id']);
+        $safeFilename = str_replace(['"', "\r", "\n"], '', basename((string)$doc['filename']));
+        header('Content-Type: ' . $contentTypes[$extension]);
+        header('Content-Disposition: inline; filename="' . $safeFilename . '"');
+        header('Content-Length: ' . filesize($filePath));
+        header('Cache-Control: private, no-store, max-age=0');
+        header('X-Content-Type-Options: nosniff');
+        readfile($filePath);
+        exit;
+    }
+
+    private function resolveAuthorizedDocument(Response $response, int $id): array
+    {
+        $doc = $this->documentModel->find($id);
+        if (!$doc) {
+            $response->setStatusCode(404);
+            die('Document Not Found.');
+        }
+
+        $userRole = (string)Session::get('role');
+        $clientId = (int)Session::get('client_id', 0);
+        if ($userRole !== 'staff' && ($userRole !== 'client' || $clientId <= 0 || (int)$doc['client_id'] !== $clientId)) {
+            $response->setStatusCode(403);
+            die('Access Denied: You do not have permission to access this document.');
+        }
+
+        $filePath = App::get('storage_dir') . '/uploads/' . $doc['stored_path'];
+        if (!is_file($filePath)) {
+            $response->setStatusCode(404);
+            die('File artifact missing from storage directory.');
+        }
+
+        return [$doc, $filePath];
     }
 }

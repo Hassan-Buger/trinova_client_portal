@@ -45,6 +45,53 @@ class Client extends Model
         return $stmt->fetchAll();
     }
 
+    public function paginate(string $search = '', int $page = 1, int $perPage = 10): array
+    {
+        $page = max(1, $page);
+        $perPage = max(5, min($perPage, 50));
+        $where = '';
+        $params = [];
+
+        if ($search !== '') {
+            $where = "WHERE u.name LIKE :search_name OR u.email LIKE :search_email OR c.phone LIKE :search_phone";
+            $like = '%' . $search . '%';
+            $params = [
+                'search_name' => $like,
+                'search_email' => $like,
+                'search_phone' => $like,
+            ];
+        }
+
+        $countStmt = $this->db->prepare("
+            SELECT COUNT(*) FROM clients c
+            JOIN users u ON u.id = c.user_id
+            {$where}
+        ");
+        $countStmt->execute($params);
+        $total = (int) $countStmt->fetchColumn();
+        $totalPages = max(1, (int) ceil($total / $perPage));
+        $page = min($page, $totalPages);
+        $offset = ($page - 1) * $perPage;
+
+        $stmt = $this->db->prepare("
+            SELECT c.*, u.name, u.email, u.status AS user_status
+            FROM clients c
+            JOIN users u ON u.id = c.user_id
+            {$where}
+            ORDER BY u.name ASC
+            LIMIT {$perPage} OFFSET {$offset}
+        ");
+        $stmt->execute($params);
+
+        return [
+            'items' => $stmt->fetchAll(),
+            'total' => $total,
+            'page' => $page,
+            'per_page' => $perPage,
+            'total_pages' => $totalPages,
+        ];
+    }
+
     public function getAmlActionRequiredCount(): int
     {
         $stmt = $this->db->query("

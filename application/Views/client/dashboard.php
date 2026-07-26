@@ -1,6 +1,5 @@
 <div class="tn-screen" style="max-width:1120px">
-    <p style="margin:0 0 4px;color:#61756e;font-size:15px;font-weight:500"><?= date('l, j F Y') ?></p>
-    <h2 style="margin:0 0 22px;font-size:30px;font-weight:800;letter-spacing:-.025em">Good morning, <?= htmlspecialchars($userName) ?></h2>
+    <p style="margin:0 0 22px;color:#61756e;font-size:15px;font-weight:500"><?= date('l, j F Y') ?></p>
     
     <!-- Dashboard Stats Grid -->
     <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:16px;margin-bottom:24px">

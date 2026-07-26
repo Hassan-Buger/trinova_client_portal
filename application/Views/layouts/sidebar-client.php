@@ -6,7 +6,7 @@ $nav = [
     ['href' => '/client/documents/upload', 'label' => 'Upload Documents', 'icon' => 'upload'],
     ['href' => '/client/documents/my-uploads', 'label' => 'My Uploads', 'icon' => 'folder'],
     ['href' => '/client/documents/trinova', 'label' => 'Documents from TriNova', 'icon' => 'file'],
-    ['href' => '/client/messages', 'label' => 'Messages', 'icon' => 'chat', 'badge' => '1'],
+    ['href' => '/client/messages', 'label' => 'Messages', 'icon' => 'chat'],
     ['href' => '/client/meetings/book', 'label' => 'Book a Meeting', 'icon' => 'calCheck'],
     ['href' => '/client/deadlines', 'label' => 'Important Dates', 'icon' => 'cal'],
     ['href' => '/client/aml', 'label' => 'AML', 'icon' => 'shield'],

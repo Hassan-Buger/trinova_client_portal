@@ -1,10 +1,5 @@
 <div class="tn-screen" style="max-width:1120px">
-    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:22px">
-        <div>
-            <p style="margin:0 0 4px;color:#61756e;font-size:15px">Overview of tasks, recent uploads, unread messages, and compliance deadlines.</p>
-            <h2 style="margin:0;font-size:26px;font-weight:800;letter-spacing:-.02em">Staff Dashboard</h2>
-        </div>
-    </div>
+    <p style="margin:0 0 22px;color:#61756e;font-size:15px">Overview of tasks, recent uploads, unread messages, and compliance deadlines.</p>
 
     <!-- Staff Stat Grid -->
     <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:16px;margin-bottom:24px">

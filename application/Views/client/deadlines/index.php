@@ -1,6 +1,5 @@
 <div class="tn-screen" style="max-width:1120px">
     <div style="margin-bottom:24px">
-        <h2 style="margin:0 0 6px;font-size:26px;font-weight:800;letter-spacing:-.02em">Important Dates & Compliance Tracker</h2>
         <p style="margin:0;color:#61756e;font-size:14.5px">Statutory deadlines for VAT, Payroll, Accounts, Corp Tax, Self Assessment, and Confirmation Statements.</p>
     </div>
 

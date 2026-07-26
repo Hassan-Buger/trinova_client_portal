@@ -1,6 +1,5 @@
 <div class="tn-screen" style="max-width:860px">
     <div style="margin-bottom:24px">
-        <h2 style="margin:0 0 6px;font-size:26px;font-weight:800;letter-spacing:-.02em">Upload Documents</h2>
         <p style="margin:0;color:#61756e;font-size:14.5px">Select or drag files to upload securely to TriNova Accounting.</p>
     </div>
 
@@ -42,6 +41,7 @@
 </div>
 
 <script>
+(() => {
 const dropzone = document.getElementById('dropzone');
 const fileInput = document.getElementById('fileInput');
 
@@ -66,4 +66,5 @@ dropzone.addEventListener('drop', (e) => {
         document.getElementById('selectedFileName').innerText = 'Selected: ' + fileInput.files[0].name;
     }
 });
+})();
 </script>
