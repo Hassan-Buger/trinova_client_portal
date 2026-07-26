@@ -101,8 +101,8 @@ class DocumentController extends Controller
                         'document_upload',
                         'document:' . $docId,
                         'New Document Uploaded',
-                        "{$clientName} uploaded {$filename}",
-                        '/staff/documents'
+                        "{$clientName} uploaded a new document: {$filename}",
+                        '/staff/documents?client_id=' . (int)$clientId
                     );
                 }
             }

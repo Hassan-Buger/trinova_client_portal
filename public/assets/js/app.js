@@ -349,6 +349,7 @@
             const response = await fetch('/notifications/feed', {
                 headers: { 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
                 credentials: 'same-origin',
+                cache: 'no-store',
             });
             const payload = await response.json();
             if (!response.ok || payload.success === false) return;
@@ -428,7 +429,9 @@
             }
         });
         loadNotifications();
-        state.notificationTimer = window.setInterval(loadNotifications, 30000);
+        // Short polling provides near-real-time cross-session updates without
+        // introducing a separate WebSocket service on shared hosting.
+        state.notificationTimer = window.setInterval(loadNotifications, 5000);
     }
 
     function initialisePage() {

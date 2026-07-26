@@ -22,6 +22,7 @@ class NotificationController extends Controller
 
     public function feed(Request $request, Response $response): void
     {
+        header('Cache-Control: private, no-store, max-age=0');
         $userId = (int)Session::get('user_id', 0);
         $role = (string)Session::get('role', 'client');
         $items = array_map(
@@ -64,7 +65,7 @@ class NotificationController extends Controller
 
         $details = match ($type) {
             'document_request' => $this->requestDetails($relatedId),
-            'document_received' => ['New Document Available', 'A new document is ready for you', '/client/documents/trinova'],
+            'document_received' => $this->documentReceivedDetails($relatedId),
             'document_upload', 'client_document_uploaded' => $this->uploadDetails($relatedId),
             'message_received' => $role === 'staff'
                 ? ['New Client Message', 'You received a new client message', '/staff/messages' . ($relatedId > 0 ? '?client_id=' . $relatedId : '')]
@@ -96,6 +97,13 @@ class NotificationController extends Controller
         $filename = (string)($document['filename'] ?? 'a document');
         $client = $document ? (new Client())->findById((int)$document['client_id']) : null;
         $name = (string)($client['name'] ?? 'A client');
-        return ['New Document Uploaded', "{$name} uploaded {$filename}", '/staff/documents'];
+        return ['New Document Uploaded', "{$name} uploaded a new document: {$filename}", '/staff/documents' . ($document ? '?client_id=' . (int)$document['client_id'] : '')];
+    }
+
+    private function documentReceivedDetails(int $id): array
+    {
+        $document = $id > 0 ? (new Document())->find($id) : null;
+        $filename = (string)($document['filename'] ?? 'a new document');
+        return ['New Document Available', "A new document has been uploaded to your account: {$filename}", '/client/documents/trinova'];
     }
 }
