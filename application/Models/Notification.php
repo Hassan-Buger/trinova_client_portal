@@ -59,6 +59,21 @@ class Notification extends Model
         return $stmt->rowCount() > 0;
     }
 
+    public function markManyAsRead(array $ids, int $userId): int
+    {
+        $ids = array_values(array_unique(array_filter(array_map('intval', $ids), fn(int $id): bool => $id > 0)));
+        if (!$ids) return 0;
+
+        $placeholders = implode(',', array_fill(0, count($ids), '?'));
+        $stmt = $this->db->prepare("
+            UPDATE notifications
+            SET read_at = COALESCE(read_at, NOW())
+            WHERE user_id = ? AND read_at IS NULL AND id IN ({$placeholders})
+        ");
+        $stmt->execute(array_merge([$userId], $ids));
+        return $stmt->rowCount();
+    }
+
     public function markAllAsRead(int $userId): void
     {
         $stmt = $this->db->prepare("

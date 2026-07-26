@@ -109,7 +109,14 @@ class DocumentController extends Controller
         try {
             $client = $this->clientModel->findById($clientId);
             if ($client && !empty($client['user_id'])) {
-                (new Notification())->create((int)$client['user_id'], 'document_received', 'document:' . $docId);
+                (new Notification())->create(
+                    (int)$client['user_id'],
+                    'document_received',
+                    'document:' . $docId,
+                    'New Document Available',
+                    "A new document has been uploaded to your account: {$filename}",
+                    '/client/documents/trinova'
+                );
             }
         } catch (\Throwable $e) {
             // Notifications must never prevent a successful document upload.

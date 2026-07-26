@@ -1,111 +1,12 @@
 <?php
-
 namespace Application\Controllers\Auth;
-
-use Application\Core\Controller;
-use Application\Core\Request;
-use Application\Core\Response;
-use Application\Core\Session;
-use Application\Models\User;
-use Application\Services\AuditService;
-use Application\Services\NotificationService;
-
+use Application\Core\Controller; use Application\Core\Request; use Application\Core\Response; use Application\Core\Session; use Application\Models\User; use Application\Models\OtpChallenge; use Application\Services\AuditService; use Application\Services\NotificationService;
 class PasswordResetController extends Controller
 {
-    private User $userModel;
-
-    public function __construct()
-    {
-        $this->userModel = new User();
-    }
-
-    public function showRequestForm(Request $request, Response $response): void
-    {
-        $this->render('auth/password-reset', [
-            'pageTitle' => 'Reset Password — TriNova Portal',
-            'error'     => Session::getFlash('error'),
-            'success'   => Session::getFlash('success'),
-        ], 'main');
-    }
-
-    public function sendResetLink(Request $request, Response $response): void
-    {
-        $email = strtolower(trim($request->input('email') ?? ''));
-
-        if (empty($email)) {
-            Session::setFlash('error', 'Please enter your email address.');
-            $response->redirect('/password/reset');
-            return;
-        }
-
-        $user = $this->userModel->findByEmail($email);
-        if ($user) {
-            $code = (string) random_int(100000, 999999);
-            $expiresAt = date('Y-m-d H:i:s', strtotime('+15 minutes'));
-
-            $this->userModel->storeVerificationCode($email, $code, $expiresAt);
-            AuditService::log('password_reset_code_sent', 'users', $user['id'], $user['id']);
-
-            NotificationService::sendVerificationCodeEmail($email, $user['name'], $code);
-        }
-
-        Session::setFlash('success', 'A 6-digit verification code has been dispatched to your email address.');
-        $response->redirect('/password/verify?email=' . urlencode($email));
-    }
-
-    public function showVerifyForm(Request $request, Response $response): void
-    {
-        $email = strtolower(trim($request->input('email') ?? ''));
-
-        $this->render('auth/verify-code', [
-            'pageTitle' => 'Enter Verification Code — TriNova Portal',
-            'email'     => $email,
-            'error'     => Session::getFlash('error'),
-            'success'   => Session::getFlash('success'),
-        ], 'main');
-    }
-
-    public function processCodeVerify(Request $request, Response $response): void
-    {
-        $email           = strtolower(trim($request->input('email') ?? ''));
-        $code            = trim($request->input('code') ?? '');
-        $password        = $request->input('password') ?? '';
-        $passwordConfirm = $request->input('password_confirm') ?? '';
-
-        if (empty($email) || empty($code)) {
-            Session::setFlash('error', 'Email address and 6-digit verification code are required.');
-            $response->redirect('/password/verify?email=' . urlencode($email));
-            return;
-        }
-
-        if (empty($password) || strlen($password) < 8) {
-            Session::setFlash('error', 'Password must be at least 8 characters long.');
-            $response->redirect('/password/verify?email=' . urlencode($email));
-            return;
-        }
-
-        if ($password !== $passwordConfirm) {
-            Session::setFlash('error', 'Passwords do not match.');
-            $response->redirect('/password/verify?email=' . urlencode($email));
-            return;
-        }
-
-        $user = $this->userModel->findByVerificationCode($email, $code);
-        if (!$user) {
-            Session::setFlash('error', 'Invalid or expired 6-digit verification code. Please request a new code.');
-            $response->redirect('/password/verify?email=' . urlencode($email));
-            return;
-        }
-
-        $hash = password_hash($password, PASSWORD_BCRYPT);
-        $this->userModel->updatePassword((int)$user['id'], $hash);
-        $this->userModel->clearVerificationCode((int)$user['id']);
-        $this->userModel->resetLoginAttempts((int)$user['id']);
-
-        AuditService::log('password_reset_complete', 'users', $user['id'], $user['id']);
-        NotificationService::sendPasswordChangedAlert($user['email'], $user['name']);
-
-        Session::setFlash('success', 'Your password has been reset successfully. Please sign in with your new password.');
-        $response->redirect('/login');
-    }
+ private User $users; private OtpChallenge $otps; public function __construct(){ $this->users=new User(); $this->otps=new OtpChallenge(); }
+ public function showRequestForm(Request $q,Response $r):void{$this->render('auth/password-reset',['pageTitle'=>'Reset Password','error'=>Session::getFlash('error'),'success'=>Session::getFlash('success')],'main');}
+ public function sendResetLink(Request $q,Response $r):void{ $email=strtolower(trim((string)$q->input('email',''))); $u=$this->users->findByEmail($email); Session::remove('otp_verified'); Session::remove('reset_user_id'); if($u&&$u['role']==='client'){ $token=bin2hex(random_bytes(32));$this->users->createResetToken($u['email'],$token,date('Y-m-d H:i:s',time()+600));$link=rtrim(\Application\Config\App::get('url'),'/').'/password/verify?token='.urlencode($token);$otp=$this->otps->issue((int)$u['id'],$u['email'],OtpChallenge::PASSWORD_RESET); if($otp['ok']&&NotificationService::sendVerificationCodeEmail($u['email'],$u['name'],$otp['code'],'password reset',$link)) Session::set('reset_user_id',(int)$u['id']); else if($otp['ok'])$this->otps->invalidate((int)$u['id'],OtpChallenge::PASSWORD_RESET); } Session::setFlash('success','If an account exists for this email, a verification code has been sent.'); $r->redirect('/password/verify'); }
+ public function showVerifyForm(Request $q,Response $r):void{ $token=trim((string)$q->input('token',''));if($token!==''){ $tu=$this->users->findByResetToken($token);if($tu&&$tu['role']==='client')Session::set('reset_user_id',(int)$tu['id']); } $uid=(int)Session::get('reset_user_id',0); $u=$uid?$this->users->findById($uid):null; $this->render('auth/verify-code',['pageTitle'=>'Verify Password Reset','email'=>$u?$this->mask($u['email']):'your email','verified'=>$u&&$this->verified($uid),'error'=>Session::getFlash('error'),'success'=>Session::getFlash('success')],'main'); }
+ public function processCodeVerify(Request $q,Response $r):void{ $uid=(int)Session::get('reset_user_id',0); $u=$uid?$this->users->findById($uid):null; if(!$u){Session::setFlash('error','Request a new verification code.');$r->redirect('/password/reset');return;} $action=(string)$q->input('action','verify'); if($action==='resend'){ $otp=$this->otps->issue($uid,$u['email'],OtpChallenge::PASSWORD_RESET); if(!$otp['ok'])Session::setFlash('error','Please wait before requesting another code.'); elseif(!NotificationService::sendVerificationCodeEmail($u['email'],$u['name'],$otp['code'],'password reset')){$this->otps->invalidate($uid,OtpChallenge::PASSWORD_RESET);Session::setFlash('error','We could not send the verification code. Please try again.');}else Session::setFlash('success','A new verification code has been sent to your email.');$r->redirect('/password/verify');return;} if($action==='verify'){ $result=$this->otps->verify($uid,$u['email'],OtpChallenge::PASSWORD_RESET,trim((string)$q->input('code',''))); if($result==='verified'){Session::set('otp_verified',['user_id'=>$uid,'purpose'=>OtpChallenge::PASSWORD_RESET,'expires'=>time()+600]);Session::setFlash('success','Code verified. Create your new password.');}else Session::setFlash('error',$result==='expired'?'The verification code has expired. Please request a new code.':($result==='locked'?'Too many incorrect attempts. Please request a new verification code.':'The verification code is incorrect.'));$r->redirect('/password/verify');return;} if(!$this->verified($uid)){Session::setFlash('error','Verify the code before resetting your password.');$r->redirect('/password/verify');return;} $p=(string)$q->input('password','');$c=(string)$q->input('password_confirm','');if(strlen($p)<8||$p!==$c){Session::setFlash('error',strlen($p)<8?'Password must be at least 8 characters long.':'Passwords do not match.');$r->redirect('/password/verify');return;} $this->users->updatePassword($uid,password_hash($p,PASSWORD_ARGON2ID));$this->users->resetLoginAttempts($uid);Session::remove('otp_verified');Session::remove('reset_user_id');AuditService::log('password_reset_complete','users',$uid,$uid);NotificationService::sendPasswordChangedAlert($u['email'],$u['name']);Session::setFlash('success','Your password has been reset successfully. You can now log in using your new password.');$r->redirect('/login'); }
+ private function verified(int $uid):bool{$v=Session::get('otp_verified',[]);return($v['user_id']??0)===$uid&&($v['purpose']??'')===OtpChallenge::PASSWORD_RESET&&($v['expires']??0)>=time();} private function mask(string $e):string{[$a,$d]=array_pad(explode('@',$e,2),2,'');return substr($a,0,1).str_repeat('*',max(2,strlen($a)-1)).'@'.$d;}
 }

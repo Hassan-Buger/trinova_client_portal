@@ -54,6 +54,22 @@ class UserAdminController extends Controller
             $response->redirect('/staff/users');
         }
 
+        if ($user['role'] === 'client') {
+            $otpModel = new \Application\Models\OtpChallenge();
+            $otp = $otpModel->issue($userId, $user['email'], \Application\Models\OtpChallenge::PASSWORD_RESET);
+            $resetToken=bin2hex(random_bytes(32));$this->userModel->createResetToken($user['email'],$resetToken,date('Y-m-d H:i:s',time()+600));
+            $resetLink=rtrim(\Application\Config\App::get('url'),'/').'/password/verify?token='.urlencode($resetToken);
+            if (!$otp['ok'] || !NotificationService::sendVerificationCodeEmail($user['email'], $user['name'], $otp['code'], 'password reset', $resetLink)) {
+                if ($otp['ok']) $otpModel->invalidate($userId, \Application\Models\OtpChallenge::PASSWORD_RESET);
+                $message='We could not send the client password-reset verification code.';
+                if($request->isAjax()){ $response->json(['success'=>false,'message'=>$message],422); return; }
+                Session::setFlash('error',$message); $response->redirect('/staff/users'); return;
+            }
+            $message="A password-reset verification code was sent to '{$user['name']}'.";
+            if($request->isAjax()){ $response->json(['success'=>true,'message'=>$message]); return; }
+            Session::setFlash('success',$message); $response->redirect('/staff/users'); return;
+        }
+
         $this->userModel->updatePassword($userId, password_hash($newPassword, PASSWORD_ARGON2ID));
         $this->userModel->resetLoginAttempts($userId);
         AuditService::log('staff_reset_user_password', 'users', $userId);
@@ -72,7 +88,7 @@ class UserAdminController extends Controller
         $role  = trim($body['role'] ?? 'client');
         $pass  = trim($body['password'] ?? 'password123');
 
-        if (empty($name) || empty($email) || !filter_var($email, FILTER_VALIDATE_EMAIL) || !in_array($role, ['client', 'staff'], true) || strlen($pass) < 8) {
+        if (empty($name) || empty($email) || !filter_var($email, FILTER_VALIDATE_EMAIL) || !in_array($role, ['client', 'staff'], true) || ($role === 'staff' && strlen($pass) < 8)) {
             $message = 'Enter a valid name, email, account role, and password of at least 8 characters.';
             if ($request->isAjax()) {
                 $response->json(['success' => false, 'message' => $message], 422);
@@ -92,13 +108,13 @@ class UserAdminController extends Controller
             return;
         }
 
-        $hash = password_hash($pass, PASSWORD_BCRYPT);
+        $hash = password_hash($role === 'client' ? bin2hex(random_bytes(32)) : $pass, PASSWORD_BCRYPT);
         $userId = $this->userModel->create([
             'name'          => $name,
             'email'         => $email,
             'password_hash' => $hash,
             'role'          => $role,
-            'status'        => 'active',
+            'status'        => $role === 'client' ? 'pending_activation' : 'active',
         ]);
 
         if ($role === 'client') {
@@ -117,10 +133,14 @@ class UserAdminController extends Controller
                 $response->redirect('/staff/users');
                 return;
             }
+            $activationToken=bin2hex(random_bytes(32)); $this->userModel->storeActivationToken($userId,$activationToken);
+            $otpModel=new \Application\Models\OtpChallenge(); $otp=$otpModel->issue($userId,$email,\Application\Models\OtpChallenge::ACTIVATION);
+            $link=rtrim(\Application\Config\App::get('url'),'/').'/activate?token='.urlencode($activationToken);
+            if(!$otp['ok']||!NotificationService::sendWelcomeActivationEmail($email,$name,$link,$otp['code'])){ if($otp['ok'])$otpModel->invalidate($userId,\Application\Models\OtpChallenge::ACTIVATION); Session::setFlash('error','Client created, but the activation email could not be sent.'); $response->redirect('/staff/users'); return; }
         }
 
         AuditService::log('user_provisioned', 'users', $userId);
-        NotificationService::sendPromptEmail($email, 'Welcome to TriNova Accounting Portal', "An account has been provisioned for you as {$role}. Default password: {$pass}");
+        if ($role !== 'client') NotificationService::sendPromptEmail($email, 'Welcome to TriNova Accounting Portal', 'A staff account has been provisioned for you.');
         $message = "User account '{$name}' created successfully.";
         if ($request->isAjax()) {
             $response->json(['success' => true, 'message' => $message, 'redirect' => '/staff/users'], 201);

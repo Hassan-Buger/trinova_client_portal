@@ -15,7 +15,7 @@ class NotificationService
         $from   = App::get('email_from', 'TriNova Portal <onboarding@resend.dev>');
 
         // Log locally first
-        self::logEmail($toEmail, $subject, strip_tags($htmlContent));
+        self::logEmail($toEmail, $subject, '[Email body omitted from logs]');
 
         if (empty($apiKey)) {
             self::logEmail($toEmail, $subject, "[RESEND SKIPPED: RESEND_API_KEY is empty in .env]");
@@ -78,7 +78,7 @@ class NotificationService
     /**
      * Send 6-digit Verification Code for Password Reset
      */
-    public static function sendVerificationCodeEmail(string $toEmail, string $userName, string $code): bool
+    public static function sendVerificationCodeEmail(string $toEmail, string $userName, string $code, string $purpose = 'password reset', string $verificationLink = ''): bool
     {
         $subject = "TriNova Portal — Password Reset Code: {$code}";
         $html = "
@@ -89,7 +89,8 @@ class NotificationService
                 <div style='background:#f0f5f3;border-radius:14px;padding:18px;text-align:center;margin:20px 0'>
                     <span style='font-size:32px;font-weight:800;letter-spacing:8px;color:#0d9488'>" . htmlspecialchars($code) . "</span>
                 </div>
-                <p style='color:#8a9a94;font-size:13px'>This code will expire in 15 minutes. If you did not request this reset, please ignore this email or notify TriNova support.</p>
+                " . ($verificationLink !== '' ? "<p style='text-align:center'><a href='" . htmlspecialchars($verificationLink) . "' style='color:#0d9488;font-weight:700'>Continue verification</a></p>" : '') . "
+                <p style='color:#8a9a94;font-size:13px'>This single-use code expires in 10 minutes. Never share it. If you did not request this " . htmlspecialchars($purpose) . ", please contact TriNova support.</p>
             </div>
         ";
 
@@ -99,7 +100,7 @@ class NotificationService
     /**
      * Send Welcome & Account Activation Link for New Clients
      */
-    public static function sendWelcomeActivationEmail(string $toEmail, string $userName, string $activationLink): bool
+    public static function sendWelcomeActivationEmail(string $toEmail, string $userName, string $activationLink, string $code): bool
     {
         $subject = "Welcome to TriNova Client Portal — Activate Your Account";
         $html = "
@@ -107,6 +108,8 @@ class NotificationService
                 <h2 style='color:#0d9488;margin-top:0'>Welcome to TriNova Accounting</h2>
                 <p style='color:#213330;font-size:15px'>Hello <strong>" . htmlspecialchars($userName) . "</strong>,</p>
                 <p style='color:#5f726c;font-size:14px;line-height:1.5'>An account has been created for you on the TriNova Client Portal. Please click the button below to verify your email address and create your portal password:</p>
+                <div style='background:#f0f5f3;border-radius:14px;padding:18px;text-align:center;margin:20px 0'><span style='font-size:32px;font-weight:800;letter-spacing:8px;color:#0d9488'>" . htmlspecialchars($code) . "</span></div>
+                <p style='color:#8a9a94;font-size:13px'>This single-use code expires in 10 minutes. Never share it. Request a new code from the verification page if needed.</p>
                 <div style='text-align:center;margin:26px 0'>
                     <a href='" . htmlspecialchars($activationLink) . "' style='background:#0d9488;color:#ffffff;padding:14px 28px;border-radius:14px;font-weight:700;font-size:15px;text-decoration:none;display:inline-block;box-shadow:0 8px 18px -8px rgba(13,148,136,.7)'>Activate My Portal Account &rarr;</a>
                 </div>
