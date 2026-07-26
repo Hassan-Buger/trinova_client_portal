@@ -406,6 +406,11 @@
             button.setAttribute('aria-expanded', opening ? 'true' : 'false');
             if (opening) {
                 await loadNotifications();
+                await markNotificationsRead();
+                panel.querySelectorAll('.tn-notification-item.is-unread').forEach((item) => {
+                    item.classList.remove('is-unread');
+                    item.classList.add('is-read');
+                });
             }
         });
         panel.addEventListener('click', async (event) => {
