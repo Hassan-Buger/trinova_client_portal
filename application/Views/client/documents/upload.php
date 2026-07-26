@@ -4,7 +4,7 @@
     </div>
 
     <div style="background:#fff;border-radius:24px;padding:32px;box-shadow:0 1px 2px rgba(16,54,45,.04),0 14px 34px -24px rgba(16,54,45,.4)">
-        <form action="/client/documents/upload" method="POST" enctype="multipart/form-data">
+        <form action="/client/documents/upload" method="POST" enctype="multipart/form-data" data-ajax-form>
             <input type="hidden" name="csrf_token" value="<?= htmlspecialchars(\Application\Core\Session::csrfToken()) ?>">
             
             <div id="dropzone" style="border:2px dashed #0d9488;border-radius:20px;padding:40px 24px;text-align:center;background:#f6faf8;cursor:pointer;transition:all .2s;margin-bottom:24px" onclick="document.getElementById('fileInput').click()">
@@ -34,7 +34,7 @@
                     </svg>
                     <span>Stored outside public web root with TLS encryption</span>
                 </div>
-                <button type="submit" style="background:#0d9488;color:#fff;border:none;padding:14px 28px;border-radius:14px;font-weight:700;font-size:15px;cursor:pointer;box-shadow:0 8px 18px -8px rgba(13,148,136,.7)">Upload Document</button>
+                <button type="submit" data-loading-text="Uploading…" style="background:#0d9488;color:#fff;border:none;padding:14px 28px;border-radius:14px;font-weight:700;font-size:15px;cursor:pointer;box-shadow:0 8px 18px -8px rgba(13,148,136,.7)">Upload Document</button>
             </div>
         </form>
     </div>

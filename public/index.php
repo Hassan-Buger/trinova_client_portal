@@ -90,6 +90,7 @@ $app->router->group([
     $r->post('/documents/upload', [ClientDocumentController::class, 'processUpload'])->middleware([CsrfMiddleware::class]);
     $r->get('/documents/my-uploads', [ClientDocumentController::class, 'myUploads']);
     $r->get('/documents/trinova', [ClientDocumentController::class, 'trinovaDocs']);
+    $r->get('/documents/view/{id}', [ClientDocumentController::class, 'view']);
     $r->get('/documents/download/{id}', [ClientDocumentController::class, 'download']);
     $r->get('/messages', [ClientMessageController::class, 'index']);
     $r->get('/messages/feed', [ClientMessageController::class, 'feed']);

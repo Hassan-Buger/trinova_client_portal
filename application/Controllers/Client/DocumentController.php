@@ -108,7 +108,17 @@ class DocumentController extends Controller
             $reqModel->updateStatus($requestId, 'Uploaded');
         }
 
-        Session::setFlash('success', "Document '{$filename}' uploaded successfully!");
+        $successMessage = "Document '{$filename}' uploaded successfully!";
+        if ($request->isAjax()) {
+            $response->json([
+                'success' => true,
+                'message' => $successMessage,
+                'redirect' => '/client/documents/my-uploads',
+            ]);
+            return;
+        }
+
+        Session::setFlash('success', $successMessage);
         $response->redirect('/client/documents/my-uploads');
     }
 
