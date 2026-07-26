@@ -146,6 +146,14 @@ class DocumentController extends Controller
 
     public function download(Request $request, Response $response, int $id): void
     {
+        // Reuse this established route for browser previews. Some deployments
+        // cache their front-controller route table, while this download route
+        // is already known to be available and working.
+        if ((string)$request->input('preview', '') === '1') {
+            $this->view($request, $response, $id);
+            return;
+        }
+
         [$doc, $filePath] = $this->resolveAuthorizedDocument($response, $id);
 
         // Log audit event
