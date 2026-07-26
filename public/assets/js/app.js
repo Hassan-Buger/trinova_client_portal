@@ -361,23 +361,26 @@
         }
     }
 
-    async function markNotificationsRead() {
+    async function markNotificationsRead(ids) {
+        if (!Array.isArray(ids) || !ids.length) return { success: true, unreadCount: 0 };
         const token = document.body.dataset.csrfToken || '';
-        try {
-            const response = await fetch('/notifications/read-all', {
-                method: 'POST',
-                headers: {
-                    'Accept': 'application/json',
-                    'Content-Type': 'application/x-www-form-urlencoded;charset=UTF-8',
-                    'X-Requested-With': 'XMLHttpRequest',
-                },
-                credentials: 'same-origin',
-                body: new URLSearchParams({ csrf_token: token }),
-            });
-            if (response.ok) setNotificationCount(0);
-        } catch (_) {
-            // A later poll will retry and keep the unread state accurate.
-        }
+        const body = new URLSearchParams({ csrf_token: token });
+        ids.forEach((id) => body.append('notification_ids[]', String(id)));
+        const response = await fetch('/notifications/read-all', {
+            method: 'POST',
+            headers: {
+                'Accept': 'application/json',
+                'Content-Type': 'application/x-www-form-urlencoded;charset=UTF-8',
+                'X-Requested-With': 'XMLHttpRequest',
+            },
+            credentials: 'same-origin',
+            body,
+        });
+        const payload = await response.json();
+        if (!response.ok || payload.success === false) throw new Error(payload.message || 'Unable to mark notifications as read.');
+        const unreadCount = Number(payload.unread_count ?? payload.count) || 0;
+        setNotificationCount(unreadCount);
+        return { success: true, unreadCount };
     }
 
     async function markNotificationRead(id) {
@@ -406,11 +409,17 @@
             button.setAttribute('aria-expanded', opening ? 'true' : 'false');
             if (opening) {
                 await loadNotifications();
-                await markNotificationsRead();
-                panel.querySelectorAll('.tn-notification-item.is-unread').forEach((item) => {
-                    item.classList.remove('is-unread');
-                    item.classList.add('is-read');
-                });
+                const unreadItems = Array.from(panel.querySelectorAll('.tn-notification-item.is-unread'));
+                const unreadIds = unreadItems.map((item) => Number(item.dataset.notificationId)).filter((id) => id > 0);
+                try {
+                    await markNotificationsRead(unreadIds);
+                    unreadItems.forEach((item) => {
+                        item.classList.remove('is-unread');
+                        item.classList.add('is-read');
+                    });
+                } catch (error) {
+                    showToast(error.message || 'Unable to mark notifications as read.', 'error');
+                }
             }
         });
         panel.addEventListener('click', async (event) => {

@@ -48,12 +48,17 @@ class NotificationController extends Controller
     {
         $userId = (int)Session::get('user_id', 0);
         $notificationId = (int)$request->input('notification_id', 0);
+        $notificationIds = $request->input('notification_ids', []);
         if ($notificationId > 0) {
             $this->notificationModel->markAsRead($notificationId, $userId);
+        } elseif (is_array($notificationIds) && $notificationIds) {
+            $this->notificationModel->markManyAsRead($notificationIds, $userId);
         } else {
-            $this->notificationModel->markAllAsRead($userId);
+            $response->json(['success' => false, 'message' => 'No notifications were selected.'], 422);
+            return;
         }
-        $response->json(['success' => true, 'count' => $this->notificationModel->countUnreadByUser($userId)]);
+        $unreadCount = $this->notificationModel->countUnreadByUser($userId);
+        $response->json(['success' => true, 'count' => $unreadCount, 'unread_count' => $unreadCount]);
     }
 
     private function serialise(array $item, string $role): array
