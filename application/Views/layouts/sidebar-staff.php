@@ -28,7 +28,7 @@ function renderStaffIcon(string $ic): string {
 
 <aside class="tn-side" style="width:262px;flex-shrink:0;background:#fff;border-right:1px solid rgba(20,60,50,.07);display:flex;flex-direction:column;padding:22px 16px;position:sticky;top:0;height:100vh">
     <div class="tn-sidebar-brand" style="display:flex;align-items:center;padding:4px 8px 22px">
-        <img class="tn-brand-logo" src="/assets/images/trinova-accounting-logo.png" alt="TriNova Accounting">
+        <img class="tn-brand-logo" src="/assets/images/trinova-staff-portal-logo.png" alt="TriNova Staff Portal">
     </div>
     <nav style="display:flex;flex-direction:column;gap:3px;flex:1">
         <?php foreach ($nav as $item): ?>

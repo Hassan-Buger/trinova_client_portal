@@ -1,6 +1,6 @@
 <div style="min-height:100vh;display:flex;align-items:center;justify-content:center;padding:28px;background:radial-gradient(1200px 620px at 15% -10%,#dff1ee 0%,rgba(223,241,238,0) 60%),radial-gradient(1000px 560px at 110% 120%,#fdecdc 0%,rgba(253,236,220,0) 55%),#eef4f1">
   <div style="width:100%;max-width:428px;animation:tnpop .4s cubic-bezier(.22,.61,.36,1)">
-    <img class="tn-auth-logo" src="/assets/images/trinova-accounting-logo.png" alt="TriNova Accounting">
+    <img class="tn-auth-logo" src="/assets/images/trinova-accounting-login-logo.png" alt="TriNova Accounting">
     
     <div style="background:#fff;border-radius:28px;padding:36px 34px;box-shadow:0 2px 4px rgba(16,54,45,.04),0 24px 60px -28px rgba(16,54,45,.35)">
       <h1 style="margin:0 0 6px;font-size:24px;font-weight:800;letter-spacing:-.02em">Sign in to your portal</h1>
