@@ -93,9 +93,17 @@ class DocumentController extends Controller
         AuditService::log('upload', 'documents', $docId);
         try {
             $notificationModel = new Notification();
+            $clientName = (new \Application\Models\Client())->findById((int)$clientId)['name'] ?? 'A client';
             foreach ((new User())->getAllStaff() as $staff) {
                 if (($staff['status'] ?? '') === 'active') {
-                    $notificationModel->create((int)$staff['id'], 'client_document_uploaded', 'document:' . $docId);
+                    $notificationModel->create(
+                        (int)$staff['id'],
+                        'document_upload',
+                        'document:' . $docId,
+                        'New Document Uploaded',
+                        "{$clientName} uploaded {$filename}",
+                        '/staff/documents'
+                    );
                 }
             }
         } catch (\Throwable $e) {

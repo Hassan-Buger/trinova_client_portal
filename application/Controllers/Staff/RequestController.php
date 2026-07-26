@@ -8,6 +8,7 @@ use Application\Core\Response;
 use Application\Core\Session;
 use Application\Models\Client;
 use Application\Models\DocumentRequest;
+use Application\Models\Notification;
 use Application\Services\AuditService;
 
 class RequestController extends Controller
@@ -86,6 +87,21 @@ class RequestController extends Controller
         ]);
 
         AuditService::log('request_created', 'document_requests', $reqId);
+        try {
+            $client = $this->clientModel->findById($clientId);
+            if ($client && !empty($client['user_id'])) {
+                (new Notification())->create(
+                    (int)$client['user_id'],
+                    'document_request',
+                    'request:' . $reqId,
+                    'New Document Request',
+                    "Staff requested: {$title}",
+                    '/client/requests'
+                );
+            }
+        } catch (\Throwable $e) {
+            // A notification failure must not roll back the document request.
+        }
         Session::setFlash('success', "Document request '{$title}' issued successfully.");
         $response->redirect('/staff/requests');
     }

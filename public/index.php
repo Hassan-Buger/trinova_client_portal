@@ -75,6 +75,8 @@ $app->router->get('/documents/download/{id}', [ClientDocumentController::class, 
 $app->router->get('/documents/view/{id}', [ClientDocumentController::class, 'view'])->middleware([AuthMiddleware::class, SessionTimeoutMiddleware::class]);
 $app->router->get('/notifications/feed', [NotificationController::class, 'feed'])->middleware([AuthMiddleware::class, SessionTimeoutMiddleware::class]);
 $app->router->post('/notifications/read-all', [NotificationController::class, 'readAll'])->middleware([AuthMiddleware::class, SessionTimeoutMiddleware::class, CsrfMiddleware::class]);
+$app->router->get('/api/notifications', [NotificationController::class, 'feed'])->middleware([AuthMiddleware::class, SessionTimeoutMiddleware::class]);
+$app->router->post('/api/notifications/mark-as-read', [NotificationController::class, 'read'])->middleware([AuthMiddleware::class, SessionTimeoutMiddleware::class, CsrfMiddleware::class]);
 
 // --- EXPLICIT STAFF CLIENT ACTION ROUTES ---
 $app->router->post('/staff/clients/reset-password', [StaffClientController::class, 'resetPassword'])->middleware([AuthMiddleware::class, SessionTimeoutMiddleware::class, RoleMiddleware::class . ':staff', CsrfMiddleware::class]);

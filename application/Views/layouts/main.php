@@ -42,7 +42,9 @@
         .tn-notification-heading { padding:15px 17px;border-bottom:1px solid #edf2f0;font-size:13px;font-weight:800;color:#41556f; }
         .tn-notification-list { max-height:360px;overflow:auto; }
         .tn-notification-item { display:block;padding:13px 17px;border-bottom:1px solid #f0f4f2;color:#213330; }
+        .tn-notification-item.is-unread { background:#eef8f5;border-left:3px solid #0d9488;padding-left:14px; }
         .tn-notification-item:hover { background:#f7faf9;color:#0f766e; }
+        .tn-notification-title { display:block;font-size:12px;font-weight:800;color:#0f766e;margin-bottom:3px; }
         .tn-notification-message { display:block;font-size:13px;font-weight:700;line-height:1.4; }
         .tn-notification-time { display:block;margin-top:4px;color:#8a9a94;font-size:11px;font-weight:600; }
         .tn-notification-empty { padding:24px 17px;text-align:center;color:#8a9a94;font-size:13px; }

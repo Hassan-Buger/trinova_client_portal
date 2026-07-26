@@ -7,6 +7,13 @@ use PDO;
 
 class DocumentRequest extends Model
 {
+    public function find(int $id): ?array
+    {
+        $stmt = $this->db->prepare("SELECT * FROM document_requests WHERE id = :id LIMIT 1");
+        $stmt->execute(['id' => $id]);
+        return $stmt->fetch() ?: null;
+    }
+
     public function getOutstandingByClientId(int $clientId): array
     {
         $stmt = $this->db->prepare("
