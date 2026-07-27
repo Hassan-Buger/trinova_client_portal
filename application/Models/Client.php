@@ -94,14 +94,14 @@ class Client extends Model
 
     public function countForExport(string $search = ''): int
     {
-        $where = '';
+        $where = "WHERE e.entity_scope='company'";
         $params = [];
         if ($search !== '') {
-            $where = 'WHERE u.name LIKE :name OR u.email LIKE :email OR c.phone LIKE :phone';
+            $where .= ' AND (e.company_name LIKE :company OR u.name LIKE :name OR u.email LIKE :email OR c.phone LIKE :phone)';
             $like = '%' . $search . '%';
-            $params = ['name'=>$like, 'email'=>$like, 'phone'=>$like];
+            $params = ['company'=>$like,'name'=>$like, 'email'=>$like, 'phone'=>$like];
         }
-        $stmt=$this->db->prepare("SELECT COUNT(*) FROM clients c JOIN users u ON u.id=c.user_id {$where}");
+        $stmt=$this->db->prepare("SELECT COUNT(*) FROM client_entities e JOIN clients c ON c.id=e.client_id JOIN users u ON u.id=c.user_id {$where}");
         $stmt->execute($params);
         return (int)$stmt->fetchColumn();
     }
@@ -110,27 +110,30 @@ class Client extends Model
     {
         $limit=max(1,min($limit,500));
         $offset=max(0,$offset);
-        $where='';
+        $where="WHERE e.entity_scope='company'";
         $params=[];
         if($search!==''){
-            $where='WHERE u.name LIKE :name OR u.email LIKE :email OR c.phone LIKE :phone';
+            $where.=' AND (e.company_name LIKE :company OR u.name LIKE :name OR u.email LIKE :email OR c.phone LIKE :phone)';
             $like='%'.$search.'%';
-            $params=['name'=>$like,'email'=>$like,'phone'=>$like];
+            $params=['company'=>$like,'name'=>$like,'email'=>$like,'phone'=>$like];
         }
         $stmt=$this->db->prepare("
-            SELECT c.id AS client_id,c.phone,c.address,c.aml_status,c.notes,
-                   u.name AS contact_name,u.email,u.status AS user_status,
+            SELECT c.id AS client_id,
+                   COALESCE((SELECT ec.phone FROM entity_contacts ec WHERE ec.entity_id=e.id AND ec.is_primary=1 ORDER BY ec.id LIMIT 1),c.phone) AS phone,
+                   c.address,c.aml_status,c.notes,u.name AS contact_name,
+                   COALESCE((SELECT ec.email FROM entity_contacts ec WHERE ec.entity_id=e.id AND ec.is_primary=1 ORDER BY ec.id LIMIT 1),u.email) AS email,
+                   u.status AS user_status,
                    e.id AS entity_id,e.company_name,e.company_number,e.tax_reference,e.attributes,
-                   GROUP_CONCAT(DISTINCT du.name ORDER BY du.name SEPARATOR '; ') AS directors,
+                   COALESCE(
+                     (SELECT GROUP_CONCAT(ec.name ORDER BY ec.is_primary DESC,ec.id ASC SEPARATOR '; ') FROM entity_contacts ec WHERE ec.entity_id=e.id),
+                     GROUP_CONCAT(DISTINCT du.name ORDER BY CASE WHEN du.id=c.user_id THEN 0 ELSE 1 END,du.name SEPARATOR '; ')
+                   ) AS directors,
                    (SELECT d.due_date FROM deadlines d
-                    WHERE d.entity_id=e.id AND (LOWER(d.type) LIKE '%account%' OR LOWER(d.type) LIKE '%filing%')
+                    WHERE d.entity_id=e.id AND d.type='Filing Deadline'
                     ORDER BY d.due_date ASC LIMIT 1) AS filing_deadline
-            FROM clients c
+            FROM client_entities e
+            JOIN clients c ON c.id=e.client_id
             JOIN users u ON u.id=c.user_id
-            LEFT JOIN client_entities e ON e.id=(
-                SELECT e2.id FROM client_entities e2 WHERE e2.client_id=c.id
-                ORDER BY CASE WHEN e2.entity_scope='company' THEN 0 ELSE 1 END,e2.id ASC LIMIT 1
-            )
             LEFT JOIN entity_directors ed ON ed.entity_id=e.id
             LEFT JOIN users du ON du.id=ed.user_id
             {$where}

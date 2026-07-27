@@ -70,7 +70,7 @@ class ClientController extends Controller
             \Application\Services\AuditService::log('client_csv_export','clients',null);
             while(ob_get_level()>0) ob_end_clean();
             header('Content-Type: text/csv; charset=UTF-8');
-            header('Content-Disposition: attachment; filename="clients-export-'.date('Y-m-d').'.csv"');
+            header('Content-Disposition: attachment; filename="trinova-clients-'.date('Y-m-d').'.csv"');
             header('Cache-Control: private, no-store, no-cache, must-revalidate');
             header('Pragma: no-cache');
             header('X-Content-Type-Options: nosniff');

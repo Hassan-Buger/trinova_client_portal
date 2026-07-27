@@ -58,7 +58,9 @@ CREATE TABLE IF NOT EXISTS `client_entities` (
   `attributes` JSON NULL,
   `created_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
   CONSTRAINT `fk_entities_client` FOREIGN KEY (`client_id`) REFERENCES `clients` (`id`) ON DELETE CASCADE,
-  INDEX `idx_entities_client` (`client_id`)
+  INDEX `idx_entities_client` (`client_id`),
+  INDEX `idx_entities_company_number` (`company_number`),
+  INDEX `idx_entities_tax_reference` (`tax_reference`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE IF NOT EXISTS `entity_directors` (
@@ -71,6 +73,21 @@ CREATE TABLE IF NOT EXISTS `entity_directors` (
   CONSTRAINT `fk_entity_directors_entity` FOREIGN KEY (`entity_id`) REFERENCES `client_entities` (`id`) ON DELETE CASCADE,
   CONSTRAINT `fk_entity_directors_user` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE CASCADE,
   CONSTRAINT `fk_entity_directors_creator` FOREIGN KEY (`created_by_user_id`) REFERENCES `users` (`id`) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS `entity_contacts` (
+  `id` INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  `entity_id` INT UNSIGNED NOT NULL,
+  `user_id` INT UNSIGNED NULL,
+  `name` VARCHAR(100) NOT NULL,
+  `email` VARCHAR(150) NULL,
+  `phone` VARCHAR(30) NULL,
+  `is_primary` TINYINT(1) NOT NULL DEFAULT 0,
+  `needs_contact_details` TINYINT(1) NOT NULL DEFAULT 0,
+  `created_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  UNIQUE KEY `uq_entity_contact_name` (`entity_id`,`name`),
+  CONSTRAINT `fk_entity_contacts_entity` FOREIGN KEY (`entity_id`) REFERENCES `client_entities` (`id`) ON DELETE CASCADE,
+  CONSTRAINT `fk_entity_contacts_user` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- Documents Management
@@ -159,6 +176,7 @@ CREATE TABLE IF NOT EXISTS `audit_log` (
   `action_type` VARCHAR(50) NOT NULL,
   `target_type` VARCHAR(50) NOT NULL,
   `target_id` INT UNSIGNED NULL,
+  `import_metadata` JSON NULL,
   `ip_address` VARCHAR(45) NOT NULL,
   `created_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
   CONSTRAINT `fk_audit_user` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE CASCADE,

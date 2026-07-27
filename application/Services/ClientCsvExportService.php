@@ -2,16 +2,11 @@
 
 namespace Application\Services;
 
+use Application\Config\ClientCsv;
 use Application\Models\Client;
 
 class ClientCsvExportService
 {
-    public const TITLE = 'Trinova Accounting - Full Client Audit (Business Clients)';
-    public const HEADERS = [
-        'Client Name','Status / Notes','Company No.','UTR','VAT No.','Registered Address',
-        'Director(s) / Contact(s)','Email','Phone','EOY (Year End)','Filing Deadline','VAT Quarter',
-    ];
-
     public function stream(Client $clients, string $search = ''): void
     {
         $output=fopen('php://output','wb');
@@ -19,8 +14,9 @@ class ClientCsvExportService
 
         // Match the supplied template: UTF-8 BOM, comma delimiter, minimal quoting and CRLF rows.
         fwrite($output,"\xEF\xBB\xBF");
-        $this->writeRow($output,array_merge([self::TITLE],array_fill(0,11,'')));
-        $this->writeRow($output,self::HEADERS);
+        $headers=ClientCsv::headers();
+        $this->writeRow($output,array_merge([ClientCsv::TITLE],array_fill(0,count($headers)-1,'')));
+        $this->writeRow($output,$headers);
 
         $offset=0;
         do {
