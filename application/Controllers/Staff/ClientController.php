@@ -46,6 +46,45 @@ class ClientController extends Controller
         ], 'main');
     }
 
+    public function exportCsv(Request $request, Response $response): void
+    {
+        $query=$request->getQueryParams();
+        if(isset($query['q']) && !is_string($query['q'])){
+            Session::setFlash('error','The selected export filter is invalid.');
+            $response->redirect('/staff/clients');
+            return;
+        }
+        $search=trim((string)($query['q']??''));
+        if(strlen($search)>100 || preg_match('/[\x00-\x08\x0B\x0C\x0E-\x1F]/',$search)){
+            Session::setFlash('error','The selected export filter is invalid.');
+            $response->redirect('/staff/clients');
+            return;
+        }
+
+        try {
+            if($this->clientModel->countForExport($search)===0){
+                Session::setFlash('error','No clients are available for the selected CSV export.');
+                $response->redirect('/staff/clients'.($search!==''?'?q='.urlencode($search):''));
+                return;
+            }
+            \Application\Services\AuditService::log('client_csv_export','clients',null);
+            while(ob_get_level()>0) ob_end_clean();
+            header('Content-Type: text/csv; charset=UTF-8');
+            header('Content-Disposition: attachment; filename="clients-export-'.date('Y-m-d').'.csv"');
+            header('Cache-Control: private, no-store, no-cache, must-revalidate');
+            header('Pragma: no-cache');
+            header('X-Content-Type-Options: nosniff');
+            (new \Application\Services\ClientCsvExportService())->stream($this->clientModel,$search);
+            exit;
+        } catch(\Throwable $e){
+            if(!headers_sent()){
+                Session::setFlash('error','The client CSV could not be generated. Please try again.');
+                $response->redirect('/staff/clients');
+            }
+            exit;
+        }
+    }
+
     public function show(Request $request, Response $response, int $id): void
     {
         $client = $this->clientModel->findById($id);

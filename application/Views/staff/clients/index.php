@@ -5,7 +5,7 @@
         <div>
             <p style="margin:0;color:#61756e;font-size:14px">Manage practice client accounts, AML status, and entity profiles.</p>
         </div>
-        <div class="tn-client-toolbar-actions" style="display:flex;align-items:center;gap:12px">
+        <div class="tn-client-toolbar-actions" style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">
             <form action="/staff/clients" method="GET" data-ajax-form style="display:flex;align-items:center;gap:8px;margin:0">
                 <input type="search" name="q" value="<?= htmlspecialchars($search ?? '') ?>" data-ajax-search placeholder="Search clients…" aria-label="Search clients" style="padding:11px 16px;border:1.5px solid #e0e9e5;border-radius:14px;font-size:14px;background:#fff;min-width:240px">
                 <select name="per_page" onchange="this.form.requestSubmit()" aria-label="Results per page" style="padding:11px 12px;border:1.5px solid #e0e9e5;border-radius:14px;background:#fff;color:#61756e">
@@ -14,6 +14,7 @@
                     <?php endforeach; ?>
                 </select>
             </form>
+            <a href="/staff/clients/export<?= ($search ?? '') !== '' ? '?q='.urlencode($search) : '' ?>" download data-no-ajax style="display:inline-flex;align-items:center;justify-content:center;background:#eef4f1;color:#0d9488;padding:12px 18px;border-radius:14px;font-weight:700;font-size:14px;white-space:nowrap">Export CSV</a>
             <button class="tn-create-client-button" onclick="document.getElementById('newClientModal').style.display='flex'" style="background:#0d9488;color:#fff;padding:12px 22px;border-radius:14px;font-weight:700;font-size:14px;cursor:pointer;border:none;box-shadow:0 8px 18px -8px rgba(13,148,136,.7)">+ Create Client Account</button>
         </div>
     </div>

@@ -92,6 +92,57 @@ class Client extends Model
         ];
     }
 
+    public function countForExport(string $search = ''): int
+    {
+        $where = '';
+        $params = [];
+        if ($search !== '') {
+            $where = 'WHERE u.name LIKE :name OR u.email LIKE :email OR c.phone LIKE :phone';
+            $like = '%' . $search . '%';
+            $params = ['name'=>$like, 'email'=>$like, 'phone'=>$like];
+        }
+        $stmt=$this->db->prepare("SELECT COUNT(*) FROM clients c JOIN users u ON u.id=c.user_id {$where}");
+        $stmt->execute($params);
+        return (int)$stmt->fetchColumn();
+    }
+
+    public function getExportBatch(string $search, int $offset, int $limit = 250): array
+    {
+        $limit=max(1,min($limit,500));
+        $offset=max(0,$offset);
+        $where='';
+        $params=[];
+        if($search!==''){
+            $where='WHERE u.name LIKE :name OR u.email LIKE :email OR c.phone LIKE :phone';
+            $like='%'.$search.'%';
+            $params=['name'=>$like,'email'=>$like,'phone'=>$like];
+        }
+        $stmt=$this->db->prepare("
+            SELECT c.id AS client_id,c.phone,c.address,c.aml_status,c.notes,
+                   u.name AS contact_name,u.email,u.status AS user_status,
+                   e.id AS entity_id,e.company_name,e.company_number,e.tax_reference,e.attributes,
+                   GROUP_CONCAT(DISTINCT du.name ORDER BY du.name SEPARATOR '; ') AS directors,
+                   (SELECT d.due_date FROM deadlines d
+                    WHERE d.entity_id=e.id AND (LOWER(d.type) LIKE '%account%' OR LOWER(d.type) LIKE '%filing%')
+                    ORDER BY d.due_date ASC LIMIT 1) AS filing_deadline
+            FROM clients c
+            JOIN users u ON u.id=c.user_id
+            LEFT JOIN client_entities e ON e.id=(
+                SELECT e2.id FROM client_entities e2 WHERE e2.client_id=c.id
+                ORDER BY CASE WHEN e2.entity_scope='company' THEN 0 ELSE 1 END,e2.id ASC LIMIT 1
+            )
+            LEFT JOIN entity_directors ed ON ed.entity_id=e.id
+            LEFT JOIN users du ON du.id=ed.user_id
+            {$where}
+            GROUP BY c.id,c.phone,c.address,c.aml_status,c.notes,u.name,u.email,u.status,
+                     e.id,e.company_name,e.company_number,e.tax_reference,e.attributes
+            ORDER BY COALESCE(e.company_name,u.name) ASC,c.id ASC
+            LIMIT {$limit} OFFSET {$offset}
+        ");
+        $stmt->execute($params);
+        return $stmt->fetchAll();
+    }
+
     public function getAmlActionRequiredCount(): int
     {
         $stmt = $this->db->query("

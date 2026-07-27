@@ -114,6 +114,7 @@ $app->router->group([
 ], function($r) {
     $r->get('/dashboard', [StaffDashboardController::class, 'index']);
     $r->get('/clients', [StaffClientController::class, 'index']);
+    $r->get('/clients/export', [StaffClientController::class, 'exportCsv']);
     $r->post('/clients/create', [StaffClientController::class, 'create'])->middleware([CsrfMiddleware::class]);
     $r->post('/clients/reset-password', [StaffClientController::class, 'resetPassword'])->middleware([CsrfMiddleware::class]);
     $r->post('/clients/delete', [StaffClientController::class, 'delete'])->middleware([CsrfMiddleware::class]);
