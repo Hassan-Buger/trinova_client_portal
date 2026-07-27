@@ -106,13 +106,13 @@
                                     <span style="padding:4px 10px;border-radius:999px;font-size:11.5px;font-weight:700;background:#dff1ee;color:#0d9488">Client</span>
                                 <?php endif; ?>
                             </td>
-                            <td style="padding:16px">
+                            <td style="padding:16px;white-space:nowrap;min-width:145px">
                                 <?php if ($u['status'] === 'active'): ?>
-                                    <span style="padding:4px 10px;border-radius:999px;font-size:11.5px;font-weight:700;background:#e2f3ea;color:#3f9d6d">Active</span>
+                                    <span style="display:inline-flex;align-items:center;justify-content:center;white-space:nowrap;line-height:1;padding:7px 12px;border-radius:999px;font-size:11.5px;font-weight:700;background:#e2f3ea;color:#3f9d6d">Active</span>
                                 <?php elseif ($u['status'] === 'pending_activation'): ?>
-                                    <span style="padding:4px 10px;border-radius:999px;font-size:11.5px;font-weight:700;background:#e6ecf5;color:#41556f">Pending activation</span>
+                                    <span style="display:inline-flex;align-items:center;justify-content:center;white-space:nowrap;line-height:1;padding:7px 12px;border-radius:999px;font-size:11.5px;font-weight:700;background:#e6ecf5;color:#41556f">Pending activation</span>
                                 <?php else: ?>
-                                    <span style="padding:4px 10px;border-radius:999px;font-size:11.5px;font-weight:700;background:#fdecdc;color:#e07d24">Suspended</span>
+                                    <span style="display:inline-flex;align-items:center;justify-content:center;white-space:nowrap;line-height:1;padding:7px 12px;border-radius:999px;font-size:11.5px;font-weight:700;background:#fdecdc;color:#e07d24">Suspended</span>
                                 <?php endif; ?>
                             </td>
                             <td style="padding:16px;color:#7d8e88;font-size:13px">

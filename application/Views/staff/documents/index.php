@@ -147,11 +147,11 @@
                                         <div style="font-size:12.5px;color:#7d8e88;font-weight:400;margin-top:2px"><?= htmlspecialchars($doc['description']) ?></div>
                                     <?php endif; ?>
                                 </td>
-                                <td style="padding:16px">
+                                <td style="padding:16px;white-space:nowrap;min-width:125px">
                                     <?php if ($doc['direction'] === 'client_upload'): ?>
-                                        <span style="padding:4px 10px;border-radius:999px;font-size:11.5px;font-weight:700;background:#fdecdc;color:#e07d24">Client Upload</span>
+                                        <span style="display:inline-flex;align-items:center;justify-content:center;white-space:nowrap;line-height:1;padding:7px 12px;border-radius:999px;font-size:11.5px;font-weight:700;background:#fdecdc;color:#e07d24">Client Upload</span>
                                     <?php else: ?>
-                                        <span style="padding:4px 10px;border-radius:999px;font-size:11.5px;font-weight:700;background:#e6ecf5;color:#41556f">From TriNova</span>
+                                        <span style="display:inline-flex;align-items:center;justify-content:center;white-space:nowrap;line-height:1;padding:7px 12px;border-radius:999px;font-size:11.5px;font-weight:700;background:#e6ecf5;color:#41556f">From TriNova</span>
                                     <?php endif; ?>
                                 </td>
                                 <td style="padding:16px">
