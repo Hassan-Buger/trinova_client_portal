@@ -227,6 +227,30 @@ class DocumentController extends Controller
         exit;
     }
 
+    public function availability(Request $request, Response $response, int $id): void
+    {
+        $doc = $this->documentModel->find($id);
+        if (!$doc) {
+            $response->json(['success' => false, 'message' => 'This document record no longer exists.'], 404);
+            return;
+        }
+
+        $role = (string)Session::get('role');
+        $userId = (int)Session::get('user_id', 0);
+        if ($role !== 'staff' && ($role !== 'client' || $userId <= 0 || !(new EntityAccess())->canAccessRecord($userId, $doc))) {
+            $response->json(['success' => false, 'message' => 'You do not have permission to view this document.'], 403);
+            return;
+        }
+
+        $filePath = App::get('storage_dir') . '/uploads/' . $doc['stored_path'];
+        if (!is_file($filePath)) {
+            $response->json(['success' => false, 'message' => 'This file is unavailable because it is missing from secure storage. Please upload it again or contact an administrator.'], 404);
+            return;
+        }
+
+        $response->json(['success' => true]);
+    }
+
     private function resolveAuthorizedDocument(Response $response, int $id): array
     {
         $doc = $this->documentModel->find($id);

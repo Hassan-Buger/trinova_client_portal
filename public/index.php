@@ -73,6 +73,7 @@ $app->router->post('/activate', [ActivationController::class, 'processActivation
 // --- SHARED DOWNLOAD ROUTE (accessible by all authenticated users: staff & clients) ---
 $app->router->get('/documents/download/{id}', [ClientDocumentController::class, 'download'])->middleware([AuthMiddleware::class, SessionTimeoutMiddleware::class]);
 $app->router->get('/documents/view/{id}', [ClientDocumentController::class, 'view'])->middleware([AuthMiddleware::class, SessionTimeoutMiddleware::class]);
+$app->router->get('/documents/availability/{id}', [ClientDocumentController::class, 'availability'])->middleware([AuthMiddleware::class, SessionTimeoutMiddleware::class]);
 $app->router->get('/notifications/feed', [NotificationController::class, 'feed'])->middleware([AuthMiddleware::class, SessionTimeoutMiddleware::class]);
 $app->router->post('/notifications/read-all', [NotificationController::class, 'readAll'])->middleware([AuthMiddleware::class, SessionTimeoutMiddleware::class, CsrfMiddleware::class]);
 $app->router->get('/api/notifications', [NotificationController::class, 'feed'])->middleware([AuthMiddleware::class, SessionTimeoutMiddleware::class]);
