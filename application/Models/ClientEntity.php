@@ -35,13 +35,14 @@ class ClientEntity extends Model
     public function create(array $data): int
     {
         $stmt = $this->db->prepare("
-            INSERT INTO client_entities (client_id, company_name, entity_type, company_number, tax_reference, attributes)
-            VALUES (:client_id, :company_name, :entity_type, :company_number, :tax_reference, :attributes)
+            INSERT INTO client_entities (client_id, company_name, entity_type, entity_scope, company_number, tax_reference, attributes)
+            VALUES (:client_id, :company_name, :entity_type, :entity_scope, :company_number, :tax_reference, :attributes)
         ");
         $stmt->execute([
             'client_id'      => $data['client_id'],
             'company_name'   => $data['company_name'],
             'entity_type'    => $data['entity_type'] ?? 'Other',
+            'entity_scope'   => $data['entity_scope'] ?? 'company',
             'company_number' => $data['company_number'] ?? null,
             'tax_reference'  => $data['tax_reference'] ?? null,
             'attributes'     => json_encode($data['attributes'] ?? [], JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR),

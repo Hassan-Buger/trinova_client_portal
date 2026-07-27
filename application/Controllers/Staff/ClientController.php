@@ -9,6 +9,8 @@ use Application\Models\Client;
 use Application\Models\ClientEntity;
 use Application\Models\Deadline;
 use Application\Models\DocumentRequest;
+use Application\Models\EntityAccess;
+use Application\Core\Session;
 
 class ClientController extends Controller
 {
@@ -69,6 +71,9 @@ class ClientController extends Controller
 
         $meetingModel = new \Application\Models\Meeting();
         $meetings = $meetingModel->getByClientId($id);
+        $accessModel = new EntityAccess();
+        $directorsByEntity=[];
+        foreach($entities as $entity) $directorsByEntity[(int)$entity['id']]=$accessModel->directors((int)$entity['id']);
 
         $this->render('staff/clients/show', [
             'pageTitle'   => "Client: {$client['name']}",
@@ -79,6 +84,8 @@ class ClientController extends Controller
             'auditLogs'   => $auditLogs,
             'documents'   => $documents,
             'meetings'    => $meetings,
+            'directorsByEntity' => $directorsByEntity,
+            'eligibleDirectors' => $accessModel->eligibleDirectors(),
         ], 'main');
     }
 
@@ -129,10 +136,12 @@ class ClientController extends Controller
                 'client_id' => $clientId,
                 'company_name' => $entityName,
                 'entity_type' => trim((string)($body['entity_type'] ?? 'Other')) ?: 'Other',
+                'entity_scope' => $this->entityScope($body),
                 'company_number' => trim((string)($body['company_number'] ?? '')) ?: null,
                 'tax_reference' => trim((string)($body['tax_reference'] ?? '')) ?: null,
                 'attributes' => $this->entityAttributes($body),
             ]);
+            if ($this->entityScope($body)==='company') (new EntityAccess())->linkDirector($entityId,$userId,(int)Session::get('user_id'));
             $this->createInlineDeadlines($clientId, $entityId, $body);
         }
 
@@ -249,10 +258,13 @@ class ClientController extends Controller
                 'client_id'      => $clientId,
                 'company_name'   => $companyName,
                 'entity_type'    => trim((string)($body['entity_type'] ?? 'Other')) ?: 'Other',
+                'entity_scope'   => $this->entityScope($body),
                 'company_number' => $companyNum,
                 'tax_reference'  => $taxRef,
                 'attributes'     => $this->entityAttributes($body),
             ]);
+            $client=$this->clientModel->findById($clientId);
+            if ($this->entityScope($body)==='company' && $client) (new EntityAccess())->linkDirector($entityId,(int)$client['user_id'],(int)Session::get('user_id'));
             $this->createInlineDeadlines($clientId, $entityId, $body);
 
             \Application\Services\AuditService::log('entity_added', 'client_entities', $clientId);
@@ -284,6 +296,28 @@ class ClientController extends Controller
         return $attributes;
     }
 
+    public function linkDirector(Request $request, Response $response): void
+    {
+        $body=$request->getBody();$entityId=(int)($body['entity_id']??0);$userId=(int)($body['user_id']??0);$returnClient=(int)($body['return_client_id']??0);
+        if((new EntityAccess())->linkDirector($entityId,$userId,(int)Session::get('user_id'))){\Application\Services\AuditService::log('director_linked','client_entities',$entityId);Session::setFlash('success','Director access added.');}
+        else Session::setFlash('error','Director could not be linked to this company record.');
+        $response->redirect('/staff/clients/'.$returnClient);
+    }
+
+    public function unlinkDirector(Request $request, Response $response): void
+    {
+        $body=$request->getBody();$entityId=(int)($body['entity_id']??0);$userId=(int)($body['user_id']??0);$returnClient=(int)($body['return_client_id']??0);
+        if((new EntityAccess())->unlinkDirector($entityId,$userId)){\Application\Services\AuditService::log('director_unlinked','client_entities',$entityId);Session::setFlash('success','Director access removed.');}
+        $response->redirect('/staff/clients/'.$returnClient);
+    }
+
+    private function entityScope(array $body): string
+    {
+        $explicit=(string)($body['entity_scope']??'');
+        if(in_array($explicit,['company','personal'],true)) return $explicit;
+        return str_contains(strtolower((string)($body['entity_type']??'')),'personal') ? 'personal' : 'company';
+    }
+
     private function createInlineDeadlines(int $clientId, int $entityId, array $body): void
     {
         $types = is_array($body['deadline_type'] ?? null) ? $body['deadline_type'] : [];
@@ -292,7 +326,8 @@ class ClientController extends Controller
             $type = trim((string)$type);
             $date = trim((string)($dates[$index] ?? ''));
             if ($type === '' || !preg_match('/^\d{4}-\d{2}-\d{2}$/', $date)) continue;
-            $this->deadlineModel->create(['client_id'=>$clientId, 'entity_id'=>$entityId, 'type'=>$type, 'due_date'=>$date, 'status'=>'Pending']);
+            $entity=$this->entityModel->findById($entityId);
+            $this->deadlineModel->create(['client_id'=>$clientId, 'entity_id'=>$entityId, 'scope'=>$entity['entity_scope']??'company', 'type'=>$type, 'due_date'=>$date, 'status'=>'Pending']);
         }
     }
 }

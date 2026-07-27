@@ -30,6 +30,20 @@ class Document extends Model
         return $stmt->fetchAll();
     }
 
+    public function getAccessibleByUserAndDirection(int $userId, string $direction): array
+    {
+        $stmt=$this->db->prepare("
+            SELECT d.*,u.name AS uploaded_by_name,u.role AS uploaded_by_role,e.company_name AS entity_name,e.entity_scope
+            FROM documents d JOIN users u ON u.id=d.uploaded_by_user_id JOIN client_entities e ON e.id=d.entity_id
+            JOIN clients c ON c.id=e.client_id
+            LEFT JOIN entity_directors ed ON ed.entity_id=e.id AND ed.user_id=:director_user
+            WHERE d.direction=:direction AND ((d.scope='company' AND ed.user_id IS NOT NULL) OR (d.scope='personal' AND c.user_id=:owner_user))
+            ORDER BY d.created_at DESC
+        ");
+        $stmt->execute(['director_user'=>$userId,'owner_user'=>$userId,'direction'=>$direction]);
+        return $stmt->fetchAll();
+    }
+
     public function getByClientId(int $clientId): array
     {
         $stmt = $this->db->prepare("
@@ -53,11 +67,13 @@ class Document extends Model
     public function create(array $data): int
     {
         $stmt = $this->db->prepare("
-            INSERT INTO documents (client_id, uploaded_by_user_id, direction, filename, stored_path, description, status)
-            VALUES (:client_id, :uploaded_by_user_id, :direction, :filename, :stored_path, :description, :status)
+            INSERT INTO documents (client_id, entity_id, scope, uploaded_by_user_id, direction, filename, stored_path, description, status)
+            VALUES (:client_id, :entity_id, :scope, :uploaded_by_user_id, :direction, :filename, :stored_path, :description, :status)
         ");
         $stmt->execute([
             'client_id'           => $data['client_id'],
+            'entity_id'           => $data['entity_id'],
+            'scope'               => $data['scope'],
             'uploaded_by_user_id' => $data['uploaded_by_user_id'],
             'direction'           => $data['direction'],
             'filename'            => $data['filename'],

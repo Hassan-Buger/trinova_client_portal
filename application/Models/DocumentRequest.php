@@ -36,6 +36,20 @@ class DocumentRequest extends Model
         return $stmt->fetchAll();
     }
 
+    public function getAccessibleByUser(int $userId, bool $outstandingOnly=false): array
+    {
+        $status=$outstandingOnly ? "AND dr.status <> 'Completed'" : '';
+        $stmt=$this->db->prepare("
+            SELECT dr.*,e.company_name AS entity_name,e.entity_scope FROM document_requests dr
+            JOIN client_entities e ON e.id=dr.entity_id JOIN clients c ON c.id=e.client_id
+            LEFT JOIN entity_directors ed ON ed.entity_id=e.id AND ed.user_id=:director_user
+            WHERE ((dr.scope='company' AND ed.user_id IS NOT NULL) OR (dr.scope='personal' AND c.user_id=:owner_user)) {$status}
+            ORDER BY dr.due_date ASC,dr.created_at DESC
+        ");
+        $stmt->execute(['director_user'=>$userId,'owner_user'=>$userId]);
+        return $stmt->fetchAll();
+    }
+
     public function getAllWithDetails(): array
     {
         $stmt = $this->db->prepare("
@@ -53,11 +67,13 @@ class DocumentRequest extends Model
     public function create(array $data): int
     {
         $stmt = $this->db->prepare("
-            INSERT INTO document_requests (client_id, created_by_user_id, title, description, due_date, status)
-            VALUES (:client_id, :created_by_user_id, :title, :description, :due_date, :status)
+            INSERT INTO document_requests (client_id, entity_id, scope, created_by_user_id, title, description, due_date, status)
+            VALUES (:client_id, :entity_id, :scope, :created_by_user_id, :title, :description, :due_date, :status)
         ");
         $stmt->execute([
             'client_id'          => $data['client_id'],
+            'entity_id'          => $data['entity_id'],
+            'scope'              => $data['scope'],
             'created_by_user_id' => $data['created_by_user_id'],
             'title'              => $data['title'],
             'description'        => $data['description'] ?? null,

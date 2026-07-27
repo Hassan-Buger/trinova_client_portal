@@ -60,6 +60,7 @@
                     <form action="/staff/messages/send" method="POST" data-ajax-form data-message-form data-ajax-refresh="false" style="margin:0;display:flex;gap:12px">
                         <input type="hidden" name="csrf_token" value="<?= htmlspecialchars(\Application\Core\Session::csrfToken()) ?>">
                         <input type="hidden" name="client_id" value="<?= $activeClient['id'] ?>">
+                        <select name="entity_id" required aria-label="Message context" style="max-width:210px;padding:10px;border:1.5px solid #e0e9e5;border-radius:14px;background:#fbfdfc"><?php foreach(($entities??[]) as $entity): ?><?php if((int)$entity['client_id']===(int)$activeClient['id']): ?><option value="<?= (int)$entity['id'] ?>"><?= htmlspecialchars($entity['company_name']) ?></option><?php endif; ?><?php endforeach; ?></select>
                         <textarea name="body" rows="2" placeholder="Write response to <?= htmlspecialchars($activeClient['name']) ?>..." required style="flex:1;padding:12px 16px;border:1.5px solid #e0e9e5;border-radius:14px;font-size:14px;background:#fbfdfc;resize:none"></textarea>
                         <button type="submit" data-loading-text="Sending…" style="background:#41556f;color:#fff;border:none;padding:0 22px;border-radius:14px;font-weight:700;font-size:14px;cursor:pointer;white-space:nowrap">Send Reply</button>
                     </form>

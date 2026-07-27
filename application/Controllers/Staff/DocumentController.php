@@ -10,6 +10,8 @@ use Application\Core\Session;
 use Application\Models\Client;
 use Application\Models\Document;
 use Application\Models\Notification;
+use Application\Models\ClientEntity;
+use Application\Models\EntityAccess;
 use Application\Services\AuditService;
 
 class DocumentController extends Controller
@@ -45,11 +47,13 @@ class DocumentController extends Controller
         }
         $pagination = $this->documentModel->paginateWithDetails($filters, $page, $perPage);
         $clients   = $this->clientModel->getAllWithUsers();
+        $entities  = (new ClientEntity())->getAllWithClient();
 
         $this->render('staff/documents/index', [
             'pageTitle' => 'Document Management',
             'documents' => $pagination['items'],
             'clients'   => $clients,
+            'entities'  => $entities,
             'statuses' => $statuses,
             'filters' => $filters,
             'pagination' => $pagination,
@@ -68,7 +72,9 @@ class DocumentController extends Controller
     public function upload(Request $request, Response $response): void
     {
         $staffUserId = Session::get('user_id');
-        $clientId    = (int)($request->getBody()['client_id'] ?? 0);
+        $entityId    = (int)($request->getBody()['entity_id'] ?? 0);
+        $entity      = $entityId > 0 ? (new ClientEntity())->findById($entityId) : null;
+        $clientId    = (int)($entity['client_id'] ?? 0);
         $description = trim($request->getBody()['description'] ?? '');
 
         if ($clientId <= 0 || empty($_FILES['file']['name'])) {
@@ -97,6 +103,8 @@ class DocumentController extends Controller
 
         $docId = $this->documentModel->create([
             'client_id'           => $clientId,
+            'entity_id'           => $entityId,
+            'scope'               => $entity['entity_scope'],
             'uploaded_by_user_id' => $staffUserId,
             'direction'           => 'from_trinova',
             'filename'            => $filename,
@@ -107,10 +115,9 @@ class DocumentController extends Controller
 
         AuditService::log('staff_upload', 'documents', $docId);
         try {
-            $client = $this->clientModel->findById($clientId);
-            if ($client && !empty($client['user_id'])) {
+            foreach ((new EntityAccess())->recipients($entityId) as $client) {
                 (new Notification())->create(
-                    (int)$client['user_id'],
+                    (int)$client['id'],
                     'document_received',
                     'document:' . $docId,
                     'New Document Available',

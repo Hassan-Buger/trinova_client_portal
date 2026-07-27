@@ -52,6 +52,7 @@ CREATE TABLE IF NOT EXISTS `client_entities` (
   `client_id` INT UNSIGNED NOT NULL,
   `company_name` VARCHAR(150) NOT NULL,
   `entity_type` VARCHAR(80) NOT NULL DEFAULT 'Other',
+  `entity_scope` ENUM('company','personal') NOT NULL DEFAULT 'company',
   `company_number` VARCHAR(30) NULL,
   `tax_reference` VARCHAR(50) NULL,
   `attributes` JSON NULL,
@@ -60,10 +61,24 @@ CREATE TABLE IF NOT EXISTS `client_entities` (
   INDEX `idx_entities_client` (`client_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+CREATE TABLE IF NOT EXISTS `entity_directors` (
+  `entity_id` INT UNSIGNED NOT NULL,
+  `user_id` INT UNSIGNED NOT NULL,
+  `created_by_user_id` INT UNSIGNED NULL,
+  `created_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`entity_id`, `user_id`),
+  INDEX `idx_entity_directors_user` (`user_id`, `entity_id`),
+  CONSTRAINT `fk_entity_directors_entity` FOREIGN KEY (`entity_id`) REFERENCES `client_entities` (`id`) ON DELETE CASCADE,
+  CONSTRAINT `fk_entity_directors_user` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE CASCADE,
+  CONSTRAINT `fk_entity_directors_creator` FOREIGN KEY (`created_by_user_id`) REFERENCES `users` (`id`) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
 -- Documents Management
 CREATE TABLE IF NOT EXISTS `documents` (
   `id` INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
   `client_id` INT UNSIGNED NOT NULL,
+  `entity_id` INT UNSIGNED NOT NULL,
+  `scope` ENUM('company','personal') NOT NULL DEFAULT 'company',
   `uploaded_by_user_id` INT UNSIGNED NOT NULL,
   `direction` ENUM('client_upload', 'from_trinova') NOT NULL,
   `filename` VARCHAR(255) NOT NULL,
@@ -72,6 +87,7 @@ CREATE TABLE IF NOT EXISTS `documents` (
   `status` VARCHAR(50) NOT NULL DEFAULT 'Ready',
   `created_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
   CONSTRAINT `fk_docs_client` FOREIGN KEY (`client_id`) REFERENCES `clients` (`id`) ON DELETE CASCADE,
+  CONSTRAINT `fk_docs_entity` FOREIGN KEY (`entity_id`) REFERENCES `client_entities` (`id`) ON DELETE CASCADE,
   CONSTRAINT `fk_docs_user` FOREIGN KEY (`uploaded_by_user_id`) REFERENCES `users` (`id`),
   INDEX `idx_docs_client_dir` (`client_id`, `direction`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
@@ -80,6 +96,8 @@ CREATE TABLE IF NOT EXISTS `documents` (
 CREATE TABLE IF NOT EXISTS `document_requests` (
   `id` INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
   `client_id` INT UNSIGNED NOT NULL,
+  `entity_id` INT UNSIGNED NOT NULL,
+  `scope` ENUM('company','personal') NOT NULL DEFAULT 'company',
   `created_by_user_id` INT UNSIGNED NOT NULL,
   `title` VARCHAR(200) NOT NULL,
   `description` TEXT NULL,
@@ -87,6 +105,7 @@ CREATE TABLE IF NOT EXISTS `document_requests` (
   `status` ENUM('Awaiting Client', 'Uploaded', 'Under Review', 'Completed') NOT NULL DEFAULT 'Awaiting Client',
   `created_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
   CONSTRAINT `fk_reqs_client` FOREIGN KEY (`client_id`) REFERENCES `clients` (`id`) ON DELETE CASCADE,
+  CONSTRAINT `fk_reqs_entity` FOREIGN KEY (`entity_id`) REFERENCES `client_entities` (`id`) ON DELETE CASCADE,
   CONSTRAINT `fk_reqs_user` FOREIGN KEY (`created_by_user_id`) REFERENCES `users` (`id`),
   INDEX `idx_reqs_client_status` (`client_id`, `status`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
@@ -95,12 +114,15 @@ CREATE TABLE IF NOT EXISTS `document_requests` (
 CREATE TABLE IF NOT EXISTS `messages` (
   `id` INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
   `client_id` INT UNSIGNED NOT NULL,
+  `entity_id` INT UNSIGNED NOT NULL,
+  `scope` ENUM('company','personal') NOT NULL DEFAULT 'company',
   `sender_id` INT UNSIGNED NOT NULL,
   `thread_id` INT UNSIGNED NULL,
   `body` TEXT NOT NULL,
   `read_at` DATETIME NULL,
   `created_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
   CONSTRAINT `fk_msg_client` FOREIGN KEY (`client_id`) REFERENCES `clients` (`id`) ON DELETE CASCADE,
+  CONSTRAINT `fk_msg_entity` FOREIGN KEY (`entity_id`) REFERENCES `client_entities` (`id`) ON DELETE CASCADE,
   CONSTRAINT `fk_msg_sender` FOREIGN KEY (`sender_id`) REFERENCES `users` (`id`),
   INDEX `idx_msg_client_read` (`client_id`, `read_at`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
@@ -110,6 +132,7 @@ CREATE TABLE IF NOT EXISTS `deadlines` (
   `id` INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
   `client_id` INT UNSIGNED NOT NULL,
   `entity_id` INT UNSIGNED NOT NULL,
+  `scope` ENUM('company','personal') NOT NULL DEFAULT 'company',
   `type` VARCHAR(100) NOT NULL,
   `due_date` DATE NOT NULL,
   `status` ENUM('Pending', 'Overdue', 'Completed') NOT NULL DEFAULT 'Pending',
@@ -172,27 +195,29 @@ INSERT INTO `users` (`id`, `name`, `email`, `password_hash`, `role`, `status`) V
 INSERT INTO `clients` (`id`, `user_id`, `phone`, `address`, `aml_status`, `notes`) VALUES
 (1, 5, '07700 900000', '1 Example Street, Exampletown EX1 1AA', 'Complete', 'Fictional test client record. Use for non-production testing only.');
 
-INSERT INTO `client_entities` (`id`, `client_id`, `company_name`, `entity_type`, `company_number`, `tax_reference`, `attributes`) VALUES
-(1, 1, 'Example Test Company Ltd', 'Limited Company', '00000000', 'TEST-REF-001', JSON_OBJECT('vat_number','GB000000000','accounting_year_end','2026-03-31')),
-(2, 1, 'Example Test Services Ltd', 'Sole Trader', '00000001', 'TEST-REF-002', JSON_OBJECT()),
-(3, 1, 'Personal Tax Test Record', 'Personal Tax Return', NULL, 'TEST-REF-003', JSON_OBJECT('tax_year','2026/27'));
+INSERT INTO `client_entities` (`id`, `client_id`, `company_name`, `entity_type`, `entity_scope`, `company_number`, `tax_reference`, `attributes`) VALUES
+(1, 1, 'Example Test Company Ltd', 'Limited Company', 'company', '00000000', 'TEST-REF-001', JSON_OBJECT('vat_number','GB000000000','accounting_year_end','2026-03-31')),
+(2, 1, 'Example Test Services Ltd', 'Sole Trader', 'company', '00000001', 'TEST-REF-002', JSON_OBJECT()),
+(3, 1, 'Personal Tax Test Record', 'Personal Tax Return', 'personal', NULL, 'TEST-REF-003', JSON_OBJECT('tax_year','2026/27'));
 
-INSERT INTO `deadlines` (`id`, `client_id`, `entity_id`, `type`, `due_date`, `status`) VALUES
-(1, 1, 1, 'Payroll', '2026-07-26', 'Pending'),
-(2, 1, 1, 'Next VAT Return Due', '2026-08-07', 'Pending'),
-(3, 1, 1, 'Confirmation Statement', '2026-09-03', 'Pending'),
-(4, 1, 1, 'Corporation Tax Due', '2026-10-01', 'Pending'),
-(5, 1, 3, 'Tax Return Due', '2027-01-31', 'Pending');
+INSERT INTO `entity_directors` (`entity_id`,`user_id`) VALUES (1,5),(2,5);
 
-INSERT INTO `document_requests` (`id`, `client_id`, `created_by_user_id`, `title`, `description`, `due_date`, `status`) VALUES
-(1, 1, 3, 'June bank statements', 'Upload PDF statements for June accounts', '2026-07-28', 'Awaiting Client'),
-(2, 1, 3, 'CIS certificates', 'Two subcontractor documents needed', '2026-07-30', 'Awaiting Client');
+INSERT INTO `deadlines` (`id`, `client_id`, `entity_id`, `scope`, `type`, `due_date`, `status`) VALUES
+(1, 1, 1, 'company', 'Payroll', '2026-07-26', 'Pending'),
+(2, 1, 1, 'company', 'Next VAT Return Due', '2026-08-07', 'Pending'),
+(3, 1, 1, 'company', 'Confirmation Statement', '2026-09-03', 'Pending'),
+(4, 1, 1, 'company', 'Corporation Tax Due', '2026-10-01', 'Pending'),
+(5, 1, 3, 'personal', 'Tax Return Due', '2027-01-31', 'Pending');
 
-INSERT INTO `documents` (`id`, `client_id`, `uploaded_by_user_id`, `direction`, `filename`, `stored_path`, `description`, `status`) VALUES
-(1, 1, 3, 'from_trinova', 'Draft accounts 2025.pdf', 'draft_accounts_2025_hash.pdf', 'Uploaded by Test Staff Three', 'New'),
-(2, 1, 3, 'from_trinova', 'VAT return Q2.pdf', 'vat_return_q2_hash.pdf', 'Submitted copy', 'Ready');
+INSERT INTO `document_requests` (`id`, `client_id`, `entity_id`, `scope`, `created_by_user_id`, `title`, `description`, `due_date`, `status`) VALUES
+(1, 1, 1, 'company', 3, 'June bank statements', 'Upload PDF statements for June accounts', '2026-07-28', 'Awaiting Client'),
+(2, 1, 1, 'company', 3, 'CIS certificates', 'Two subcontractor documents needed', '2026-07-30', 'Awaiting Client');
 
-INSERT INTO `messages` (`id`, `client_id`, `sender_id`, `thread_id`, `body`, `read_at`) VALUES
-(1, 1, 3, 1, 'Hello Test Client Alpha, could you send over the June payroll figures when convenient?', NOW()),
-(2, 1, 5, 1, 'Of course — I have just uploaded them to the portal.', NOW()),
-(3, 1, 3, 1, 'Perfect, received. Thank you, Test Client Alpha. I will process these today.', NULL);
+INSERT INTO `documents` (`id`, `client_id`, `entity_id`, `scope`, `uploaded_by_user_id`, `direction`, `filename`, `stored_path`, `description`, `status`) VALUES
+(1, 1, 1, 'company', 3, 'from_trinova', 'Draft accounts 2025.pdf', 'draft_accounts_2025_hash.pdf', 'Uploaded by Test Staff Three', 'New'),
+(2, 1, 1, 'company', 3, 'from_trinova', 'VAT return Q2.pdf', 'vat_return_q2_hash.pdf', 'Submitted copy', 'Ready');
+
+INSERT INTO `messages` (`id`, `client_id`, `entity_id`, `scope`, `sender_id`, `thread_id`, `body`, `read_at`) VALUES
+(1, 1, 1, 'company', 3, 1, 'Hello Test Client Alpha, could you send over the June payroll figures when convenient?', NOW()),
+(2, 1, 1, 'company', 5, 1, 'Of course — I have just uploaded them to the portal.', NOW()),
+(3, 1, 1, 'company', 3, 1, 'Perfect, received. Thank you, Test Client Alpha. I will process these today.', NULL);

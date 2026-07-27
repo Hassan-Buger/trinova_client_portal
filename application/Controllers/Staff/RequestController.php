@@ -9,6 +9,8 @@ use Application\Core\Session;
 use Application\Models\Client;
 use Application\Models\DocumentRequest;
 use Application\Models\Notification;
+use Application\Models\ClientEntity;
+use Application\Models\EntityAccess;
 use Application\Services\AuditService;
 
 class RequestController extends Controller
@@ -41,12 +43,14 @@ class RequestController extends Controller
         $pagination = $this->requestModel->paginateWithDetails($filters, max(1, (int)($query['page'] ?? 1)), $perPage);
         $clients  = $this->clientModel->getAllWithUsers();
         $staff = (new \Application\Models\User())->getAllStaff();
+        $entities = (new ClientEntity())->getAllWithClient();
 
         $this->render('staff/requests/index', [
             'pageTitle' => 'Document Request Management',
             'requests'  => $pagination['items'],
             'clients'   => $clients,
             'staff' => $staff,
+            'entities' => $entities,
             'statuses' => $statuses,
             'filters' => $filters,
             'pagination' => $pagination,
@@ -64,7 +68,9 @@ class RequestController extends Controller
     {
         $staffUserId = Session::get('user_id');
         $body        = $request->getBody();
-        $clientId    = (int)($body['client_id'] ?? 0);
+        $entityId    = (int)($body['entity_id'] ?? 0);
+        $entity      = $entityId > 0 ? (new ClientEntity())->findById($entityId) : null;
+        $clientId    = (int)($entity['client_id'] ?? 0);
         $title       = trim($body['title'] ?? '');
         $description = trim($body['description'] ?? '');
         $dueDate     = trim($body['due_date'] ?? '');
@@ -79,6 +85,8 @@ class RequestController extends Controller
 
         $reqId = $this->requestModel->create([
             'client_id'          => $clientId,
+            'entity_id'          => $entityId,
+            'scope'              => $entity['entity_scope'],
             'created_by_user_id' => $staffUserId,
             'title'              => $title,
             'description'        => $description,
@@ -88,10 +96,9 @@ class RequestController extends Controller
 
         AuditService::log('request_created', 'document_requests', $reqId);
         try {
-            $client = $this->clientModel->findById($clientId);
-            if ($client && !empty($client['user_id'])) {
+            foreach ((new EntityAccess())->recipients($entityId) as $client) {
                 (new Notification())->create(
-                    (int)$client['user_id'],
+                    (int)$client['id'],
                     'document_request',
                     'request:' . $reqId,
                     'New Document Request',

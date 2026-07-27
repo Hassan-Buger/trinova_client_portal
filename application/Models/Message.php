@@ -19,6 +19,20 @@ class Message extends Model
         return (int) ($row['total'] ?? 0);
     }
 
+    public function getUnreadCountByUser(int $userId): int
+    {
+        $stmt=$this->db->prepare("SELECT COUNT(DISTINCT m.id) FROM messages m JOIN client_entities e ON e.id=m.entity_id JOIN clients c ON c.id=e.client_id LEFT JOIN entity_directors ed ON ed.entity_id=e.id AND ed.user_id=:director_user JOIN users sender ON sender.id=m.sender_id WHERE m.read_at IS NULL AND sender.role='staff' AND ((m.scope='company' AND ed.user_id IS NOT NULL) OR (m.scope='personal' AND c.user_id=:owner_user))");
+        $stmt->execute(['director_user'=>$userId,'owner_user'=>$userId]);
+        return (int)$stmt->fetchColumn();
+    }
+
+    public function getAccessibleByUser(int $userId, int $afterId=0): array
+    {
+        $stmt=$this->db->prepare("SELECT DISTINCT m.*,u.name AS sender_name,u.role AS sender_role,e.company_name AS entity_name FROM messages m LEFT JOIN users u ON u.id=m.sender_id JOIN client_entities e ON e.id=m.entity_id JOIN clients c ON c.id=e.client_id LEFT JOIN entity_directors ed ON ed.entity_id=e.id AND ed.user_id=:director_user WHERE m.id>:after_id AND ((m.scope='company' AND ed.user_id IS NOT NULL) OR (m.scope='personal' AND c.user_id=:owner_user)) ORDER BY m.id ASC LIMIT 100");
+        $stmt->execute(['director_user'=>$userId,'owner_user'=>$userId,'after_id'=>$afterId]);
+        return $stmt->fetchAll();
+    }
+
     public function getTotalUnreadCountForStaff(): int
     {
         $stmt = $this->db->query("SELECT COUNT(*) AS total FROM messages WHERE read_at IS NULL");
@@ -59,11 +73,13 @@ class Message extends Model
     public function create(array $data): int
     {
         $stmt = $this->db->prepare("
-            INSERT INTO messages (client_id, sender_id, thread_id, body)
-            VALUES (:client_id, :sender_id, :thread_id, :body)
+            INSERT INTO messages (client_id, entity_id, scope, sender_id, thread_id, body)
+            VALUES (:client_id, :entity_id, :scope, :sender_id, :thread_id, :body)
         ");
         $stmt->execute([
             'client_id' => $data['client_id'],
+            'entity_id' => $data['entity_id'],
+            'scope' => $data['scope'],
             'sender_id' => $data['sender_id'],
             'thread_id' => $data['thread_id'] ?? 1,
             'body'      => $data['body'],

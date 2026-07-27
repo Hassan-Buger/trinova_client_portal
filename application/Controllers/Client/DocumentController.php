@@ -10,6 +10,8 @@ use Application\Core\Session;
 use Application\Models\Document;
 use Application\Models\Notification;
 use Application\Models\User;
+use Application\Models\EntityAccess;
+use Application\Models\ClientEntity;
 use Application\Services\AuditService;
 
 class DocumentController extends Controller
@@ -23,8 +25,14 @@ class DocumentController extends Controller
 
     public function showUpload(Request $request, Response $response): void
     {
+        $userId=(int)Session::get('user_id');
+        $requestId=(int)($request->getQueryParams()['request_id']??0);
+        $selectedRequest=$requestId>0?(new \Application\Models\DocumentRequest())->find($requestId):null;
+        if($selectedRequest && !(new EntityAccess())->canAccessRecord($userId,$selectedRequest)) $selectedRequest=null;
         $this->render('client/documents/upload', [
             'pageTitle' => 'Upload Documents',
+            'entities' => (new EntityAccess())->accessibleEntities($userId),
+            'selectedRequest' => $selectedRequest,
         ], 'main');
     }
 
@@ -49,6 +57,18 @@ class DocumentController extends Controller
         $filename    = basename($file['name']);
         $description = trim($request->getBody()['description'] ?? '');
         $requestId   = (int)($request->getBody()['request_id'] ?? 0);
+        $entityId    = (int)($request->getBody()['entity_id'] ?? 0);
+        $entityAccess = new EntityAccess();
+        $requestRecord = $requestId > 0 ? (new \Application\Models\DocumentRequest())->find($requestId) : null;
+        if ($requestRecord) $entityId = (int)$requestRecord['entity_id'];
+        if ($entityId <= 0 || !$entityAccess->canAccessEntity((int)$userId, $entityId) || ($requestId > 0 && !$requestRecord)) {
+            Session::setFlash('error', 'Choose a valid company or personal record.');
+            $response->redirect('/client/documents/upload');
+            return;
+        }
+        $entity = (new ClientEntity())->findById($entityId);
+        $recordClientId = (int)$entity['client_id'];
+        $scope = (string)$entity['entity_scope'];
 
         // Validation: File size limit 25MB
         if ($file['size'] > 25 * 1024 * 1024) {
@@ -81,7 +101,9 @@ class DocumentController extends Controller
         }
 
         $docId = $this->documentModel->create([
-            'client_id'           => $clientId,
+            'client_id'           => $recordClientId,
+            'entity_id'           => $entityId,
+            'scope'               => $scope,
             'uploaded_by_user_id' => $userId,
             'direction'           => 'client_upload',
             'filename'            => $filename,
@@ -132,8 +154,7 @@ class DocumentController extends Controller
 
     public function myUploads(Request $request, Response $response): void
     {
-        $clientId = Session::get('client_id');
-        $documents = $clientId ? $this->documentModel->getByClientAndDirection($clientId, 'client_upload') : [];
+        $documents = $this->documentModel->getAccessibleByUserAndDirection((int)Session::get('user_id'), 'client_upload');
 
         $this->render('client/documents/my-uploads', [
             'pageTitle' => 'My Uploads',
@@ -143,8 +164,7 @@ class DocumentController extends Controller
 
     public function trinovaDocs(Request $request, Response $response): void
     {
-        $clientId = Session::get('client_id');
-        $documents = $clientId ? $this->documentModel->getByClientAndDirection($clientId, 'from_trinova') : [];
+        $documents = $this->documentModel->getAccessibleByUserAndDirection((int)Session::get('user_id'), 'from_trinova');
 
         $this->render('client/documents/trinova-docs', [
             'pageTitle' => 'Documents from TriNova',
@@ -216,8 +236,8 @@ class DocumentController extends Controller
         }
 
         $userRole = (string)Session::get('role');
-        $clientId = (int)Session::get('client_id', 0);
-        if ($userRole !== 'staff' && ($userRole !== 'client' || $clientId <= 0 || (int)$doc['client_id'] !== $clientId)) {
+        $userId = (int)Session::get('user_id', 0);
+        if ($userRole !== 'staff' && ($userRole !== 'client' || $userId <= 0 || !(new EntityAccess())->canAccessRecord($userId, $doc))) {
             $response->setStatusCode(403);
             die('Access Denied: You do not have permission to access this document.');
         }

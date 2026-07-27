@@ -30,6 +30,20 @@ class Deadline extends Model
         return $this->getAllByClient($clientId);
     }
 
+    public function getAccessibleByUser(int $userId): array
+    {
+        $stmt=$this->db->prepare("SELECT DISTINCT d.*,e.company_name AS entity_name,e.entity_type,e.entity_scope FROM deadlines d JOIN client_entities e ON e.id=d.entity_id JOIN clients c ON c.id=e.client_id LEFT JOIN entity_directors ed ON ed.entity_id=e.id AND ed.user_id=:director_user WHERE ((d.scope='company' AND ed.user_id IS NOT NULL) OR (d.scope='personal' AND c.user_id=:owner_user)) ORDER BY e.company_name,d.due_date");
+        $stmt->execute(['director_user'=>$userId,'owner_user'=>$userId]);
+        return $stmt->fetchAll();
+    }
+
+    public function getGroupedByUser(int $userId): array
+    {
+        $grouped=[];
+        foreach($this->getAccessibleByUser($userId) as $deadline){$id=(int)$deadline['entity_id'];if(!isset($grouped[$id]))$grouped[$id]=['entity_id'=>$id,'entity_name'=>$deadline['entity_name'],'entity_type'=>$deadline['entity_type'],'deadlines'=>[]];$grouped[$id]['deadlines'][]=$deadline;}
+        return array_values($grouped);
+    }
+
     public function getGroupedByClient(int $clientId): array
     {
         $grouped = [];
@@ -60,12 +74,13 @@ class Deadline extends Model
     public function create(array $data): int
     {
         $stmt = $this->db->prepare("
-            INSERT INTO deadlines (client_id, entity_id, type, due_date, status)
-            VALUES (:client_id, :entity_id, :type, :due_date, :status)
+            INSERT INTO deadlines (client_id, entity_id, scope, type, due_date, status)
+            VALUES (:client_id, :entity_id, :scope, :type, :due_date, :status)
         ");
         $stmt->execute([
             'client_id' => $data['client_id'],
             'entity_id' => $data['entity_id'],
+            'scope'     => $data['scope'] ?? 'company',
             'type'      => $data['type'],
             'due_date'  => $data['due_date'],
             'status'    => $data['status'] ?? 'Pending',

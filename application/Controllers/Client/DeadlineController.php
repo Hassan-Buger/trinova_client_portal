@@ -21,10 +21,11 @@ class DeadlineController extends Controller
     public function index(Request $request, Response $response): void
     {
         $clientId  = Session::get('client_id');
-        $deadlineGroups = $clientId ? $this->deadlineModel->getGroupedByClient($clientId) : [];
+        $userId=(int)Session::get('user_id');
+        $deadlineGroups = $this->deadlineModel->getGroupedByUser($userId);
         if ($clientId) {
             $byEntity=[]; foreach($deadlineGroups as $group) $byEntity[(int)$group['entity_id']]=$group;
-            $deadlineGroups=array_map(static fn(array $entity):array=>$byEntity[(int)$entity['id']]??['entity_id'=>(int)$entity['id'],'entity_name'=>$entity['company_name'],'entity_type'=>$entity['entity_type'],'deadlines'=>[]],(new ClientEntity())->getByClientId($clientId));
+            $deadlineGroups=array_map(static fn(array $entity):array=>$byEntity[(int)$entity['id']]??['entity_id'=>(int)$entity['id'],'entity_name'=>$entity['company_name'],'entity_type'=>$entity['entity_type'],'deadlines'=>[]],(new \Application\Models\EntityAccess())->accessibleEntities($userId));
         }
 
         $this->render('client/deadlines/index', [

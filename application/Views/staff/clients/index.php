@@ -61,6 +61,7 @@
                     <legend style="padding:0 8px;font-size:13px;font-weight:800;color:#41556f">Initial linked entity (optional)</legend>
                     <input name="entity_name" placeholder="Entity name" style="width:100%;padding:11px;margin-bottom:9px;border:1px solid #e0e9e5;border-radius:11px">
                     <input name="entity_type" list="entityTypes" placeholder="Entity type, e.g. Limited Company" style="width:100%;padding:11px;margin-bottom:9px;border:1px solid #e0e9e5;border-radius:11px">
+                    <select name="entity_scope" style="width:100%;padding:11px;margin-bottom:9px;border:1px solid #e0e9e5;border-radius:11px"><option value="company">Shared company record</option><option value="personal">Private personal record</option></select>
                     <datalist id="entityTypes"><option value="Limited Company"><option value="Personal Tax Return"><option value="Sole Trader"><option value="Partnership"><option value="Other"></datalist>
                     <div data-entity-fields style="display:grid;grid-template-columns:1fr 1fr;gap:9px"><input name="company_number" placeholder="Company number"><input name="vat_number" placeholder="VAT number"><input name="ct_utr" placeholder="Corporation Tax UTR"><input name="personal_utr" placeholder="Personal UTR"><input type="date" name="accounting_year_end" title="Accounting year end"><input name="tax_year" placeholder="Tax year, e.g. 2026/27"></div>
                     <div style="margin-top:12px;font-size:12px;font-weight:800;color:#61756e">Important dates for this entity</div>

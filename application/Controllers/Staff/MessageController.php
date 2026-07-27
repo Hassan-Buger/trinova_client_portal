@@ -33,6 +33,7 @@ class MessageController extends Controller
         }
 
         $messages = $selectedClientId > 0 ? $this->messageModel->getByClientId($selectedClientId) : [];
+        $entities=(new \Application\Models\ClientEntity())->getAllWithClient();
         $activeClient = $selectedClientId > 0 ? $this->clientModel->findById($selectedClientId) : null;
 
         $this->render('staff/messages/index', [
@@ -41,6 +42,7 @@ class MessageController extends Controller
             'selectedClientId' => $selectedClientId,
             'activeClient'     => $activeClient,
             'messages'         => $messages,
+            'entities'         => $entities,
         ], 'main');
     }
 
@@ -65,10 +67,16 @@ class MessageController extends Controller
         $clientId    = (int)($body['client_id'] ?? 0);
         $senderId    = Session::get('user_id');
         $messageText = trim($body['body'] ?? '');
+        $entityId=(int)($body['entity_id']??0);
+        $entity=$entityId ? (new \Application\Models\ClientEntity())->findById($entityId) : null;
+        if(!$entity && $clientId){$owned=(new \Application\Models\ClientEntity())->getByClientId($clientId);$entity=$owned[0]??null;$entityId=(int)($entity['id']??0);}
+        if($entity) $clientId=(int)$entity['client_id'];
 
-        if ($clientId > 0 && $senderId && !empty($messageText) && $this->clientModel->findById($clientId)) {
+        if ($clientId > 0 && $senderId && !empty($messageText) && $entity) {
             $msgId = $this->messageModel->create([
-                'client_id' => $clientId,
+                'client_id' => (int)$entity['client_id'],
+                'entity_id' => $entityId,
+                'scope' => $entity['entity_scope'],
                 'sender_id' => $senderId,
                 'body'      => $messageText,
             ]);

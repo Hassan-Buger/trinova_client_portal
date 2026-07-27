@@ -6,6 +6,7 @@
     <div style="background:#fff;border-radius:24px;padding:32px;box-shadow:0 1px 2px rgba(16,54,45,.04),0 14px 34px -24px rgba(16,54,45,.4)">
         <form action="/client/documents/upload" method="POST" enctype="multipart/form-data" data-ajax-form>
             <input type="hidden" name="csrf_token" value="<?= htmlspecialchars(\Application\Core\Session::csrfToken()) ?>">
+            <?php if(!empty($selectedRequest)): ?><input type="hidden" name="request_id" value="<?= (int)$selectedRequest['id'] ?>"><?php endif; ?>
             
             <div id="dropzone" style="border:2px dashed #0d9488;border-radius:20px;padding:40px 24px;text-align:center;background:#f6faf8;cursor:pointer;transition:all .2s;margin-bottom:24px" onclick="document.getElementById('fileInput').click()">
                 <div style="width:56px;height:56px;border-radius:16px;background:#dff1ee;color:#0d9488;display:flex;align-items:center;justify-content:center;margin:0 auto 16px">
@@ -19,6 +20,14 @@
                 <p style="margin:0;color:#7d8e88;font-size:13.5px">Supports PDF, Word, Excel, CSV, PNG, JPG, ZIP (up to 25MB)</p>
                 <div id="selectedFileName" style="margin-top:14px;font-weight:700;color:#0d9488;font-size:14px"></div>
                 <input type="file" id="fileInput" name="file" required style="display:none" onchange="document.getElementById('selectedFileName').innerText = 'Selected: ' + this.files[0].name">
+            </div>
+
+            <div style="margin-bottom:18px">
+                <label style="display:block;font-size:13.5px;font-weight:700;color:#3a4d47;margin-bottom:8px">Company or personal record</label>
+                <select name="entity_id" required style="width:100%;padding:14px 16px;border:1.5px solid #e0e9e5;border-radius:15px;background:#fbfdfc">
+                    <option value="">-- Select record --</option>
+                    <?php foreach (($entities ?? []) as $entity): ?><option value="<?= (int)$entity['id'] ?>" <?= !empty($selectedRequest) && (int)$selectedRequest['entity_id']===(int)$entity['id']?'selected':'' ?>><?= htmlspecialchars($entity['company_name']) ?> — <?= htmlspecialchars(ucfirst($entity['entity_scope'])) ?></option><?php endforeach; ?>
+                </select>
             </div>
 
             <div style="margin-bottom:24px">

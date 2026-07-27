@@ -118,6 +118,8 @@ $app->router->group([
     $r->post('/clients/delete', [StaffClientController::class, 'delete'])->middleware([CsrfMiddleware::class]);
     $r->get('/clients/{id}', [StaffClientController::class, 'show']);
     $r->post('/clients/add-entity', [StaffClientController::class, 'addEntity'])->middleware([CsrfMiddleware::class]);
+    $r->post('/clients/link-director', [StaffClientController::class, 'linkDirector'])->middleware([CsrfMiddleware::class]);
+    $r->post('/clients/unlink-director', [StaffClientController::class, 'unlinkDirector'])->middleware([CsrfMiddleware::class]);
     $r->get('/documents', [StaffDocumentController::class, 'index']);
     $r->post('/documents/upload', [StaffDocumentController::class, 'upload'])->middleware([CsrfMiddleware::class]);
     $r->get('/documents/download/{id}', [StaffDocumentController::class, 'download']);

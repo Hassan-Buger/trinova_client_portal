@@ -88,11 +88,11 @@
                 <input type="hidden" name="csrf_token" value="<?= htmlspecialchars(\Application\Core\Session::csrfToken()) ?>">
                 
                 <div style="margin-bottom:16px">
-                    <label style="display:block;font-size:13px;font-weight:700;color:#3a4d47;margin-bottom:6px">Select Target Client</label>
-                    <select name="client_id" required style="width:100%;padding:13px 16px;border:1.5px solid #e0e9e5;border-radius:14px;font-size:14px;background:#fbfdfc">
-                        <option value="">-- Choose Client Account --</option>
-                        <?php foreach ($clients as $c): ?>
-                            <option value="<?= $c['id'] ?>"><?= htmlspecialchars($c['name']) ?> (<?= htmlspecialchars($c['email']) ?>)</option>
+                    <label style="display:block;font-size:13px;font-weight:700;color:#3a4d47;margin-bottom:6px">Company or personal record</label>
+                    <select name="entity_id" required style="width:100%;padding:13px 16px;border:1.5px solid #e0e9e5;border-radius:14px;font-size:14px;background:#fbfdfc">
+                        <option value="">-- Choose record --</option>
+                        <?php foreach ($entities as $entity): ?>
+                            <option value="<?= (int)$entity['id'] ?>"><?= htmlspecialchars($entity['company_name']) ?> — <?= htmlspecialchars(ucfirst($entity['entity_scope'])) ?></option>
                         <?php endforeach; ?>
                     </select>
                 </div>

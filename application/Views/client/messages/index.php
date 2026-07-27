@@ -49,6 +49,7 @@
         <div style="padding:20px 26px;border-top:1px solid #eef4f1;background:#fff">
             <form action="/client/messages/send" method="POST" data-ajax-form data-message-form data-ajax-refresh="false" style="margin:0;display:flex;gap:12px">
                 <input type="hidden" name="csrf_token" value="<?= htmlspecialchars(\Application\Core\Session::csrfToken()) ?>">
+                <select name="entity_id" required aria-label="Message context" style="max-width:220px;padding:10px;border:1.5px solid #e0e9e5;border-radius:15px;background:#fbfdfc"><?php foreach(($entities??[]) as $entity): ?><option value="<?= (int)$entity['id'] ?>"><?= htmlspecialchars($entity['company_name']) ?></option><?php endforeach; ?></select>
                 <textarea name="body" rows="2" placeholder="Type your message to the TriNova team..." required style="flex:1;padding:13px 16px;border:1.5px solid #e0e9e5;border-radius:15px;font-size:14px;background:#fbfdfc;resize:none"></textarea>
                 <button type="submit" data-loading-text="Sending…" style="background:#0d9488;color:#fff;border:none;padding:0 24px;border-radius:15px;font-weight:700;font-size:14.5px;cursor:pointer;box-shadow:0 8px 18px -8px rgba(13,148,136,.7);white-space:nowrap">Send Message</button>
             </form>

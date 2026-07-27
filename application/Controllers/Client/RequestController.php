@@ -19,8 +19,7 @@ class RequestController extends Controller
 
     public function index(Request $request, Response $response): void
     {
-        $clientId = Session::get('client_id');
-        $requests = $clientId ? $this->requestModel->getAllByClientId($clientId) : [];
+        $requests = $this->requestModel->getAccessibleByUser((int)Session::get('user_id'));
 
         $this->render('client/requests/index', [
             'pageTitle' => 'Document Requests',

@@ -77,6 +77,7 @@ class DeadlineController extends Controller
             $id = $this->deadlineModel->create([
                 'client_id' => $clientId,
                 'entity_id' => $entityId,
+                'scope'     => $entity['entity_scope'],
                 'type'      => $type,
                 'due_date'  => $dueDate,
                 'status'    => 'Pending',

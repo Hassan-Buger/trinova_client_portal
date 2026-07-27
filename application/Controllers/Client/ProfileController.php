@@ -36,7 +36,7 @@ class ProfileController extends Controller
     {
         $clientId = Session::get('client_id');
         $client   = $clientId ? $this->clientModel->findById($clientId) : null;
-        $entities = $clientId ? $this->entityModel->getByClientId($clientId) : [];
+        $entities = (new \Application\Models\EntityAccess())->accessibleEntities((int)Session::get('user_id'));
 
         $this->render('client/profile/details', [
             'pageTitle' => 'My Account Details',
@@ -52,9 +52,14 @@ class ProfileController extends Controller
         $notes    = trim($request->getBody()['update_notes'] ?? '');
 
         if ($clientId && $userId && !empty($notes)) {
+            $entities=(new \Application\Models\EntityAccess())->accessibleEntities((int)$userId);
+            $entity=$entities[0]??null;
+            if(!$entity){ Session::setFlash('error','No accessible record is available.'); $response->redirect('/client/profile/details'); return; }
             $msgModel = new Message();
             $msgModel->create([
-                'client_id' => $clientId,
+                'client_id' => (int)$entity['client_id'],
+                'entity_id' => (int)$entity['id'],
+                'scope' => $entity['entity_scope'],
                 'sender_id' => $userId,
                 'body'      => '[Detail Update Request]: ' . $notes,
             ]);
