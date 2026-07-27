@@ -1,5 +1,11 @@
 <?php
 
+// Production-safe bootstrap: diagnostics are logged, never rendered into a
+// user response before the application exception handler is available.
+ini_set('display_errors','0');
+ini_set('display_startup_errors','0');
+ini_set('log_errors','1');
+
 /**
  * TriNova Client Portal - Front Controller
  */

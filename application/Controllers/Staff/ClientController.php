@@ -62,6 +62,7 @@ class ClientController extends Controller
         }
 
         try {
+            \Application\Services\SchemaGuard::assertClientCsvReady();
             if($this->clientModel->countForExport($search)===0){
                 Session::setFlash('error','No clients are available for the selected CSV export.');
                 $response->redirect('/staff/clients'.($search!==''?'?q='.urlencode($search):''));
@@ -76,9 +77,18 @@ class ClientController extends Controller
             header('X-Content-Type-Options: nosniff');
             (new \Application\Services\ClientCsvExportService())->stream($this->clientModel,$search);
             exit;
-        } catch(\Throwable $e){
+        } catch(\Application\Exceptions\SystemSetupException $e){
+            \Application\Services\ErrorHandler::report($e,$request);
             if(!headers_sent()){
-                Session::setFlash('error','The client CSV could not be generated. Please try again.');
+                if($request->isAjax()){$response->json(['success'=>false,'message'=>\Application\Services\ErrorHandler::SETUP_MESSAGE],503);return;}
+                Session::setFlash('error',\Application\Services\ErrorHandler::SETUP_MESSAGE);$response->redirect('/staff/clients');
+            }
+            exit;
+        } catch(\Throwable $e){
+            \Application\Services\ErrorHandler::report($e,$request);
+            if(!headers_sent()){
+                if($request->isAjax()){$response->json(['success'=>false,'message'=>\Application\Services\ErrorHandler::CLIENT_DATA_MESSAGE],500);return;}
+                Session::setFlash('error',\Application\Services\ErrorHandler::CLIENT_DATA_MESSAGE);
                 $response->redirect('/staff/clients');
             }
             exit;

@@ -5,6 +5,7 @@ namespace Application\Services;
 use Application\Config\App;
 use Application\Config\ClientCsv;
 use Application\Core\Database;
+use Application\Exceptions\UserFacingException;
 use PDO;
 
 final class ClientCsvImportService
@@ -14,31 +15,31 @@ final class ClientCsvImportService
 
     public function upload(array $file): array
     {
-        if(($file['error']??UPLOAD_ERR_NO_FILE)!==UPLOAD_ERR_OK) throw new \RuntimeException('Select a CSV file to upload.');
-        if((int)($file['size']??0)<=0 || (int)$file['size']>ClientCsv::MAX_FILE_BYTES) throw new \RuntimeException('The CSV must be between 1 byte and 5 MB.');
-        if(strtolower(pathinfo((string)($file['name']??''),PATHINFO_EXTENSION))!=='csv') throw new \RuntimeException('Only .csv files are accepted.');
+        if(($file['error']??UPLOAD_ERR_NO_FILE)!==UPLOAD_ERR_OK) throw new UserFacingException('Select a CSV file to upload.');
+        if((int)($file['size']??0)<=0 || (int)$file['size']>ClientCsv::MAX_FILE_BYTES) throw new UserFacingException('The CSV must be between 1 byte and 5 MB.');
+        if(strtolower(pathinfo((string)($file['name']??''),PATHINFO_EXTENSION))!=='csv') throw new UserFacingException('Only .csv files are accepted.');
         $handle=fopen((string)$file['tmp_name'],'rb');
-        if(!$handle) throw new \RuntimeException('The uploaded CSV could not be read.');
+        if(!$handle) throw new UserFacingException('The uploaded CSV could not be read.');
         $headers=fgetcsv($handle);
-        if(!$headers){fclose($handle);throw new \RuntimeException('The CSV is empty.');}
+        if(!$headers){fclose($handle);throw new UserFacingException('The CSV is empty.');}
         $headers=array_map(fn($v)=>trim((string)$v," \t\n\r\0\x0B\xEF\xBB\xBF"),$headers);
         // TriNova's canonical export has a human-readable title row before the
         // actual header row. Accept it while still supporting ordinary CSVs.
         if(($headers[0]??'')===ClientCsv::TITLE && count(array_filter(array_slice($headers,1),fn($v)=>$v!==''))===0){
             $headers=fgetcsv($handle);
-            if(!$headers){fclose($handle);throw new \RuntimeException('The CSV title is present but its header row is missing.');}
+            if(!$headers){fclose($handle);throw new UserFacingException('The CSV title is present but its header row is missing.');}
             $headers=array_map(fn($v)=>trim((string)$v," \t\n\r\0\x0B\xEF\xBB\xBF"),$headers);
         }
-        if(count($headers)<2 || count(array_filter($headers))!==count(array_unique(array_filter($headers)))){fclose($handle);throw new \RuntimeException('The CSV headers are missing or duplicated.');}
+        if(count($headers)<2 || count(array_filter($headers))!==count(array_unique(array_filter($headers)))){fclose($handle);throw new UserFacingException('The CSV headers are missing or duplicated.');}
         $rows=[];$line=1;
         while(($row=fgetcsv($handle))!==false){
-            $line++; if(count($rows)>=ClientCsv::MAX_ROWS){fclose($handle);throw new \RuntimeException('The CSV exceeds the 5,000 row import limit.');}
+            $line++; if(count($rows)>=ClientCsv::MAX_ROWS){fclose($handle);throw new UserFacingException('The CSV exceeds the 5,000 row import limit.');}
             if(count(array_filter($row,fn($v)=>trim((string)$v)!==''))===0) continue;
             if(count($row)!==count($headers)){$rows[]=['_line'=>$line,'_malformed'=>true,'values'=>$row];continue;}
             $rows[]=['_line'=>$line,'values'=>array_map(fn($v)=>trim((string)$v),$row)];
         }
         fclose($handle);
-        if(!$rows) throw new \RuntimeException('The CSV contains no data rows.');
+        if(!$rows) throw new UserFacingException('The CSV contains no data rows.');
         $token=bin2hex(random_bytes(24));
         $draft=['token'=>$token,'user_id'=>(int)\Application\Core\Session::get('user_id'),'filename'=>basename((string)$file['name']),'created_at'=>time(),'headers'=>$headers,'rows'=>$rows];
         $this->writeDraft($token,$draft);
@@ -47,12 +48,13 @@ final class ClientCsvImportService
 
     public function preview(string $token,array $mapping): array
     {
+        SchemaGuard::assertClientCsvReady();
         $draft=$this->readDraft($token); $fields=ClientCsv::fields(); $clean=[];$used=[];
         foreach($fields as $key=>$definition){
             $index=$mapping[$key]??'';
-            if($index===''){if($definition['required']) throw new \RuntimeException("Map the required '{$definition['header']}' field.");continue;}
-            if(!ctype_digit((string)$index) || !array_key_exists((int)$index,$draft['headers'])) throw new \RuntimeException('The selected column mapping is invalid.');
-            if(isset($used[(int)$index])) throw new \RuntimeException('A CSV column cannot be mapped to more than one destination field.');
+            if($index===''){if($definition['required']) throw new UserFacingException("Map the required '{$definition['header']}' field.");continue;}
+            if(!ctype_digit((string)$index) || !array_key_exists((int)$index,$draft['headers'])) throw new UserFacingException('The selected column mapping is invalid.');
+            if(isset($used[(int)$index])) throw new UserFacingException('A CSV column cannot be mapped to more than one destination field.');
             $used[(int)$index]=true;$clean[$key]=(int)$index;
         }
         $identifiers=$this->existingIdentifiers();$preview=[];$seen=[];
@@ -68,7 +70,8 @@ final class ClientCsvImportService
 
     public function commit(string $token): array
     {
-        $draft=$this->readDraft($token); if(empty($draft['preview'])) throw new \RuntimeException('Preview this import before confirming it.');
+        SchemaGuard::assertClientCsvReady();
+        $draft=$this->readDraft($token); if(empty($draft['preview'])) throw new UserFacingException('Preview this import before confirming it.');
         $report=[];$this->db->beginTransaction();
         try{
             foreach($draft['preview'] as $row){
@@ -88,7 +91,7 @@ final class ClientCsvImportService
         return $result+['token'=>$token];
     }
 
-    public function report(string $token): array { $draft=$this->readDraft($token);if(empty($draft['report']))throw new \RuntimeException('No completed report is available.');return $draft['report']; }
+    public function report(string $token): array { $draft=$this->readDraft($token);if(empty($draft['report']))throw new UserFacingException('No completed report is available.');return $draft['report']; }
 
     private function validateRow(int $line,array $data,bool $malformed,array $existing): array
     {
@@ -115,7 +118,7 @@ final class ClientCsvImportService
         $d=$row['data'];$entityId=(int)($row['match']['entity_id']??0);$created=false;$primaryCreated=0;$placeholderCount=0;$deadlines=0;
         if($entityId){
             $stmt=$this->db->prepare('SELECT e.*,c.user_id,c.id AS client_id FROM client_entities e JOIN clients c ON c.id=e.client_id WHERE e.id=:id FOR UPDATE');$stmt->execute(['id'=>$entityId]);$entity=$stmt->fetch();
-            if(!$entity){throw new \RuntimeException('A matched company no longer exists.');}
+            if(!$entity){throw new UserFacingException('A matched company no longer exists.');}
             $clientId=(int)$entity['client_id'];$userId=(int)$entity['user_id'];
             $attrs=json_decode((string)($entity['attributes']??'{}'),true)?:[];
             foreach(['vat_number'=>$d['vat_number']??'','ct_utr'=>$d['utr']??'','accounting_year_end'=>$this->parseDate($d['year_end']??''),'vat_quarter'=>$d['vat_quarter']??''] as $k=>$v)if($v!==''&&empty($attrs[$k]))$attrs[$k]=['label'=>$k,'value'=>$v];
@@ -123,7 +126,7 @@ final class ClientCsvImportService
             $this->db->prepare('UPDATE clients SET phone=COALESCE(NULLIF(phone,\'\'),:phone),address=COALESCE(NULLIF(address,\'\'),:address),notes=COALESCE(NULLIF(notes,\'\'),:notes) WHERE id=:id')->execute(['phone'=>$d['phone']?:null,'address'=>$d['address']?:null,'notes'=>$d['status_notes']?:null,'id'=>$clientId]);
         }else{
             $user=$this->db->prepare('SELECT id FROM users WHERE email=:email LIMIT 1');$user->execute(['email'=>$d['email']]);$userId=(int)($user->fetchColumn()?:0);
-            if($userId){$c=$this->db->prepare('SELECT id FROM clients WHERE user_id=:id');$c->execute(['id'=>$userId]);$clientId=(int)($c->fetchColumn()?:0);if(!$clientId)throw new \RuntimeException('The primary email belongs to a non-client account.');}
+            if($userId){$c=$this->db->prepare('SELECT id FROM clients WHERE user_id=:id');$c->execute(['id'=>$userId]);$clientId=(int)($c->fetchColumn()?:0);if(!$clientId)throw new UserFacingException('The primary email belongs to a non-client account.');}
             else{$this->db->prepare("INSERT INTO users(name,email,password_hash,role,status) VALUES(:name,:email,:hash,'client','pending_activation')")->execute(['name'=>$row['directors'][0]??$d['client_name'],'email'=>$d['email'],'hash'=>password_hash(bin2hex(random_bytes(24)),PASSWORD_BCRYPT)]);$userId=(int)$this->db->lastInsertId();$this->db->prepare("INSERT INTO clients(user_id,phone,address,aml_status,notes) VALUES(:user,:phone,:address,'Action Required',:notes)")->execute(['user'=>$userId,'phone'=>$d['phone']?:null,'address'=>$d['address']?:null,'notes'=>$d['status_notes']?:null]);$clientId=(int)$this->db->lastInsertId();$primaryCreated=1;}
             $attrs=['vat_number'=>['label'=>'VAT registration number','value'=>$d['vat_number']??''],'ct_utr'=>['label'=>'Corporation Tax UTR','value'=>$d['utr']??''],'accounting_year_end'=>['label'=>'Accounting year end','value'=>$this->parseDate($d['year_end']??'')],'vat_quarter'=>['label'=>'VAT quarter pattern','value'=>$d['vat_quarter']??'']];$attrs=array_filter($attrs,fn($v)=>$v['value']!=='');
             $this->db->prepare("INSERT INTO client_entities(client_id,company_name,entity_type,entity_scope,company_number,tax_reference,attributes) VALUES(:client,:name,'Limited Company','company',:number,:utr,:attrs)")->execute(['client'=>$clientId,'name'=>$d['client_name'],'number'=>$d['company_number']?:null,'utr'=>$d['utr']?:null,'attrs'=>json_encode($attrs,JSON_UNESCAPED_UNICODE)]);$entityId=(int)$this->db->lastInsertId();$created=true;
@@ -147,7 +150,7 @@ final class ClientCsvImportService
     private function nextVatDeadline(string $pattern):?string{$months=$this->vatMonths($pattern);if(!$months)return null;$today=new \DateTimeImmutable('today',new \DateTimeZone('UTC'));foreach([$today->format('Y'),(string)((int)$today->format('Y')+1)] as $year)foreach($months as $month){$end=(new \DateTimeImmutable(sprintf('%s-%02d-01',$year,$month),new \DateTimeZone('UTC')))->modify('last day of this month');$due=$end->modify('+'.ClientCsv::VAT_DEADLINE_OFFSET_DAYS.' days');if($due>=$today)return $due->format('Y-m-d');}return null;}
     private function ensureDeadline(int $client,int $entity,string $type,string $date):bool{$s=$this->db->prepare('INSERT INTO deadlines(client_id,entity_id,scope,type,due_date,status) SELECT :client,:entity,\'company\',:type,:date,\'Pending\' WHERE NOT EXISTS(SELECT 1 FROM deadlines WHERE entity_id=:entity2 AND type=:type2 AND due_date=:date2)');$s->execute(['client'=>$client,'entity'=>$entity,'type'=>$type,'date'=>$date,'entity2'=>$entity,'type2'=>$type,'date2'=>$date]);return $s->rowCount()>0;}
     private function summarize(array $rows):array{$s=['total'=>count($rows),'created'=>0,'updated'=>0,'skipped'=>0,'flagged'=>0,'failed'=>0,'primary_contacts_created'=>0,'placeholder_directors_created'=>0,'deadlines_created'=>0];foreach($rows as $r){$result=$r['result']??'planned';if($result==='planned')$result=($r['errors']??[])?'failed':($r['action']??'skipped');if(isset($s[$result]))$s[$result]++;if($r['warnings']??[])$s['flagged']++;foreach(['primary_contacts_created','placeholder_directors_created','deadlines_created'] as $k)$s[$k]+=(int)($r[$k]??0);}return $s;}
-    private function path(string $token):string{if(!preg_match('/^[a-f0-9]{48}$/',$token))throw new \RuntimeException('The import token is invalid.');$dir=App::get('storage_dir').'/csv-imports';if(!is_dir($dir)&&!mkdir($dir,0700,true)&&!is_dir($dir))throw new \RuntimeException('The secure import workspace is unavailable.');return $dir.'/'.$token.'.json';}
+    private function path(string $token):string{if(!preg_match('/^[a-f0-9]{48}$/',$token))throw new UserFacingException('The import token is invalid.');$dir=App::get('storage_dir').'/csv-imports';if(!is_dir($dir)&&!mkdir($dir,0700,true)&&!is_dir($dir))throw new UserFacingException('The secure import workspace is unavailable.');return $dir.'/'.$token.'.json';}
     private function writeDraft(string $token,array $data):void{file_put_contents($this->path($token),json_encode($data,JSON_UNESCAPED_UNICODE|JSON_THROW_ON_ERROR),LOCK_EX);}
-    private function readDraft(string $token):array{$path=$this->path($token);if(!is_file($path))throw new \RuntimeException('This import preview has expired.');$data=json_decode((string)file_get_contents($path),true,512,JSON_THROW_ON_ERROR);if((int)($data['user_id']??0)!==(int)\Application\Core\Session::get('user_id')||time()-(int)($data['created_at']??0)>3600)throw new \RuntimeException('This import preview has expired or belongs to another user.');return $data;}
+    private function readDraft(string $token):array{$path=$this->path($token);if(!is_file($path))throw new UserFacingException('This import preview has expired.');$data=json_decode((string)file_get_contents($path),true,512,JSON_THROW_ON_ERROR);if((int)($data['user_id']??0)!==(int)\Application\Core\Session::get('user_id')||time()-(int)($data['created_at']??0)>3600)throw new UserFacingException('This import preview has expired or belongs to another user.');return $data;}
 }

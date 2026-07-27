@@ -29,7 +29,9 @@ class Database
                     PDO::ATTR_EMULATE_PREPARES   => false,
                 ]);
             } catch (PDOException $e) {
-                self::renderSetupPage($e->getMessage(), $config);
+                // Preserve full diagnostics in the server log, never in HTML.
+                error_log(sprintf('[%s] Database connection failure: %s',date('c'),$e->getMessage()));
+                self::renderSetupPage();
                 exit;
             }
         }
@@ -37,7 +39,7 @@ class Database
         return self::$instance;
     }
 
-    private static function renderSetupPage(string $errorMsg, array $config): void
+    private static function renderSetupPage(): void
     {
         http_response_code(500);
         ?>
@@ -66,28 +68,7 @@ class Database
             <div class="card">
                 <span class="badge">MySQL Database Connection Error</span>
                 <h1>Database Setup Required</h1>
-                <p>The TriNova Client Portal application cannot connect to the MySQL database server using the configured credentials.</p>
-                
-                <div class="error-box">
-                    <strong>Error Message:</strong><br>
-                    <?= htmlspecialchars($errorMsg) ?>
-                </div>
-
-                <div class="steps">
-                    <strong>How to Fix This Issue:</strong>
-                    <ol>
-                        <li><strong>Local Setup (XAMPP / Wamp / MySQL)</strong>:<br>
-                            Ensure MySQL is running on host <code><?= htmlspecialchars($config['host']) ?></code> port <code><?= htmlspecialchars($config['port']) ?></code>, and import <code>config/database.sql</code> into your database tool.
-                        </li>
-                        <li style="margin-top: 10px;"><strong>Hostinger Hosting Deployment</strong>:<br>
-                            Create a MySQL database in Hostinger hPanel, then create a <code>.env</code> file in your project root with your Hostinger database details:
-                            <pre style="background:#fff;padding:10px;border-radius:10px;margin-top:6px;font-size:12px">DB_HOST=localhost
-DB_NAME=your_hostinger_db_name
-DB_USER=your_hostinger_db_user
-DB_PASS=your_hostinger_db_password</pre>
-                        </li>
-                    </ol>
-                </div>
+                <p>This feature is currently unavailable because the system setup is incomplete. Please contact the administrator.</p>
             </div>
         </body>
         </html>
