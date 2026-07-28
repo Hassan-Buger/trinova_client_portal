@@ -69,6 +69,13 @@ class EntityAccess extends Model
         return $stmt->fetchAll();
     }
 
+    public function contacts(int $entityId): array
+    {
+        $stmt=$this->db->prepare("SELECT id,user_id,name,email,phone,is_primary,needs_contact_details FROM entity_contacts WHERE entity_id=:id ORDER BY is_primary DESC,name,id");
+        $stmt->execute(['id'=>$entityId]);
+        return $stmt->fetchAll();
+    }
+
     public function eligibleDirectors(): array
     {
         return $this->db->query("SELECT u.id,u.name,u.email,c.id AS client_id FROM users u JOIN clients c ON c.user_id=u.id WHERE u.role='client' ORDER BY u.name")->fetchAll();

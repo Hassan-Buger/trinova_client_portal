@@ -121,8 +121,8 @@ class ClientController extends Controller
         $meetingModel = new \Application\Models\Meeting();
         $meetings = $meetingModel->getByClientId($id);
         $accessModel = new EntityAccess();
-        $directorsByEntity=[];
-        foreach($entities as $entity) $directorsByEntity[(int)$entity['id']]=$accessModel->directors((int)$entity['id']);
+        $directorsByEntity=[];$contactsByEntity=[];
+        foreach($entities as $entity){$entityId=(int)$entity['id'];$directorsByEntity[$entityId]=$accessModel->directors($entityId);$contactsByEntity[$entityId]=$accessModel->contacts($entityId);}
 
         $this->render('staff/clients/show', [
             'pageTitle'   => "Client: {$client['name']}",
@@ -134,6 +134,7 @@ class ClientController extends Controller
             'documents'   => $documents,
             'meetings'    => $meetings,
             'directorsByEntity' => $directorsByEntity,
+            'contactsByEntity' => $contactsByEntity,
             'eligibleDirectors' => $accessModel->eligibleDirectors(),
         ], 'main');
     }
