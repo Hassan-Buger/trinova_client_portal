@@ -19,4 +19,13 @@ final class SchemaGuard
         $tracking=$db->query("SELECT COUNT(*) FROM information_schema.tables WHERE table_schema=DATABASE() AND table_name='client_csv_imports'")->fetchColumn();
         if(!(int)$tracking)throw new SystemSetupException('Client CSV duplicate-tracking migration is incomplete.');
     }
+
+    public static function assertDirectorImporterReady():void
+    {
+        self::assertClientCsvReady();$db=Database::getInstance();
+        $required=['original_full_name','director_utr','address','id_number','ch_verification_number','last_director_import_id'];
+        $stmt=$db->query("SELECT column_name FROM information_schema.columns WHERE table_schema=DATABASE() AND table_name='entity_contacts'");
+        $available=array_map('strtolower',$stmt->fetchAll(\PDO::FETCH_COLUMN));
+        if(array_diff($required,$available))throw new SystemSetupException('Directors Importer schema migration is incomplete.');
+    }
 }

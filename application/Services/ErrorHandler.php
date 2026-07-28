@@ -16,7 +16,7 @@ final class ErrorHandler
     public static function handle(\Throwable $error,Request $request,Response $response): void
     {
         self::report($error,$request);
-        $isClientData=str_starts_with($request->getUri(),'/staff/clients/import') || $request->getUri()==='/staff/clients/export';
+        $isClientData=str_starts_with($request->getUri(),'/staff/clients/import') || str_starts_with($request->getUri(),'/staff/directors/import') || $request->getUri()==='/staff/clients/export';
         $message=$error instanceof SystemSetupException?self::SETUP_MESSAGE:($isClientData?self::CLIENT_DATA_MESSAGE:self::GENERAL_MESSAGE);
         if($request->isAjax()){$response->json(['success'=>false,'message'=>$message],500);return;}
         if($isClientData && !headers_sent()){
