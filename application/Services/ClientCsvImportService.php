@@ -5,8 +5,10 @@ namespace Application\Services;
 use Application\Config\App;
 use Application\Config\ClientCsv;
 use Application\Core\Database;
+use Application\Core\Session;
 use Application\Exceptions\UserFacingException;
 use PDO;
+use PDOException;
 
 final class ClientCsvImportService
 {
@@ -15,10 +17,13 @@ final class ClientCsvImportService
 
     public function upload(array $file): array
     {
+        SchemaGuard::assertClientCsvReady();
         if(($file['error']??UPLOAD_ERR_NO_FILE)!==UPLOAD_ERR_OK) throw new UserFacingException('Select a CSV file to upload.');
         if((int)($file['size']??0)<=0 || (int)$file['size']>ClientCsv::MAX_FILE_BYTES) throw new UserFacingException('The CSV must be between 1 byte and 5 MB.');
         if(strtolower(pathinfo((string)($file['name']??''),PATHINFO_EXTENSION))!=='csv') throw new UserFacingException('Only .csv files are accepted.');
         if(function_exists('finfo_open')){$info=finfo_open(FILEINFO_MIME_TYPE);$mime=$info?finfo_file($info,(string)$file['tmp_name']):false;if($info)finfo_close($info);if($mime!==false&&!in_array(strtolower((string)$mime),['text/csv','text/plain','application/csv','application/vnd.ms-excel','application/octet-stream'],true))throw new UserFacingException('The uploaded file is not recognized as a CSV.');}
+        $fileHash=hash_file('sha256',(string)$file['tmp_name']);
+        if($fileHash===false)throw new UserFacingException('The uploaded CSV could not be fingerprinted safely.');
         $handle=fopen((string)$file['tmp_name'],'rb');
         if(!$handle) throw new UserFacingException('The uploaded CSV could not be read.');
         [$headers,$headerLine]=$this->findHeaders($handle);
@@ -33,9 +38,12 @@ final class ClientCsvImportService
         fclose($handle);
         if(!$rows) throw new UserFacingException('The CSV contains no data rows.');
         $token=bin2hex(random_bytes(24));
-        $draft=['token'=>$token,'user_id'=>(int)\Application\Core\Session::get('user_id'),'filename'=>basename((string)$file['name']),'created_at'=>time(),'headers'=>$headers,'rows'=>$rows];
-        $this->writeDraft($token,$draft);
-        return ['token'=>$token,'headers'=>$headers,'mapping'=>ClientCsv::defaultMapping($headers),'row_count'=>count($rows),'filename'=>$draft['filename']];
+        $contentHash=$this->contentHash($headers,$rows);
+        $reservation=$this->reserveImport($fileHash,$contentHash,basename((string)$file['name']),count($rows),$token,(int)Session::get('user_id'));
+        if(!empty($reservation['duplicate'])){try{AuditService::log('client_csv_duplicate_prevented','client_csv_imports',(int)$reservation['record']['id'],null,['practice_key'=>$this->practiceKey(),'filename'=>basename((string)$file['name']),'existing_import_id'=>(int)$reservation['record']['id'],'status'=>$reservation['record']['status']]);}catch(\Throwable $auditError){error_log('CSV duplicate audit logging failed: '.$auditError->getMessage());}return ['duplicate'=>true,'existing'=>$this->duplicateDetails($reservation['record'])];}
+        $draft=['token'=>$token,'user_id'=>(int)Session::get('user_id'),'import_id'=>(int)$reservation['record']['id'],'filename'=>basename((string)$file['name']),'created_at'=>time(),'headers'=>$headers,'rows'=>$rows];
+        try{$this->writeDraft($token,$draft);}catch(\Throwable $e){$this->failImport((int)$reservation['record']['id'],'The secure import draft could not be stored.');throw $e;}
+        return ['token'=>$token,'import_id'=>(int)$reservation['record']['id'],'headers'=>$headers,'mapping'=>ClientCsv::defaultMapping($headers),'row_count'=>count($rows),'filename'=>$draft['filename']];
     }
 
     public function preview(string $token,array $mapping): array
@@ -64,16 +72,23 @@ final class ClientCsvImportService
     {
         SchemaGuard::assertClientCsvReady();
         $draft=$this->readDraft($token); if(empty($draft['preview'])) throw new UserFacingException('Preview this import before confirming it.');
-        $report=[];$currentLine=0;$this->db->beginTransaction();
+        $report=[];$currentLine=0;$importId=(int)($draft['import_id']??0);if($importId<1)throw new UserFacingException('This import draft predates duplicate protection. Upload the CSV again.');$this->db->beginTransaction();
         try{
+            $tracked=$this->lockImport($importId);
+            if(!$tracked)throw new UserFacingException('The tracked import could not be found. Upload the CSV again.');
+            if($tracked['status']==='completed'){$this->db->rollBack();$saved=$this->decodeReport($tracked);return $saved+['import_id'=>$importId,'duplicate'=>true];}
+            if($tracked['status']!=='pending')throw new UserFacingException('This CSV import is already being processed.');
+            $this->db->prepare("UPDATE client_csv_imports SET status='processing',started_at=NOW(),safe_error=NULL WHERE id=:id")->execute(['id'=>$importId]);
             foreach($draft['preview'] as $row){
                 $currentLine=(int)($row['line']??0);
                 if($row['errors']){$row['result']='failed';$report[]=$row;continue;}
                 $report[]=$this->commitRow($row);
             }
+            $summary=$this->summarize($report);
+            $result=['filename'=>$draft['filename'],'rows'=>$report,'summary'=>$summary,'completed_at'=>date('c'),'vat_rule_confirmed'=>ClientCsv::VAT_RULE_CONFIRMED,'vat_offset_days'=>ClientCsv::VAT_DEADLINE_OFFSET_DAYS,'import_id'=>$importId];
+            $this->completeImport($importId,$summary,$result);
             $this->db->commit();
-        }catch(\Throwable $e){if($this->db->inTransaction())$this->db->rollBack();throw new \RuntimeException('Client CSV commit failed at row '.$currentLine.'; all changes were rolled back. Cause: '.$e->getMessage(),0,$e);}
-        $summary=$this->summarize($report);
+        }catch(\Throwable $e){if($this->db->inTransaction())$this->db->rollBack();$this->failImport($importId,'The import could not be completed. Please review the file and try again.');throw new \RuntimeException('Client CSV commit failed at row '.$currentLine.'; all changes were rolled back. Cause: '.$e->getMessage(),0,$e);}
         AuditService::log('client_csv_import','clients',null,null,[
             'filename'=>$draft['filename'],'total_rows'=>$summary['total'],'created'=>$summary['created'],
             'updated'=>$summary['updated'],'skipped'=>$summary['skipped'],'flagged'=>$summary['flagged'],
@@ -83,12 +98,19 @@ final class ClientCsvImportService
             'placeholder_directors_reused'=>$summary['placeholder_directors_reused'],
             'director_links_created'=>$summary['director_links_created'],
         ]);
-        $result=['filename'=>$draft['filename'],'rows'=>$report,'summary'=>$summary,'completed_at'=>date('c'),'vat_rule_confirmed'=>ClientCsv::VAT_RULE_CONFIRMED,'vat_offset_days'=>ClientCsv::VAT_DEADLINE_OFFSET_DAYS];
         $draft['report']=$result;$this->writeDraft($token,$draft);
         return $result+['token'=>$token];
     }
 
     public function report(string $token): array { $draft=$this->readDraft($token);if(empty($draft['report']))throw new UserFacingException('No completed report is available.');return $draft['report']; }
+
+    public function reportById(int $id): array
+    {
+        $stmt=$this->db->prepare("SELECT * FROM client_csv_imports WHERE id=:id AND practice_key=:practice AND import_type='business_clients' AND status='completed' LIMIT 1");
+        $stmt->execute(['id'=>$id,'practice'=>$this->practiceKey()]);$record=$stmt->fetch();
+        if(!$record)throw new UserFacingException('The requested import report is unavailable.');
+        return $this->decodeReport($record)+['import_id'=>$id];
+    }
 
     /** @return array{0:array,1:int} */
     private function findHeaders($handle): array
@@ -100,6 +122,41 @@ final class ClientCsvImportService
         }
         throw new UserFacingException('The CSV header could not be recognized. Ensure the Client Name and expected business columns are present.');
     }
+
+    private function contentHash(array $headers,array $rows): string
+    {
+        $mapping=ClientCsv::defaultMapping($headers);$normalized=[];
+        foreach($rows as $row){$values=$row['values']??[];$record=[];foreach(ClientCsv::fields() as $key=>$definition){if(!isset($mapping[$key]))continue;$value=trim((string)($values[$mapping[$key]]??''));$record[$key]=strtolower(preg_replace('/\s+/u',' ',$value)??$value);}if(!empty($row['_malformed']))$record['_malformed']=array_map(fn($value)=>strtolower(trim((string)$value)),$values);$normalized[]=json_encode($record,JSON_UNESCAPED_UNICODE|JSON_UNESCAPED_SLASHES|JSON_THROW_ON_ERROR);}
+        sort($normalized,SORT_STRING);
+        return hash('sha256',json_encode($normalized,JSON_UNESCAPED_UNICODE|JSON_UNESCAPED_SLASHES|JSON_THROW_ON_ERROR));
+    }
+
+    private function reserveImport(string $fileHash,string $contentHash,string $filename,int $rows,string $token,int $userId): array
+    {
+        $practice=$this->practiceKey();$existing=$this->findTrackedImport($fileHash,$contentHash);
+        if($existing){
+            if($existing['status']==='failed'){$retry=$this->db->prepare("UPDATE client_csv_imports SET file_hash=:file_hash,content_hash=:content_hash,original_filename=:filename,created_by_user_id=:user,draft_token=:token,status='pending',total_rows=:rows,safe_error=NULL,started_at=NULL,completed_at=NULL,report_json=NULL WHERE id=:id AND status='failed'");try{$retry->execute(['file_hash'=>$fileHash,'content_hash'=>$contentHash,'filename'=>$filename,'user'=>$userId?:null,'token'=>$token,'rows'=>$rows,'id'=>$existing['id']]);}catch(PDOException $e){if($e->getCode()!=='23000')throw $e;}if($retry->rowCount()>0)return ['duplicate'=>false,'record'=>['id'=>(int)$existing['id']]];$existing=$this->findTrackedImport($fileHash,$contentHash);}
+            if($existing&&$existing['status']==='pending'&&strtotime((string)$existing['updated_at'])<time()-3600){$retry=$this->db->prepare("UPDATE client_csv_imports SET file_hash=:file_hash,content_hash=:content_hash,original_filename=:filename,created_by_user_id=:user,draft_token=:token,total_rows=:rows,safe_error=NULL,started_at=NULL,completed_at=NULL,report_json=NULL WHERE id=:id AND status='pending' AND updated_at<DATE_SUB(NOW(),INTERVAL 1 HOUR)");$retry->execute(['file_hash'=>$fileHash,'content_hash'=>$contentHash,'filename'=>$filename,'user'=>$userId?:null,'token'=>$token,'rows'=>$rows,'id'=>$existing['id']]);if($retry->rowCount()>0)return ['duplicate'=>false,'record'=>['id'=>(int)$existing['id']]];$existing=$this->findTrackedImport($fileHash,$contentHash);}
+            if($existing)return ['duplicate'=>true,'record'=>$existing];
+        }
+        try{$stmt=$this->db->prepare("INSERT INTO client_csv_imports(practice_key,import_type,file_hash,content_hash,original_filename,created_by_user_id,draft_token,status,total_rows) VALUES(:practice,'business_clients',:file_hash,:content_hash,:filename,:user,:token,'pending',:rows)");$stmt->execute(['practice'=>$practice,'file_hash'=>$fileHash,'content_hash'=>$contentHash,'filename'=>$filename,'user'=>$userId?:null,'token'=>$token,'rows'=>$rows]);return ['duplicate'=>false,'record'=>['id'=>(int)$this->db->lastInsertId()]];}catch(PDOException $e){if($e->getCode()!=='23000')throw $e;$existing=$this->findTrackedImport($fileHash,$contentHash);if(!$existing)throw $e;return ['duplicate'=>true,'record'=>$existing];}
+    }
+
+    private function findTrackedImport(string $fileHash,string $contentHash): ?array
+    {
+        $stmt=$this->db->prepare("SELECT i.*,u.name AS imported_by FROM client_csv_imports i LEFT JOIN users u ON u.id=i.created_by_user_id WHERE i.practice_key=:practice AND i.import_type='business_clients' AND (i.file_hash=:file_hash OR i.content_hash=:content_hash) ORDER BY (i.status='completed') DESC,i.id DESC LIMIT 1");$stmt->execute(['practice'=>$this->practiceKey(),'file_hash'=>$fileHash,'content_hash'=>$contentHash]);return $stmt->fetch()?:null;
+    }
+
+    private function duplicateDetails(array $record): array
+    {
+        return ['id'=>(int)$record['id'],'status'=>(string)$record['status'],'filename'=>(string)$record['original_filename'],'imported_by'=>(string)($record['imported_by']??'Staff user'),'completed_at'=>$record['completed_at']??null,'total_rows'=>(int)$record['total_rows'],'created'=>(int)$record['created_count'],'updated'=>(int)$record['updated_count'],'flagged'=>(int)$record['flagged_count'],'report_url'=>$record['status']==='completed'?'/staff/clients/import/report/'.(int)$record['id']:null];
+    }
+
+    private function lockImport(int $id): ?array{$stmt=$this->db->prepare('SELECT * FROM client_csv_imports WHERE id=:id AND practice_key=:practice FOR UPDATE');$stmt->execute(['id'=>$id,'practice'=>$this->practiceKey()]);return $stmt->fetch()?:null;}
+    private function completeImport(int $id,array $summary,array $report): void{$this->db->prepare("UPDATE client_csv_imports SET status='completed',completed_at=NOW(),total_rows=:total,created_count=:created,updated_count=:updated,skipped_count=:skipped,flagged_count=:flagged,failed_count=:failed,report_json=:report,safe_error=NULL WHERE id=:id")->execute(['total'=>$summary['total'],'created'=>$summary['created'],'updated'=>$summary['updated'],'skipped'=>$summary['skipped'],'flagged'=>$summary['flagged'],'failed'=>$summary['failed'],'report'=>json_encode($report,JSON_UNESCAPED_UNICODE|JSON_UNESCAPED_SLASHES|JSON_THROW_ON_ERROR),'id'=>$id]);}
+    private function failImport(int $id,string $message): void{if($id<1)return;try{$this->db->prepare("UPDATE client_csv_imports SET status='failed',safe_error=:error,completed_at=NOW() WHERE id=:id AND status<>'completed'")->execute(['error'=>$message,'id'=>$id]);}catch(\Throwable $ignored){}}
+    private function decodeReport(array $record): array{$report=json_decode((string)($record['report_json']??''),true);if(!is_array($report))throw new UserFacingException('The original import report is unavailable.');return $report;}
+    private function practiceKey(): string{return substr((string)App::get('practice_key','trinova-default'),0,64);}
 
     private function validateRow(int $line,array $data,bool $malformed,array $existing): array
     {

@@ -22,6 +22,13 @@ expect($line===2,'The title row was not skipped.');
 expect((ClientCsv::defaultMapping($detected)['client_name']??null)===0,'BOM/case-insensitive Client Name mapping failed.');
 fclose($stream);
 
+$fingerprint=$reflection->getMethod('contentHash');
+$fingerprintHeaders=['Client Name','Company No.','Email'];
+$rowsA=[['_line'=>2,'values'=>['Example Ltd','00123456','company@example.com']],['_line'=>3,'values'=>['Second Ltd','00876543','second@example.com']]];
+$rowsB=[['_line'=>20,'values'=>[' second   ltd ','00876543','SECOND@example.com']],['_line'=>21,'values'=>['EXAMPLE LTD','00123456','company@example.com']]];
+expect($fingerprint->invoke($service,$fingerprintHeaders,$rowsA)===$fingerprint->invoke($service,$fingerprintHeaders,$rowsB),'Reordered or whitespace/case-only CSV changes bypassed normalized duplicate detection.');
+$tempA=tempnam(sys_get_temp_dir(),'csv-a');$tempB=tempnam(sys_get_temp_dir(),'csv-b');file_put_contents($tempA,"a,b\r\n1,2\r\n");file_put_contents($tempB,file_get_contents($tempA));expect(hash_file('sha256',$tempA)===hash_file('sha256',$tempB),'Renaming identical file content changed the raw fingerprint.');unlink($tempA);unlink($tempB);
+
 $invalid=fopen('php://temp','w+b');fputcsv($invalid,['Not','A','Header']);rewind($invalid);
 try{$headers->invoke($service,$invalid);throw new RuntimeException('Invalid headers were accepted.');}catch(ReflectionException $e){throw $e;}catch(Throwable $e){$cause=$e instanceof ReflectionException?$e:$e->getPrevious();expect($e instanceof UserFacingException||$cause instanceof UserFacingException,'Invalid header did not produce a safe validation error.');}fclose($invalid);
 
@@ -45,5 +52,11 @@ expect(count($row['errors'])>=2,'Missing company name and invalid date were not 
 $source=file_get_contents(dirname(__DIR__).'/application/Services/ClientCsvImportService.php');
 expect(str_contains($source,'VALUES(:entity,NULL,:name,NULL,NULL,:primary,1)'),'Director placeholders are not name-only records.');
 expect(!str_contains($source,'NotificationService'),'CSV import must not send invitations or notification emails.');
+$migration=file_get_contents(dirname(__DIR__).'/config/client_csv_duplicate_tracking_migration.sql');
+expect(str_contains($migration,'UNIQUE KEY uq_csv_import_file (practice_key, import_type, file_hash)'),'Exact-file concurrency constraint is missing.');
+expect(str_contains($migration,'UNIQUE KEY uq_csv_import_content (practice_key, import_type, content_hash)'),'Normalized-content concurrency constraint is missing.');
+expect(str_contains($source,"status='completed'"),'Completed import state is not persisted.');
+expect(str_contains($source,'practice_key=:practice'),'Import/report queries are not tenant scoped.');
+expect(str_contains($source,'FOR UPDATE'),'Concurrent commit locking is missing.');
 
 echo "Client CSV focused tests passed\n";

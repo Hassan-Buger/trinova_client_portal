@@ -184,6 +184,36 @@ CREATE TABLE IF NOT EXISTS `audit_log` (
   INDEX `idx_audit_created` (`created_at`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+-- Persistent client CSV import ledger and duplicate protection
+CREATE TABLE IF NOT EXISTS `client_csv_imports` (
+  `id` BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  `practice_key` VARCHAR(64) NOT NULL,
+  `import_type` VARCHAR(40) NOT NULL DEFAULT 'business_clients',
+  `file_hash` CHAR(64) NOT NULL,
+  `content_hash` CHAR(64) NOT NULL,
+  `original_filename` VARCHAR(255) NOT NULL,
+  `created_by_user_id` INT UNSIGNED NULL,
+  `draft_token` CHAR(48) NULL,
+  `status` VARCHAR(24) NOT NULL DEFAULT 'pending',
+  `total_rows` INT UNSIGNED NOT NULL DEFAULT 0,
+  `created_count` INT UNSIGNED NOT NULL DEFAULT 0,
+  `updated_count` INT UNSIGNED NOT NULL DEFAULT 0,
+  `skipped_count` INT UNSIGNED NOT NULL DEFAULT 0,
+  `flagged_count` INT UNSIGNED NOT NULL DEFAULT 0,
+  `failed_count` INT UNSIGNED NOT NULL DEFAULT 0,
+  `report_json` MEDIUMTEXT NULL,
+  `safe_error` VARCHAR(255) NULL,
+  `started_at` DATETIME NULL,
+  `completed_at` DATETIME NULL,
+  `created_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `updated_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  UNIQUE KEY `uq_csv_import_file` (`practice_key`,`import_type`,`file_hash`),
+  UNIQUE KEY `uq_csv_import_content` (`practice_key`,`import_type`,`content_hash`),
+  INDEX `idx_csv_import_status` (`practice_key`,`import_type`,`status`,`completed_at`),
+  INDEX `idx_csv_import_user` (`created_by_user_id`),
+  CONSTRAINT `fk_csv_import_user` FOREIGN KEY (`created_by_user_id`) REFERENCES `users` (`id`) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
 -- System Notifications Queue
 CREATE TABLE IF NOT EXISTS `notifications` (
   `id` INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,

@@ -16,5 +16,7 @@ final class SchemaGuard
         if(array_diff($required,$available)){
             throw new SystemSetupException('Client CSV schema migration is incomplete: entity_contacts is missing required columns.');
         }
+        $tracking=$db->query("SELECT COUNT(*) FROM information_schema.tables WHERE table_schema=DATABASE() AND table_name='client_csv_imports'")->fetchColumn();
+        if(!(int)$tracking)throw new SystemSetupException('Client CSV duplicate-tracking migration is incomplete.');
     }
 }

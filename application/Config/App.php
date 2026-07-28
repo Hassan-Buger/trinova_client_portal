@@ -14,6 +14,7 @@ class App
             'secret' => $_ENV['APP_SECRET'] ?? 'trinova_default_secret_key_32bytes!',
             'session_timeout' => 900, // 15 minutes session inactivity timeout in seconds
             'storage_dir' => dirname(__DIR__, 2) . '/storage',
+            'practice_key' => trim((string)($_ENV['PRACTICE_KEY'] ?? 'trinova-default')),
             'resend_api_key' => trim((string) ($_ENV['RESEND_API_KEY'] ?? '')),
             'email_from'     => trim((string) ($_ENV['RESEND_FROM'] ?? ($_ENV['EMAIL_FROM'] ?? 'TriNova Accounting <onboarding@resend.dev>'))),
         ];

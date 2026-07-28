@@ -19,7 +19,7 @@ final class ClientCsvController extends Controller
 
     public function upload(Request $request,Response $response):void
     {
-        try{$upload=(new ClientCsvImportService())->upload($_FILES['csv_file']??[]);$this->render('staff/clients/import',['pageTitle'=>'Map CSV Columns','fields'=>ClientCsv::fields(),'upload'=>$upload],'main');}
+        try{$upload=(new ClientCsvImportService())->upload($_FILES['csv_file']??[]);if(!empty($upload['duplicate'])){$this->render('staff/clients/import-duplicate',['pageTitle'=>'Duplicate Import Prevented','existing'=>$upload['existing']],'main');return;}$this->render('staff/clients/import',['pageTitle'=>'Map CSV Columns','fields'=>ClientCsv::fields(),'upload'=>$upload],'main');}
         catch(UserFacingException $e){$this->userFailure($request,$response,$e->getMessage());}
     }
 
@@ -37,7 +37,13 @@ final class ClientCsvController extends Controller
 
     public function reportCsv(Request $request,Response $response):void
     {
-        try{$report=(new ClientCsvImportService())->report((string)($request->getQueryParams()['token']??''));while(ob_get_level()>0)ob_end_clean();header('Content-Type: text/csv; charset=UTF-8');header('Content-Disposition: attachment; filename="trinova-client-import-report-'.date('Y-m-d').'.csv"');header('Cache-Control: private, no-store');header('X-Content-Type-Options: nosniff');$out=fopen('php://output','wb');fwrite($out,"\xEF\xBB\xBF");fputcsv($out,['Row','Company','Result','Action','Duplicate Match','Director Names','Placeholders Created','Placeholders Reused','Links Created','Need Details','Warnings','Errors']);foreach($report['rows'] as $row)fputcsv($out,[$row['line'],$this->csvCell($row['data']['client_name']??''),$this->csvCell($row['result']??''),$this->csvCell($row['action']??''),$this->csvCell(isset($row['match'])&&$row['match']?($row['match']['field'].'='.$row['match']['value']):''),$this->csvCell(implode('; ',$row['directors']??[])),(int)($row['placeholder_directors_created']??0),(int)($row['placeholder_directors_reused']??0),(int)($row['director_links_created']??0),(int)($row['directors_needing_details']??0),$this->csvCell(implode('; ',$row['warnings']??[])),$this->csvCell(implode('; ',$row['errors']??[]))]);fclose($out);exit;}
+        try{$query=$request->getQueryParams();$service=new ClientCsvImportService();$report=!empty($query['import_id'])?$service->reportById((int)$query['import_id']):$service->report((string)($query['token']??''));while(ob_get_level()>0)ob_end_clean();header('Content-Type: text/csv; charset=UTF-8');header('Content-Disposition: attachment; filename="trinova-client-import-report-'.date('Y-m-d').'.csv"');header('Cache-Control: private, no-store');header('X-Content-Type-Options: nosniff');$out=fopen('php://output','wb');fwrite($out,"\xEF\xBB\xBF");fputcsv($out,['Row','Company','Result','Action','Duplicate Match','Director Names','Placeholders Created','Placeholders Reused','Links Created','Need Details','Warnings','Errors']);foreach($report['rows'] as $row)fputcsv($out,[$row['line'],$this->csvCell($row['data']['client_name']??''),$this->csvCell($row['result']??''),$this->csvCell($row['action']??''),$this->csvCell(isset($row['match'])&&$row['match']?($row['match']['field'].'='.$row['match']['value']):''),$this->csvCell(implode('; ',$row['directors']??[])),(int)($row['placeholder_directors_created']??0),(int)($row['placeholder_directors_reused']??0),(int)($row['director_links_created']??0),(int)($row['directors_needing_details']??0),$this->csvCell(implode('; ',$row['warnings']??[])),$this->csvCell(implode('; ',$row['errors']??[]))]);fclose($out);exit;}
+        catch(UserFacingException $e){$this->userFailure($request,$response,$e->getMessage());}
+    }
+
+    public function showReport(Request $request,Response $response,int $id):void
+    {
+        try{$result=(new ClientCsvImportService())->reportById($id);$this->render('staff/clients/import-report',['pageTitle'=>'Client Import Report','result'=>$result],'main');}
         catch(UserFacingException $e){$this->userFailure($request,$response,$e->getMessage());}
     }
 

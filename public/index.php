@@ -127,6 +127,7 @@ $app->router->group([
     $r->post('/clients/import/preview', [StaffClientCsvController::class, 'preview'])->middleware([CsrfMiddleware::class]);
     $r->post('/clients/import/commit', [StaffClientCsvController::class, 'commit'])->middleware([CsrfMiddleware::class]);
     $r->get('/clients/import/report.csv', [StaffClientCsvController::class, 'reportCsv']);
+    $r->get('/clients/import/report/{id}', [StaffClientCsvController::class, 'showReport']);
     $r->post('/clients/create', [StaffClientController::class, 'create'])->middleware([CsrfMiddleware::class]);
     $r->post('/clients/reset-password', [StaffClientController::class, 'resetPassword'])->middleware([CsrfMiddleware::class]);
     $r->post('/clients/delete', [StaffClientController::class, 'delete'])->middleware([CsrfMiddleware::class]);
