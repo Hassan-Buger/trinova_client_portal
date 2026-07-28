@@ -37,7 +37,7 @@ final class ClientCsvController extends Controller
 
     public function reportCsv(Request $request,Response $response):void
     {
-        try{$report=(new ClientCsvImportService())->report((string)($request->getQueryParams()['token']??''));while(ob_get_level()>0)ob_end_clean();header('Content-Type: text/csv; charset=UTF-8');header('Content-Disposition: attachment; filename="trinova-client-import-report-'.date('Y-m-d').'.csv"');header('Cache-Control: private, no-store');header('X-Content-Type-Options: nosniff');$out=fopen('php://output','wb');fwrite($out,"\xEF\xBB\xBF");fputcsv($out,['Row','Company','Result','Action','Duplicate Match','Director Names','Placeholders Created','Placeholders Reused','Links Created','Need Details','Warnings','Errors']);foreach($report['rows'] as $row)fputcsv($out,[$row['line'],$row['data']['client_name']??'',$row['result']??'',$row['action']??'',isset($row['match'])&&$row['match']?($row['match']['field'].'='.$row['match']['value']):'',implode('; ',$row['directors']??[]),(int)($row['placeholder_directors_created']??0),(int)($row['placeholder_directors_reused']??0),(int)($row['director_links_created']??0),(int)($row['directors_needing_details']??0),implode('; ',$row['warnings']??[]),implode('; ',$row['errors']??[])]);fclose($out);exit;}
+        try{$report=(new ClientCsvImportService())->report((string)($request->getQueryParams()['token']??''));while(ob_get_level()>0)ob_end_clean();header('Content-Type: text/csv; charset=UTF-8');header('Content-Disposition: attachment; filename="trinova-client-import-report-'.date('Y-m-d').'.csv"');header('Cache-Control: private, no-store');header('X-Content-Type-Options: nosniff');$out=fopen('php://output','wb');fwrite($out,"\xEF\xBB\xBF");fputcsv($out,['Row','Company','Result','Action','Duplicate Match','Director Names','Placeholders Created','Placeholders Reused','Links Created','Need Details','Warnings','Errors']);foreach($report['rows'] as $row)fputcsv($out,[$row['line'],$this->csvCell($row['data']['client_name']??''),$this->csvCell($row['result']??''),$this->csvCell($row['action']??''),$this->csvCell(isset($row['match'])&&$row['match']?($row['match']['field'].'='.$row['match']['value']):''),$this->csvCell(implode('; ',$row['directors']??[])),(int)($row['placeholder_directors_created']??0),(int)($row['placeholder_directors_reused']??0),(int)($row['director_links_created']??0),(int)($row['directors_needing_details']??0),$this->csvCell(implode('; ',$row['warnings']??[])),$this->csvCell(implode('; ',$row['errors']??[]))]);fclose($out);exit;}
         catch(UserFacingException $e){$this->userFailure($request,$response,$e->getMessage());}
     }
 
@@ -45,5 +45,11 @@ final class ClientCsvController extends Controller
     {
         if($request->isAjax()){$response->json(['success'=>false,'message'=>$message],422);return;}
         Session::setFlash('error',$message);$response->redirect('/staff/clients/import');
+    }
+
+    private function csvCell(string $value): string
+    {
+        $value=str_replace("\0",'',trim($value));
+        return preg_match('/^[\x00-\x20]*[=+\-@]/u',$value)?"'".$value:$value;
     }
 }

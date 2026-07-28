@@ -18,20 +18,12 @@ final class ClientCsvImportService
         if(($file['error']??UPLOAD_ERR_NO_FILE)!==UPLOAD_ERR_OK) throw new UserFacingException('Select a CSV file to upload.');
         if((int)($file['size']??0)<=0 || (int)$file['size']>ClientCsv::MAX_FILE_BYTES) throw new UserFacingException('The CSV must be between 1 byte and 5 MB.');
         if(strtolower(pathinfo((string)($file['name']??''),PATHINFO_EXTENSION))!=='csv') throw new UserFacingException('Only .csv files are accepted.');
+        if(function_exists('finfo_open')){$info=finfo_open(FILEINFO_MIME_TYPE);$mime=$info?finfo_file($info,(string)$file['tmp_name']):false;if($info)finfo_close($info);if($mime!==false&&!in_array(strtolower((string)$mime),['text/csv','text/plain','application/csv','application/vnd.ms-excel','application/octet-stream'],true))throw new UserFacingException('The uploaded file is not recognized as a CSV.');}
         $handle=fopen((string)$file['tmp_name'],'rb');
         if(!$handle) throw new UserFacingException('The uploaded CSV could not be read.');
-        $headers=fgetcsv($handle);
-        if(!$headers){fclose($handle);throw new UserFacingException('The CSV is empty.');}
-        $headers=array_map(fn($v)=>trim((string)$v," \t\n\r\0\x0B\xEF\xBB\xBF"),$headers);
-        // TriNova's canonical export has a human-readable title row before the
-        // actual header row. Accept it while still supporting ordinary CSVs.
-        if(($headers[0]??'')===ClientCsv::TITLE && count(array_filter(array_slice($headers,1),fn($v)=>$v!==''))===0){
-            $headers=fgetcsv($handle);
-            if(!$headers){fclose($handle);throw new UserFacingException('The CSV title is present but its header row is missing.');}
-            $headers=array_map(fn($v)=>trim((string)$v," \t\n\r\0\x0B\xEF\xBB\xBF"),$headers);
-        }
+        [$headers,$headerLine]=$this->findHeaders($handle);
         if(count($headers)<2 || count(array_filter($headers))!==count(array_unique(array_filter($headers)))){fclose($handle);throw new UserFacingException('The CSV headers are missing or duplicated.');}
-        $rows=[];$line=1;
+        $rows=[];$line=$headerLine;
         while(($row=fgetcsv($handle))!==false){
             $line++; if(count($rows)>=ClientCsv::MAX_ROWS){fclose($handle);throw new UserFacingException('The CSV exceeds the 5,000 row import limit.');}
             if(count(array_filter($row,fn($v)=>trim((string)$v)!==''))===0) continue;
@@ -72,14 +64,15 @@ final class ClientCsvImportService
     {
         SchemaGuard::assertClientCsvReady();
         $draft=$this->readDraft($token); if(empty($draft['preview'])) throw new UserFacingException('Preview this import before confirming it.');
-        $report=[];$this->db->beginTransaction();
+        $report=[];$currentLine=0;$this->db->beginTransaction();
         try{
             foreach($draft['preview'] as $row){
+                $currentLine=(int)($row['line']??0);
                 if($row['errors']){$row['result']='failed';$report[]=$row;continue;}
                 $report[]=$this->commitRow($row);
             }
             $this->db->commit();
-        }catch(\Throwable $e){if($this->db->inTransaction())$this->db->rollBack();throw $e;}
+        }catch(\Throwable $e){if($this->db->inTransaction())$this->db->rollBack();throw new \RuntimeException('Client CSV commit failed at row '.$currentLine.'; all changes were rolled back. Cause: '.$e->getMessage(),0,$e);}
         $summary=$this->summarize($report);
         AuditService::log('client_csv_import','clients',null,null,[
             'filename'=>$draft['filename'],'total_rows'=>$summary['total'],'created'=>$summary['created'],
@@ -97,10 +90,21 @@ final class ClientCsvImportService
 
     public function report(string $token): array { $draft=$this->readDraft($token);if(empty($draft['report']))throw new UserFacingException('No completed report is available.');return $draft['report']; }
 
+    /** @return array{0:array,1:int} */
+    private function findHeaders($handle): array
+    {
+        for($line=1;$line<=10 && ($candidate=fgetcsv($handle))!==false;$line++){
+            $candidate=array_map(fn($value)=>trim((string)$value," \t\n\r\0\x0B\xEF\xBB\xBF"),$candidate);
+            $mapping=ClientCsv::defaultMapping($candidate);
+            if(isset($mapping['client_name'])&&count($mapping)>=2)return [$candidate,$line];
+        }
+        throw new UserFacingException('The CSV header could not be recognized. Ensure the Client Name and expected business columns are present.');
+    }
+
     private function validateRow(int $line,array $data,bool $malformed,array $existing): array
     {
         $errors=[];$warnings=[];$directors=[];$seenNames=[];
-        foreach(explode(';',(string)($data['directors']??'')) as $name){$name=trim($name);if($name==='')continue;$normalized=$this->normalizeName($name);if(isset($seenNames[$normalized]))continue;$seenNames[$normalized]=true;$directors[]=$name;}
+        foreach(preg_split('/[;,\r\n]+/u',(string)($data['directors']??''))?:[] as $name){$name=trim($name);if($name==='')continue;$normalized=$this->normalizeName($name);if(isset($seenNames[$normalized]))continue;$seenNames[$normalized]=true;$directors[]=$name;}
         if($malformed)$errors[]='Malformed row: column count does not match the header.';
         if(($data['client_name']??'')==='')$errors[]='Company name is required.';
         if(($data['company_number']??'')!==''&&!preg_match('/^[A-Za-z0-9]{6,10}$/',$data['company_number']))$warnings[]='Company Number has an unusual format.';
@@ -113,6 +117,7 @@ final class ClientCsvImportService
         if(($data['vat_quarter']??'')!==''&&!$this->vatMonths($data['vat_quarter']))$errors[]='VAT quarter must contain four recurring months, such as Jan/Apr/Jul/Oct.';
         $match=null;
         foreach(['company_number','utr','vat_number'] as $key){$v=$this->identifier($data[$key]??'');if($v!==''&&isset($existing[$key][$v])){$match=['entity_id'=>$existing[$key][$v],'field'=>$key,'value'=>$data[$key]];break;}}
+        if(!$match&&($data['email']??'')!==''&&($data['client_name']??'')!==''){$emailCompany=strtolower(trim($data['email'])).'|'.$this->normalizeName($data['client_name']);if(isset($existing['email_company'][$emailCompany]))$match=['entity_id'=>$existing['email_company'][$emailCompany],'field'=>'email + company name','value'=>$data['email']];}
         if(!$match && ($data['company_number']??'')===''&&($data['utr']??'')===''&&($data['vat_number']??'')==='')$warnings[]='No strong company identifier was supplied; safe re-import matching is limited.';
         if(!$match && ($data['email']??'')==='')$errors[]='A primary contact email is required when creating a new company.';
         $existingContacts=$match?($existing['contacts'][(int)$match['entity_id']]??[]):[];$create=[];$reuse=[];
@@ -148,8 +153,8 @@ final class ClientCsvImportService
 
     private function existingIdentifiers(): array
     {
-        $result=['company_number'=>[],'utr'=>[],'vat_number'=>[],'contacts'=>[]];
-        foreach($this->db->query('SELECT id,company_number,tax_reference,attributes FROM client_entities WHERE entity_scope=\'company\'')->fetchAll() as $row){$a=json_decode((string)($row['attributes']??'{}'),true)?:[];foreach(['company_number'=>$row['company_number'],'utr'=>$this->attr($a,'ct_utr')?:$row['tax_reference'],'vat_number'=>$this->attr($a,'vat_number')] as $k=>$v){$v=$this->identifier((string)$v);if($v!=='')$result[$k][$v]=(int)$row['id'];}}
+        $result=['company_number'=>[],'utr'=>[],'vat_number'=>[],'email_company'=>[],'contacts'=>[]];
+        foreach($this->db->query("SELECT e.id,e.company_name,e.company_number,e.tax_reference,e.attributes,u.email FROM client_entities e JOIN clients c ON c.id=e.client_id JOIN users u ON u.id=c.user_id WHERE e.entity_scope='company'")->fetchAll() as $row){$a=json_decode((string)($row['attributes']??'{}'),true)?:[];foreach(['company_number'=>$row['company_number'],'utr'=>$this->attr($a,'ct_utr')?:$row['tax_reference'],'vat_number'=>$this->attr($a,'vat_number')] as $k=>$v){$v=$this->identifier((string)$v);if($v!=='')$result[$k][$v]=(int)$row['id'];}$email=strtolower(trim((string)$row['email']));if($email!=='')$result['email_company'][$email.'|'.$this->normalizeName((string)$row['company_name'])]=(int)$row['id'];}
         foreach($this->db->query('SELECT entity_id,name FROM entity_contacts')->fetchAll() as $contact)$result['contacts'][(int)$contact['entity_id']][$this->normalizeName((string)$contact['name'])]=true;
         return $result;
     }

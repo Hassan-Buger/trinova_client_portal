@@ -1,5 +1,6 @@
--- Required once for CSV-imported name-only directors/contacts.
--- Backward-compatible: existing entity_directors and login access are unchanged.
+-- Production-safe, rerunnable migration for the client CSV module.
+-- Existing records are preserved. Run against the selected TriNova database.
+
 CREATE TABLE IF NOT EXISTS entity_contacts (
   id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
   entity_id INT UNSIGNED NOT NULL,
@@ -16,8 +17,25 @@ CREATE TABLE IF NOT EXISTS entity_contacts (
   CONSTRAINT fk_entity_contacts_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
-ALTER TABLE audit_log ADD COLUMN import_metadata JSON NULL AFTER target_id;
+-- MariaDB/MySQL-compatible conditional DDL. This avoids "duplicate column/index"
+-- failures when a previous deployment completed only part of the migration.
+SET @ddl = IF(
+  EXISTS(SELECT 1 FROM information_schema.columns WHERE table_schema=DATABASE() AND table_name='audit_log' AND column_name='import_metadata'),
+  'SELECT 1',
+  'ALTER TABLE audit_log ADD COLUMN import_metadata JSON NULL AFTER target_id'
+);
+PREPARE trinova_stmt FROM @ddl; EXECUTE trinova_stmt; DEALLOCATE PREPARE trinova_stmt;
 
-ALTER TABLE client_entities
-  ADD INDEX idx_entities_company_number (company_number),
-  ADD INDEX idx_entities_tax_reference (tax_reference);
+SET @ddl = IF(
+  EXISTS(SELECT 1 FROM information_schema.statistics WHERE table_schema=DATABASE() AND table_name='client_entities' AND index_name='idx_entities_company_number'),
+  'SELECT 1',
+  'ALTER TABLE client_entities ADD INDEX idx_entities_company_number (company_number)'
+);
+PREPARE trinova_stmt FROM @ddl; EXECUTE trinova_stmt; DEALLOCATE PREPARE trinova_stmt;
+
+SET @ddl = IF(
+  EXISTS(SELECT 1 FROM information_schema.statistics WHERE table_schema=DATABASE() AND table_name='client_entities' AND index_name='idx_entities_tax_reference'),
+  'SELECT 1',
+  'ALTER TABLE client_entities ADD INDEX idx_entities_tax_reference (tax_reference)'
+);
+PREPARE trinova_stmt FROM @ddl; EXECUTE trinova_stmt; DEALLOCATE PREPARE trinova_stmt;
