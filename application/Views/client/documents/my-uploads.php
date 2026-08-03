@@ -58,7 +58,7 @@
                                     <?php if ($previewable): ?>
                                         <a href="/client/documents/download/<?= (int)$doc['id'] ?>?preview=1" target="_blank" rel="noopener" data-no-ajax data-document-preview data-document-id="<?= (int)$doc['id'] ?>" style="background:#fff;color:#41556f;border:1px solid #dfe8e4;padding:8px 14px;border-radius:10px;font-weight:700;font-size:13px;display:inline-flex;margin-right:6px">View</a>
                                     <?php endif; ?>
-                                    <a href="/documents/download/<?= $doc['id'] ?>" style="background:#f0f5f3;color:#0d9488;padding:8px 14px;border-radius:10px;font-weight:700;font-size:13px;display:inline-flex;align-items:center;gap:6px">
+                                    <a href="/documents/download/<?= $doc['id'] ?>" style="background:#f0f5f3;color:#0d9488;padding:8px 14px;border-radius:10px;font-weight:700;font-size:13px;display:inline-flex;align-items:center;gap:6px;margin-right:6px">
                                         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                                             <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
                                             <polyline points="7 10 12 15 17 10"></polyline>
@@ -66,6 +66,7 @@
                                         </svg>
                                         Download
                                     </a>
+                                    <button type="button" onclick="tnClientDeleteDoc(<?= (int)$doc['id'] ?>)" style="background:#fef2f2;color:#dc2626;border:1px solid #fecaca;padding:8px 12px;border-radius:10px;font-weight:700;font-size:13px;cursor:pointer">Delete</button>
                                 </td>
                             </tr>
                         <?php endforeach; ?>
@@ -75,3 +76,26 @@
         <?php endif; ?>
     </div>
 </div>
+
+<!-- Delete Document Modal -->
+<div id="deleteClientDocModal" style="display:none;position:fixed;inset:0;background:rgba(20,40,35,.45);backdrop-filter:blur(6px);z-index:199;align-items:center;justify-content:center;padding:20px">
+    <div style="background:#fff;border-radius:24px;width:100%;max-width:440px;padding:32px;box-shadow:0 24px 60px -28px rgba(0,0,0,.4)">
+        <h3 style="margin:0 0 12px;font-size:19px;font-weight:800">Delete Document?</h3>
+        <p style="color:#61756e;font-size:14px;margin:0 0 24px">This file will be soft-deleted and can be restored from Trash by staff.</p>
+        <form action="/client/documents/delete" method="POST" data-ajax-form>
+            <input type="hidden" name="csrf_token" value="<?= htmlspecialchars(\Application\Core\Session::csrfToken()) ?>">
+            <input type="hidden" name="document_id" id="deleteClientDocId">
+            <div style="display:flex;justify-content:flex-end;gap:12px">
+                <button type="button" onclick="document.getElementById('deleteClientDocModal').style.display='none'" style="background:#f0f5f3;color:#5f726c;border:none;padding:11px 20px;border-radius:12px;font-weight:700;cursor:pointer">Cancel</button>
+                <button type="submit" style="background:#dc2626;color:#fff;border:none;padding:11px 22px;border-radius:12px;font-weight:700;cursor:pointer">Delete</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<script>
+function tnClientDeleteDoc(id) {
+    document.getElementById('deleteClientDocId').value = id;
+    document.getElementById('deleteClientDocModal').style.display = 'flex';
+}
+</script>

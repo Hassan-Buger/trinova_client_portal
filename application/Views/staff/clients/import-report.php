@@ -12,7 +12,16 @@ $secondary=['placeholder_directors_created'=>'Directors created','placeholder_di
     <div class="ir-kicker">Verified import record<?= !empty($result['import_id'])?' #'.(int)$result['import_id']:'' ?></div>
     <h2>Import complete</h2>
     <p><?= htmlspecialchars((string)($result['filename']??'Client CSV')) ?> · completed <?= htmlspecialchars(date('d M Y, H:i',strtotime((string)($result['completed_at']??'now')))) ?></p>
-    <div class="ir-actions"><a data-no-ajax class="ir-btn ir-btn-primary" href="/staff/clients/import/report.csv?<?= htmlspecialchars($downloadQuery) ?>">Download report CSV</a><a class="ir-btn ir-btn-secondary" href="/staff/clients">View clients</a></div>
+    <div class="ir-actions">
+      <a data-no-ajax class="ir-btn ir-btn-primary" href="/staff/clients/import/report.csv?<?= htmlspecialchars($downloadQuery) ?>">Download report CSV</a>
+      <a class="ir-btn ir-btn-secondary" href="/staff/clients">View clients</a>
+      <form action="/staff/clients/import/batch/delete" method="POST" data-ajax-form style="margin:0;display:inline-block">
+        <input type="hidden" name="csrf_token" value="<?= htmlspecialchars(\Application\Core\Session::csrfToken()) ?>">
+        <input type="hidden" name="import_id" value="<?= (int)($result['import_id'] ?? 0) ?>">
+        <input type="hidden" name="token" value="<?= htmlspecialchars((string)($result['token'] ?? '')) ?>">
+        <button type="submit" onclick="return confirm('Delete all client companies imported in this batch? They can be restored from Trash.')" class="ir-btn" style="background:#fef2f2;color:#dc2626;border:1px solid #fecaca;cursor:pointer">Delete Import Batch</button>
+      </form>
+    </div>
   </section>
   <div class="ir-stats"><?php foreach($primary as $key=>$label): ?><div class="ir-stat"><strong><?= (int)($summary[$key]??0) ?></strong><span><?= htmlspecialchars($label) ?></span></div><?php endforeach; ?></div>
   <div class="ir-secondary"><?php foreach($secondary as $key=>$label): ?><span class="ir-chip"><strong><?= (int)($summary[$key]??0) ?></strong> <?= htmlspecialchars($label) ?></span><?php endforeach; ?></div>

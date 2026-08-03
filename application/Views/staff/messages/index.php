@@ -29,7 +29,14 @@
                         <h3 style="margin:0;font-size:17px;font-weight:800;color:#213330"><?= htmlspecialchars($activeClient['name']) ?></h3>
                         <div style="font-size:12.5px;color:#7d8e88"><?= htmlspecialchars($activeClient['email']) ?> &middot; Phone: <?= htmlspecialchars($activeClient['phone'] ?? 'N/A') ?></div>
                     </div>
-                    <span style="font-size:12px;font-weight:700;color:#41556f;background:#e6ecf5;padding:4px 10px;border-radius:999px">Shared Access</span>
+                    <div style="display:flex;align-items:center;gap:10px">
+                        <form action="/staff/messages/delete-thread" method="POST" data-ajax-form style="margin:0">
+                            <input type="hidden" name="csrf_token" value="<?= htmlspecialchars(\Application\Core\Session::csrfToken()) ?>">
+                            <input type="hidden" name="client_id" value="<?= (int)$activeClient['id'] ?>">
+                            <button type="submit" onclick="return confirm('Delete entire message thread for this client? All messages will be soft-deleted.')" style="background:#fef2f2;color:#dc2626;border:1px solid #fecaca;padding:6px 12px;border-radius:10px;font-weight:700;font-size:12.5px;cursor:pointer">Delete Thread</button>
+                        </form>
+                        <span style="font-size:12px;font-weight:700;color:#41556f;background:#e6ecf5;padding:4px 10px;border-radius:999px">Shared Access</span>
+                    </div>
                 </div>
 
                 <div data-message-thread data-current-role="staff" data-feed-url="/staff/messages/feed?client_id=<?= (int) $activeClient['id'] ?>" style="flex:1;padding:24px;overflow-y:auto;display:flex;flex-direction:column;gap:14px;background:#fcfdfe;max-height:560px">
@@ -47,8 +54,9 @@
                                 <?php $lastMessageDay = $messageDay; ?>
                             <?php endif; ?>
                             <article class="tn-message-bubble <?= $isStaff ? 'is-mine' : 'is-theirs' ?>" data-message-id="<?= (int) $msg['id'] ?>" data-message-day="<?= $messageDay ?>">
-                                <div class="tn-message-meta" title="<?= htmlspecialchars(date('l, d F Y \a\t H:i', strtotime($msg['created_at']))) ?>">
-                                    <?= htmlspecialchars($msg['sender_name'] ?? 'User') ?> &middot; <?= date('H:i', strtotime($msg['created_at'])) ?>
+                                <div class="tn-message-meta" title="<?= htmlspecialchars(date('l, d F Y \a\t H:i', strtotime($msg['created_at']))) ?>" style="display:flex;justify-content:space-between;align-items:center">
+                                    <span><?= htmlspecialchars($msg['sender_name'] ?? 'User') ?> &middot; <?= date('H:i', strtotime($msg['created_at'])) ?></span>
+                                    <button type="button" onclick="tnStaffDeleteMsg(<?= (int)$msg['id'] ?>)" title="Delete message" style="background:none;border:none;color:#dc2626;cursor:pointer;font-size:11px;font-weight:700;margin-left:8px;padding:0">Delete</button>
                                 </div>
                                 <div class="tn-message-body"><?= htmlspecialchars($msg['body']) ?></div>
                             </article>
@@ -69,3 +77,26 @@
         </div>
     </div>
 </div>
+
+<!-- Delete Message Modal -->
+<div id="deleteStaffMsgModal" style="display:none;position:fixed;inset:0;background:rgba(20,40,35,.45);backdrop-filter:blur(6px);z-index:199;align-items:center;justify-content:center;padding:20px">
+    <div style="background:#fff;border-radius:24px;width:100%;max-width:440px;padding:32px;box-shadow:0 24px 60px -28px rgba(0,0,0,.4)">
+        <h3 style="margin:0 0 12px;font-size:19px;font-weight:800">Delete Message?</h3>
+        <p style="color:#61756e;font-size:14px;margin:0 0 24px">This message will be soft-deleted and moved to Trash.</p>
+        <form action="/staff/messages/delete" method="POST" data-ajax-form>
+            <input type="hidden" name="csrf_token" value="<?= htmlspecialchars(\Application\Core\Session::csrfToken()) ?>">
+            <input type="hidden" name="message_id" id="deleteStaffMsgId">
+            <div style="display:flex;justify-content:flex-end;gap:12px">
+                <button type="button" onclick="document.getElementById('deleteStaffMsgModal').style.display='none'" style="background:#f0f5f3;color:#5f726c;border:none;padding:11px 20px;border-radius:12px;font-weight:700;cursor:pointer">Cancel</button>
+                <button type="submit" style="background:#dc2626;color:#fff;border:none;padding:11px 22px;border-radius:12px;font-weight:700;cursor:pointer">Delete Message</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<script>
+function tnStaffDeleteMsg(id) {
+    document.getElementById('deleteStaffMsgId').value = id;
+    document.getElementById('deleteStaffMsgModal').style.display = 'flex';
+}
+</script>

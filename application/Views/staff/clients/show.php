@@ -97,7 +97,7 @@
                     <?php else: ?>
                         <?php foreach ($entities as $b): ?>
                             <div style="padding:13px 0;border-bottom:1px solid rgba(20,60,50,.07)">
-                                <div style="display:flex;justify-content:space-between;gap:10px"><strong><?= htmlspecialchars($b['company_name']) ?></strong><span style="font-size:11px;font-weight:700;background:#eef4f1;padding:4px 9px;border-radius:999px"><?= htmlspecialchars($b['entity_type']) ?> · <?= htmlspecialchars(ucfirst($b['entity_scope'])) ?></span></div>
+                                <div style="display:flex;justify-content:space-between;gap:10px;align-items:center"><strong><?= htmlspecialchars($b['company_name']) ?></strong><div><span style="font-size:11px;font-weight:700;background:#eef4f1;padding:4px 9px;border-radius:999px"><?= htmlspecialchars($b['entity_type']) ?> · <?= htmlspecialchars(ucfirst($b['entity_scope'])) ?></span> <button type="button" onclick="tnDeleteEntity(<?= (int)$b['id'] ?>)" style="background:#fef2f2;color:#dc2626;border:1px solid #fecaca;padding:3px 8px;border-radius:8px;font-weight:700;font-size:11px;cursor:pointer;margin-left:6px">Delete Entity</button></div></div>
                                 <?php if($b['company_number']): ?><div style="font-size:12px;color:#61756e;margin-top:5px">Company no: <?= htmlspecialchars($b['company_number']) ?></div><?php endif; ?>
                                 <?php if($b['tax_reference']): ?><div style="font-size:12px;color:#61756e">Tax ref: <?= htmlspecialchars($b['tax_reference']) ?></div><?php endif; ?>
                                 <?php foreach($b['attributes'] as $attribute): ?><div style="font-size:12px;color:#61756e"><?= htmlspecialchars($attribute['label'] ?? '') ?>: <strong><?= htmlspecialchars($attribute['value'] ?? '') ?></strong></div><?php endforeach; ?>
@@ -230,3 +230,28 @@
         </div>
     </div>
 </div>
+
+<!-- Delete Entity Modal -->
+<div id="deleteEntityModal" style="display:none;position:fixed;inset:0;background:rgba(20,40,35,.45);backdrop-filter:blur(6px);z-index:199;align-items:center;justify-content:center;padding:20px">
+    <div style="background:#fff;border-radius:24px;width:100%;max-width:440px;padding:32px;box-shadow:0 24px 60px -28px rgba(0,0,0,.4)">
+        <h3 style="margin:0 0 12px;font-size:19px;font-weight:800">Delete Business Entity?</h3>
+        <p style="color:#61756e;font-size:14px;margin:0 0 24px">This business entity will be soft-deleted and moved to Trash.</p>
+        <form action="/staff/clients/delete-entity" method="POST" data-ajax-form>
+            <input type="hidden" name="csrf_token" value="<?= htmlspecialchars(\Application\Core\Session::csrfToken()) ?>">
+            <input type="hidden" name="entity_id" id="deleteEntityId">
+            <input type="hidden" name="client_id" value="<?= (int)$client['id'] ?>">
+            <div style="display:flex;justify-content:flex-end;gap:12px">
+                <button type="button" onclick="document.getElementById('deleteEntityModal').style.display='none'" style="background:#f0f5f3;color:#5f726c;border:none;padding:11px 20px;border-radius:12px;font-weight:700;cursor:pointer">Cancel</button>
+                <button type="submit" style="background:#dc2626;color:#fff;border:none;padding:11px 22px;border-radius:12px;font-weight:700;cursor:pointer">Delete Entity</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<script>
+function tnDeleteEntity(id) {
+    document.getElementById('deleteEntityId').value = id;
+    document.getElementById('deleteEntityModal').style.display = 'flex';
+}
+</script>
+

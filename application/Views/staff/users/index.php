@@ -75,12 +75,40 @@
         </div>
     </div>
 
+    <!-- Delete User Confirmation Modal -->
+    <div id="deleteUserModal" style="display:none;position:fixed;inset:0;background:rgba(20,40,35,.45);backdrop-filter:blur(6px);z-index:199;align-items:center;justify-content:center;padding:20px">
+        <div style="background:#fff;border-radius:24px;width:100%;max-width:440px;padding:32px;box-shadow:0 24px 60px -28px rgba(0,0,0,.4)">
+            <h3 style="margin:0 0 12px;font-size:19px;font-weight:800">Delete User Account?</h3>
+            <p style="color:#61756e;font-size:14px;margin:0 0 24px">This user account will be soft-deleted and moved to Trash.</p>
+            <form action="/staff/users/delete" method="POST" data-ajax-form>
+                <input type="hidden" name="csrf_token" value="<?= htmlspecialchars(\Application\Core\Session::csrfToken()) ?>">
+                <input type="hidden" name="user_id" id="deleteUserId">
+                <div style="display:flex;justify-content:flex-end;gap:12px">
+                    <button type="button" onclick="document.getElementById('deleteUserModal').style.display='none'" style="background:#f0f5f3;color:#5f726c;border:none;padding:11px 20px;border-radius:12px;font-weight:700;cursor:pointer">Cancel</button>
+                    <button type="submit" style="background:#dc2626;color:#fff;border:none;padding:11px 22px;border-radius:12px;font-weight:700;cursor:pointer">Delete User</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
     <!-- Users List Table -->
     <div style="background:#fff;border-radius:24px;padding:26px;box-shadow:0 1px 2px rgba(16,54,45,.04),0 14px 34px -24px rgba(16,54,45,.4)">
+        <!-- Bulk Action Bar -->
+        <div id="userBulkBar" style="display:none;align-items:center;gap:12px;padding:12px 16px;background:#fff8ee;border-radius:14px;margin-bottom:16px;border:1px solid #f6dfc0">
+            <span id="userBulkCount" style="font-weight:700;color:#e07d24;font-size:13.5px">0 selected</span>
+            <form action="/staff/users/bulk-delete" method="POST" data-ajax-form style="display:inline">
+                <input type="hidden" name="csrf_token" value="<?= htmlspecialchars(\Application\Core\Session::csrfToken()) ?>">
+                <div id="userBulkIds"></div>
+                <button type="submit" onclick="return confirm('Delete all selected users? They can be restored from Trash.')" style="background:#dc2626;color:#fff;border:none;padding:8px 18px;border-radius:10px;font-weight:700;font-size:13px;cursor:pointer">Delete Selected</button>
+            </form>
+            <button type="button" onclick="tnUserSelectNone()" style="background:#f0f5f3;color:#5f726c;border:none;padding:8px 14px;border-radius:10px;font-weight:700;font-size:13px;cursor:pointer">Clear</button>
+        </div>
+
         <div style="overflow-x:auto">
             <table style="width:100%;border-collapse:collapse;text-align:left">
                 <thead>
                     <tr style="border-bottom:2px solid #eef4f1;color:#7d8e88;font-size:12.5px;text-transform:uppercase;letter-spacing:.05em">
+                        <th style="padding:12px 10px;width:36px"><input type="checkbox" id="userCheckAll" aria-label="Select all users" onchange="tnUserToggleAll(this)" style="width:16px;height:16px;cursor:pointer"></th>
                         <th style="padding:12px 16px;font-weight:700">User Name</th>
                         <th style="padding:12px 16px;font-weight:700">Email</th>
                         <th style="padding:12px 16px;font-weight:700">Role</th>
@@ -90,9 +118,10 @@
                     </tr>
                 </thead>
                 <tbody>
-                    <?php if(empty($users)): ?><tr><td colspan="6" style="padding:42px;text-align:center;color:#7d8e88"><?= $hasUserFilters ? 'No users match the selected filters.' : 'No users found.' ?></td></tr><?php endif; ?>
+                    <?php if(empty($users)): ?><tr><td colspan="7" style="padding:42px;text-align:center;color:#7d8e88"><?= $hasUserFilters ? 'No users match the selected filters.' : 'No users found.' ?></td></tr><?php endif; ?>
                     <?php foreach ($users as $u): ?>
                         <tr style="border-bottom:1px solid #eef4f1">
+                            <td style="padding:12px 10px"><input type="checkbox" class="tn-user-check" value="<?= (int)$u['id'] ?>" aria-label="Select user" onchange="tnUserUpdateBar()" style="width:16px;height:16px;cursor:pointer"></td>
                             <td style="padding:16px;font-weight:700;color:#213330">
                                 <?= htmlspecialchars($u['name']) ?>
                             </td>
@@ -134,6 +163,7 @@
                                         <?= $u['status'] === 'active' ? 'Suspend' : 'Activate' ?>
                                     </button>
                                 </form><?php endif; ?>
+                                <button type="button" onclick="tnDeleteUser(<?= (int)$u['id'] ?>)" style="width:100%;min-height:36px;background:#fef2f2;color:#dc2626;border:1px solid #fecaca;padding:8px 12px;border-radius:11px;font-weight:700;font-size:12.5px;cursor:pointer">Delete</button>
                                 </div>
                             </td>
                         </tr>
@@ -150,5 +180,29 @@ function openUserReset(id, name) {
     document.getElementById('reset_user_id').value = id;
     document.getElementById('reset_user_name').textContent = name;
     document.getElementById('userResetModal').style.display = 'flex';
+}
+function tnDeleteUser(id) {
+    document.getElementById('deleteUserId').value = id;
+    document.getElementById('deleteUserModal').style.display = 'flex';
+}
+function tnUserToggleAll(el) {
+    document.querySelectorAll('.tn-user-check').forEach(c => { c.checked = el.checked; });
+    tnUserUpdateBar();
+}
+function tnUserSelectNone() {
+    document.querySelectorAll('.tn-user-check, #userCheckAll').forEach(c => { c.checked = false; });
+    tnUserUpdateBar();
+}
+function tnUserUpdateBar() {
+    const checked = [...document.querySelectorAll('.tn-user-check:checked')];
+    document.getElementById('userBulkCount').textContent = checked.length + ' selected';
+    const container = document.getElementById('userBulkIds');
+    container.innerHTML = '';
+    checked.forEach(c => {
+        const inp = document.createElement('input');
+        inp.type = 'hidden'; inp.name = 'ids[]'; inp.value = c.value;
+        container.appendChild(inp);
+    });
+    document.getElementById('userBulkBar').style.display = checked.length > 0 ? 'flex' : 'none';
 }
 </script>

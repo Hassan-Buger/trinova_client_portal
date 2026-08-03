@@ -36,8 +36,11 @@
                         <?php $lastMessageDay = $messageDay; ?>
                     <?php endif; ?>
                     <article class="tn-message-bubble <?= $isMe ? 'is-mine' : 'is-theirs' ?>" data-message-id="<?= (int) $msg['id'] ?>" data-message-day="<?= $messageDay ?>">
-                        <div class="tn-message-meta" title="<?= htmlspecialchars(date('l, d F Y \a\t H:i', strtotime($msg['created_at']))) ?>">
-                            <?= htmlspecialchars($msg['sender_name']) ?> &middot; <?= date('H:i', strtotime($msg['created_at'])) ?>
+                        <div class="tn-message-meta" title="<?= htmlspecialchars(date('l, d F Y \a\t H:i', strtotime($msg['created_at']))) ?>" style="display:flex;justify-content:space-between;align-items:center">
+                            <span><?= htmlspecialchars($msg['sender_name']) ?> &middot; <?= date('H:i', strtotime($msg['created_at'])) ?></span>
+                            <?php if ($isMe): ?>
+                                <button type="button" onclick="tnClientDeleteMsg(<?= (int)$msg['id'] ?>)" title="Delete message" style="background:none;border:none;color:#dc2626;cursor:pointer;font-size:11px;font-weight:700;margin-left:8px;padding:0">Delete</button>
+                            <?php endif; ?>
                         </div>
                         <div class="tn-message-body"><?= htmlspecialchars($msg['body']) ?></div>
                     </article>
@@ -56,3 +59,26 @@
         </div>
     </div>
 </div>
+
+<!-- Delete Message Modal -->
+<div id="deleteClientMsgModal" style="display:none;position:fixed;inset:0;background:rgba(20,40,35,.45);backdrop-filter:blur(6px);z-index:199;align-items:center;justify-content:center;padding:20px">
+    <div style="background:#fff;border-radius:24px;width:100%;max-width:440px;padding:32px;box-shadow:0 24px 60px -28px rgba(0,0,0,.4)">
+        <h3 style="margin:0 0 12px;font-size:19px;font-weight:800">Delete Message?</h3>
+        <p style="color:#61756e;font-size:14px;margin:0 0 24px">This sent message will be soft-deleted.</p>
+        <form action="/client/messages/delete" method="POST" data-ajax-form>
+            <input type="hidden" name="csrf_token" value="<?= htmlspecialchars(\Application\Core\Session::csrfToken()) ?>">
+            <input type="hidden" name="message_id" id="deleteClientMsgId">
+            <div style="display:flex;justify-content:flex-end;gap:12px">
+                <button type="button" onclick="document.getElementById('deleteClientMsgModal').style.display='none'" style="background:#f0f5f3;color:#5f726c;border:none;padding:11px 20px;border-radius:12px;font-weight:700;cursor:pointer">Cancel</button>
+                <button type="submit" style="background:#dc2626;color:#fff;border:none;padding:11px 22px;border-radius:12px;font-weight:700;cursor:pointer">Delete Message</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<script>
+function tnClientDeleteMsg(id) {
+    document.getElementById('deleteClientMsgId').value = id;
+    document.getElementById('deleteClientMsgModal').style.display = 'flex';
+}
+</script>

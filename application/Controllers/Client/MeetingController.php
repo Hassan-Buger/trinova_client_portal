@@ -49,4 +49,27 @@ class MeetingController extends Controller
 
         $response->redirect('/client/meetings/book');
     }
+
+    public function delete(Request $request, Response $response): void
+    {
+        $clientId = Session::get('client_id');
+        $id = (int)($request->getBody()['meeting_id'] ?? 0);
+
+        if ($clientId && $id > 0) {
+            $meeting = $this->meetingModel->find($id);
+            if ($meeting && (int)$meeting['client_id'] === (int)$clientId) {
+                if ($this->meetingModel->softDelete($id)) {
+                    AuditService::log('meeting_deleted', 'meetings', $id, Session::get('user_id'), ['client_id' => $clientId]);
+                    Session::setFlash('success', 'Meeting request deleted successfully.');
+                } else {
+                    Session::setFlash('error', 'Failed to delete meeting request.');
+                }
+            } else {
+                Session::setFlash('error', 'Unauthorized or meeting not found.');
+            }
+        }
+
+        $response->redirect('/client/meetings/book');
+    }
 }
+

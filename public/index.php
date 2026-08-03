@@ -112,6 +112,7 @@ $app->router->group([
     $r->get('/deadlines', [ClientDeadlineController::class, 'index']);
     $r->get('/meetings/book', [ClientMeetingController::class, 'index']);
     $r->post('/meetings/book', [ClientMeetingController::class, 'book'])->middleware([CsrfMiddleware::class]);
+    $r->post('/meetings/delete', [ClientMeetingController::class, 'delete'])->middleware([CsrfMiddleware::class]);
     $r->get('/aml', [ClientProfileController::class, 'aml']);
     $r->get('/profile/details', [ClientProfileController::class, 'details']);
     $r->post('/profile/request-update', [ClientProfileController::class, 'requestUpdate'])->middleware([CsrfMiddleware::class]);
