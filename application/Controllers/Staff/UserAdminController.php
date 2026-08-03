@@ -163,4 +163,53 @@ class UserAdminController extends Controller
 
         $response->redirect('/staff/users');
     }
+
+    public function delete(Request $request, Response $response): void
+    {
+        $userId = (int)($request->input('user_id', 0) ?: $request->input('id', 0));
+        if ($userId > 0 && $this->userModel->softDelete($userId)) {
+            AuditService::log('user_deleted', 'users', $userId);
+            $msg = 'User account deleted.';
+            if ($request->isAjax()) {
+                $response->json(['success' => true, 'message' => $msg]);
+                return;
+            }
+            Session::setFlash('success', $msg);
+        } else {
+            if ($request->isAjax()) {
+                $response->json(['success' => false, 'message' => 'Failed to delete user account.'], 422);
+                return;
+            }
+            Session::setFlash('error', 'Failed to delete user account.');
+        }
+        $response->redirect('/staff/users');
+    }
+
+    public function bulkDelete(Request $request, Response $response): void
+    {
+        $rawIds = $request->input('ids', []);
+        $ids = is_array($rawIds) ? array_map('intval', array_filter($rawIds)) : [];
+
+        if (empty($ids)) {
+            if ($request->isAjax()) {
+                $response->json(['success' => false, 'message' => 'No users selected for deletion.'], 422);
+                return;
+            }
+            Session::setFlash('error', 'No users selected for deletion.');
+            $response->redirect('/staff/users');
+            return;
+        }
+
+        $count = $this->userModel->bulkSoftDelete($ids);
+        if ($count > 0) {
+            AuditService::log('user_bulk_deleted', 'users', null, null, ['count' => $count, 'ids' => $ids]);
+            $msg = "{$count} user account(s) deleted.";
+            if ($request->isAjax()) {
+                $response->json(['success' => true, 'message' => $msg]);
+                return;
+            }
+            Session::setFlash('success', $msg);
+        }
+        $response->redirect('/staff/users');
+    }
 }

@@ -9,7 +9,7 @@ class DocumentRequest extends Model
 {
     public function find(int $id): ?array
     {
-        $stmt = $this->db->prepare("SELECT * FROM document_requests WHERE id = :id LIMIT 1");
+        $stmt = $this->db->prepare("SELECT * FROM document_requests WHERE id = :id AND deleted_at IS NULL LIMIT 1");
         $stmt->execute(['id' => $id]);
         return $stmt->fetch() ?: null;
     }
@@ -18,7 +18,7 @@ class DocumentRequest extends Model
     {
         $stmt = $this->db->prepare("
             SELECT * FROM document_requests
-            WHERE client_id = :client_id AND status != 'Completed'
+            WHERE client_id = :client_id AND status != 'Completed' AND deleted_at IS NULL
             ORDER BY due_date ASC
         ");
         $stmt->execute(['client_id' => $clientId]);
@@ -29,7 +29,7 @@ class DocumentRequest extends Model
     {
         $stmt = $this->db->prepare("
             SELECT * FROM document_requests
-            WHERE client_id = :client_id
+            WHERE client_id = :client_id AND deleted_at IS NULL
             ORDER BY created_at DESC
         ");
         $stmt->execute(['client_id' => $clientId]);
@@ -43,7 +43,7 @@ class DocumentRequest extends Model
             SELECT dr.*,e.company_name AS entity_name,e.entity_scope FROM document_requests dr
             JOIN client_entities e ON e.id=dr.entity_id JOIN clients c ON c.id=e.client_id
             LEFT JOIN entity_directors ed ON ed.entity_id=e.id AND ed.user_id=:director_user
-            WHERE ((dr.scope='company' AND ed.user_id IS NOT NULL) OR (dr.scope='personal' AND c.user_id=:owner_user)) {$status}
+            WHERE dr.deleted_at IS NULL AND ((dr.scope='company' AND ed.user_id IS NOT NULL) OR (dr.scope='personal' AND c.user_id=:owner_user)) {$status}
             ORDER BY dr.due_date ASC,dr.created_at DESC
         ");
         $stmt->execute(['director_user'=>$userId,'owner_user'=>$userId]);
@@ -58,6 +58,7 @@ class DocumentRequest extends Model
             JOIN users u ON u.id = dr.created_by_user_id
             JOIN clients c ON c.id = dr.client_id
             JOIN users c_user ON c_user.id = c.user_id
+            WHERE dr.deleted_at IS NULL
             ORDER BY dr.due_date ASC
         ");
         $stmt->execute();
@@ -94,7 +95,7 @@ class DocumentRequest extends Model
         $stmt = $this->db->query("
             SELECT COUNT(*) AS total 
             FROM document_requests 
-            WHERE status != 'Completed' AND due_date < CURRENT_DATE()
+            WHERE status != 'Completed' AND due_date < CURRENT_DATE() AND deleted_at IS NULL
         ");
         $row = $stmt->fetch();
         return (int) ($row['total'] ?? 0);
@@ -104,7 +105,7 @@ class DocumentRequest extends Model
     {
         $page = max(1, $page);
         $perPage = max(10, min($perPage, 50));
-        $where = [];
+        $where = ['dr.deleted_at IS NULL'];
         $params = [];
 
         if (($filters['search'] ?? '') !== '') {
@@ -156,5 +157,53 @@ class DocumentRequest extends Model
         $stmt = $this->db->prepare("SELECT dr.*, u.name AS created_by_name, c_user.name AS client_name FROM document_requests dr {$joins} {$whereSql} ORDER BY {$orderBy} LIMIT {$perPage} OFFSET {$offset}");
         $stmt->execute($params);
         return ['items' => $stmt->fetchAll(), 'total' => $total, 'page' => $page, 'per_page' => $perPage, 'total_pages' => $totalPages];
+    }
+
+    public function softDelete(int $id): bool
+    {
+        $stmt = $this->db->prepare("UPDATE document_requests SET deleted_at = NOW() WHERE id = :id");
+        return $stmt->execute(['id' => $id]);
+    }
+
+    public function bulkSoftDelete(array $ids): int
+    {
+        $count = 0;
+        foreach ($ids as $id) {
+            if ($this->softDelete((int)$id)) {
+                $count++;
+            }
+        }
+        return $count;
+    }
+
+    public function restore(int $id): bool
+    {
+        $stmt = $this->db->prepare("UPDATE document_requests SET deleted_at = NULL WHERE id = :id");
+        return $stmt->execute(['id' => $id]);
+    }
+
+    public function bulkRestore(array $ids): int
+    {
+        $count = 0;
+        foreach ($ids as $id) {
+            if ($this->restore((int)$id)) {
+                $count++;
+            }
+        }
+        return $count;
+    }
+
+    public function getSoftDeleted(): array
+    {
+        $stmt = $this->db->query("
+            SELECT dr.*, u.name AS created_by_name, c_user.name AS client_name
+            FROM document_requests dr
+            JOIN users u ON u.id = dr.created_by_user_id
+            JOIN clients c ON c.id = dr.client_id
+            JOIN users c_user ON c_user.id = c.user_id
+            WHERE dr.deleted_at IS NOT NULL
+            ORDER BY dr.deleted_at DESC
+        ");
+        return $stmt->fetchAll();
     }
 }

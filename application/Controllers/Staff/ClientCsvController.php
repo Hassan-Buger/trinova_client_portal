@@ -58,4 +58,23 @@ final class ClientCsvController extends Controller
         $value=str_replace("\0",'',trim($value));
         return preg_match('/^[\x00-\x20]*[=+\-@]/u',$value)?"'".$value:$value;
     }
+
+    public function deleteBatch(Request $request, Response $response): void
+    {
+        $batchId = (int)($request->input('batch_id', 0) ?: $request->input('id', 0));
+        try {
+            if ($batchId > 0 && (new ClientCsvImportService())->deleteImportBatch($batchId)) {
+                $msg = 'Import batch deleted.';
+                if ($request->isAjax()) { $response->json(['success' => true, 'message' => $msg]); return; }
+                Session::setFlash('success', $msg);
+            } else {
+                if ($request->isAjax()) { $response->json(['success' => false, 'message' => 'Failed to delete batch.'], 422); return; }
+                Session::setFlash('error', 'Failed to delete batch.');
+            }
+        } catch (UserFacingException $e) {
+            $this->userFailure($request, $response, $e->getMessage());
+            return;
+        }
+        $response->redirect('/staff/clients/import');
+    }
 }

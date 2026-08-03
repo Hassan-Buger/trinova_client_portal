@@ -44,6 +44,7 @@ use Application\Controllers\Staff\MessageController as StaffMessageController;
 use Application\Controllers\Staff\DeadlineController as StaffDeadlineController;
 use Application\Controllers\Staff\UserAdminController as StaffUserAdminController;
 use Application\Controllers\Staff\AuditController as StaffAuditController;
+use Application\Controllers\Staff\TrashController as StaffTrashController;
 use Application\Controllers\NotificationController;
 
 // Simple dotenv loader fallback for environment variables
@@ -106,6 +107,7 @@ $app->router->group([
     $r->get('/messages', [ClientMessageController::class, 'index']);
     $r->get('/messages/feed', [ClientMessageController::class, 'feed']);
     $r->post('/messages/send', [ClientMessageController::class, 'send'])->middleware([CsrfMiddleware::class]);
+    $r->post('/messages/delete', [ClientMessageController::class, 'delete'])->middleware([CsrfMiddleware::class]);
     $r->get('/requests', [ClientRequestController::class, 'index']);
     $r->get('/deadlines', [ClientDeadlineController::class, 'index']);
     $r->get('/meetings/book', [ClientMeetingController::class, 'index']);
@@ -113,6 +115,7 @@ $app->router->group([
     $r->get('/aml', [ClientProfileController::class, 'aml']);
     $r->get('/profile/details', [ClientProfileController::class, 'details']);
     $r->post('/profile/request-update', [ClientProfileController::class, 'requestUpdate'])->middleware([CsrfMiddleware::class]);
+    $r->post('/documents/delete', [ClientDocumentController::class, 'delete'])->middleware([CsrfMiddleware::class]);
 });
 
 // --- SECURED STAFF ROUTES ---
@@ -138,6 +141,9 @@ $app->router->group([
     $r->post('/clients/create', [StaffClientController::class, 'create'])->middleware([CsrfMiddleware::class]);
     $r->post('/clients/reset-password', [StaffClientController::class, 'resetPassword'])->middleware([CsrfMiddleware::class]);
     $r->post('/clients/delete', [StaffClientController::class, 'delete'])->middleware([CsrfMiddleware::class]);
+    $r->post('/clients/bulk-delete', [StaffClientController::class, 'bulkDelete'])->middleware([CsrfMiddleware::class]);
+    $r->post('/clients/delete-entity', [StaffClientController::class, 'deleteEntity'])->middleware([CsrfMiddleware::class]);
+    $r->post('/clients/import/batch/delete', [StaffClientCsvController::class, 'deleteBatch'])->middleware([CsrfMiddleware::class]);
     $r->get('/clients/{id}', [StaffClientController::class, 'show']);
     $r->post('/clients/add-entity', [StaffClientController::class, 'addEntity'])->middleware([CsrfMiddleware::class]);
     $r->post('/clients/link-director', [StaffClientController::class, 'linkDirector'])->middleware([CsrfMiddleware::class]);
@@ -145,20 +151,34 @@ $app->router->group([
     $r->get('/documents', [StaffDocumentController::class, 'index']);
     $r->post('/documents/upload', [StaffDocumentController::class, 'upload'])->middleware([CsrfMiddleware::class]);
     $r->get('/documents/download/{id}', [StaffDocumentController::class, 'download']);
+    $r->post('/documents/delete', [StaffDocumentController::class, 'delete'])->middleware([CsrfMiddleware::class]);
+    $r->post('/documents/bulk-delete', [StaffDocumentController::class, 'bulkDelete'])->middleware([CsrfMiddleware::class]);
     $r->get('/requests', [StaffRequestController::class, 'index']);
     $r->post('/requests/create', [StaffRequestController::class, 'create'])->middleware([CsrfMiddleware::class]);
     $r->post('/requests/update-status', [StaffRequestController::class, 'updateStatus'])->middleware([CsrfMiddleware::class]);
+    $r->post('/requests/delete', [StaffRequestController::class, 'delete'])->middleware([CsrfMiddleware::class]);
+    $r->post('/requests/bulk-delete', [StaffRequestController::class, 'bulkDelete'])->middleware([CsrfMiddleware::class]);
     $r->get('/messages', [StaffMessageController::class, 'index']);
     $r->get('/messages/feed', [StaffMessageController::class, 'feed']);
     $r->post('/messages/send', [StaffMessageController::class, 'send'])->middleware([CsrfMiddleware::class]);
+    $r->post('/messages/delete', [StaffMessageController::class, 'delete'])->middleware([CsrfMiddleware::class]);
+    $r->post('/messages/delete-thread', [StaffMessageController::class, 'deleteThread'])->middleware([CsrfMiddleware::class]);
+    $r->post('/messages/bulk-delete', [StaffMessageController::class, 'bulkDelete'])->middleware([CsrfMiddleware::class]);
     $r->get('/deadlines', [StaffDeadlineController::class, 'index']);
     $r->post('/deadlines/create', [StaffDeadlineController::class, 'create'])->middleware([CsrfMiddleware::class]);
     $r->post('/deadlines/update-status', [StaffDeadlineController::class, 'updateStatus'])->middleware([CsrfMiddleware::class]);
+    $r->post('/deadlines/delete', [StaffDeadlineController::class, 'delete'])->middleware([CsrfMiddleware::class]);
+    $r->post('/deadlines/bulk-delete', [StaffDeadlineController::class, 'bulkDelete'])->middleware([CsrfMiddleware::class]);
     $r->get('/audit', [StaffAuditController::class, 'index']);
     $r->get('/users', [StaffUserAdminController::class, 'index']);
     $r->post('/users/create', [StaffUserAdminController::class, 'createUser'])->middleware([CsrfMiddleware::class]);
     $r->post('/users/toggle-status', [StaffUserAdminController::class, 'toggleStatus'])->middleware([CsrfMiddleware::class]);
     $r->post('/users/reset-password', [StaffUserAdminController::class, 'resetPassword'])->middleware([CsrfMiddleware::class]);
+    $r->post('/users/delete', [StaffUserAdminController::class, 'delete'])->middleware([CsrfMiddleware::class]);
+    $r->post('/users/bulk-delete', [StaffUserAdminController::class, 'bulkDelete'])->middleware([CsrfMiddleware::class]);
+    $r->get('/trash', [StaffTrashController::class, 'index']);
+    $r->post('/trash/restore', [StaffTrashController::class, 'restore'])->middleware([CsrfMiddleware::class]);
+    $r->post('/trash/bulk-restore', [StaffTrashController::class, 'bulkRestore'])->middleware([CsrfMiddleware::class]);
 });
 
 // Security response headers

@@ -118,4 +118,77 @@ class MessageController extends Controller
             'read_at' => $message['read_at'] ?? null,
         ], $messages);
     }
+
+    public function delete(Request $request, Response $response): void
+    {
+        $msgId = (int)($request->input('message_id', 0) ?: $request->input('id', 0));
+        $clientId = (int)($request->input('client_id', 0));
+        if ($msgId > 0 && $this->messageModel->softDelete($msgId)) {
+            AuditService::log('message_deleted', 'messages', $msgId);
+            $msg = 'Message deleted.';
+            if ($request->isAjax()) {
+                $response->json(['success' => true, 'message' => $msg]);
+                return;
+            }
+            Session::setFlash('success', $msg);
+        } else {
+            if ($request->isAjax()) {
+                $response->json(['success' => false, 'message' => 'Failed to delete message.'], 422);
+                return;
+            }
+            Session::setFlash('error', 'Failed to delete message.');
+        }
+        $response->redirect('/staff/messages' . ($clientId ? '?client_id=' . $clientId : ''));
+    }
+
+    public function deleteThread(Request $request, Response $response): void
+    {
+        $clientId = (int)($request->input('client_id', 0));
+        $threadId = (int)($request->input('thread_id', 1));
+        if ($clientId > 0 && $this->messageModel->softDeleteThread($threadId, $clientId)) {
+            AuditService::log('message_thread_deleted', 'messages', null, null, ['client_id' => $clientId, 'thread_id' => $threadId]);
+            $msg = 'Entire message thread deleted.';
+            if ($request->isAjax()) {
+                $response->json(['success' => true, 'message' => $msg]);
+                return;
+            }
+            Session::setFlash('success', $msg);
+        } else {
+            if ($request->isAjax()) {
+                $response->json(['success' => false, 'message' => 'Failed to delete message thread.'], 422);
+                return;
+            }
+            Session::setFlash('error', 'Failed to delete message thread.');
+        }
+        $response->redirect('/staff/messages');
+    }
+
+    public function bulkDelete(Request $request, Response $response): void
+    {
+        $rawIds = $request->input('ids', []);
+        $ids = is_array($rawIds) ? array_map('intval', array_filter($rawIds)) : [];
+        $clientId = (int)($request->input('client_id', 0));
+
+        if (empty($ids)) {
+            if ($request->isAjax()) {
+                $response->json(['success' => false, 'message' => 'No messages selected for deletion.'], 422);
+                return;
+            }
+            Session::setFlash('error', 'No messages selected for deletion.');
+            $response->redirect('/staff/messages' . ($clientId ? '?client_id=' . $clientId : ''));
+            return;
+        }
+
+        $count = $this->messageModel->bulkSoftDelete($ids);
+        if ($count > 0) {
+            AuditService::log('message_bulk_deleted', 'messages', null, null, ['count' => $count, 'ids' => $ids]);
+            $msg = "{$count} message(s) deleted.";
+            if ($request->isAjax()) {
+                $response->json(['success' => true, 'message' => $msg]);
+                return;
+            }
+            Session::setFlash('success', $msg);
+        }
+        $response->redirect('/staff/messages' . ($clientId ? '?client_id=' . $clientId : ''));
+    }
 }

@@ -103,4 +103,39 @@ class MessageController extends Controller
             'read_at' => $message['read_at'] ?? null,
         ], $messages);
     }
+
+    public function delete(Request $request, Response $response): void
+    {
+        $msgId = (int)($request->input('message_id', 0) ?: $request->input('id', 0));
+        $userId = (int)Session::get('user_id');
+
+        $msg = $msgId > 0 ? $this->messageModel->find($msgId) : null;
+
+        if (!$msg || (int)$msg['sender_id'] !== $userId) {
+            if ($request->isAjax()) {
+                $response->json(['success' => false, 'message' => 'You can only delete messages you sent.'], 403);
+                return;
+            }
+            Session::setFlash('error', 'You can only delete messages you sent.');
+            $response->redirect('/client/messages');
+            return;
+        }
+
+        if ($this->messageModel->softDelete($msgId)) {
+            AuditService::log('message_deleted', 'messages', $msgId);
+            $flash = 'Message deleted.';
+            if ($request->isAjax()) {
+                $response->json(['success' => true, 'message' => $flash]);
+                return;
+            }
+            Session::setFlash('success', $flash);
+        } else {
+            if ($request->isAjax()) {
+                $response->json(['success' => false, 'message' => 'Failed to delete message.'], 422);
+                return;
+            }
+            Session::setFlash('error', 'Failed to delete message.');
+        }
+        $response->redirect('/client/messages');
+    }
 }

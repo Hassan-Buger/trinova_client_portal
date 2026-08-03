@@ -104,4 +104,53 @@ class DeadlineController extends Controller
 
         $response->redirect('/staff/deadlines');
     }
+
+    public function delete(Request $request, Response $response): void
+    {
+        $deadlineId = (int)($request->input('deadline_id', 0) ?: $request->input('id', 0));
+        if ($deadlineId > 0 && $this->deadlineModel->softDelete($deadlineId)) {
+            AuditService::log('deadline_deleted', 'deadlines', $deadlineId);
+            $msg = 'Deadline deleted.';
+            if ($request->isAjax()) {
+                $response->json(['success' => true, 'message' => $msg]);
+                return;
+            }
+            Session::setFlash('success', $msg);
+        } else {
+            if ($request->isAjax()) {
+                $response->json(['success' => false, 'message' => 'Failed to delete deadline.'], 422);
+                return;
+            }
+            Session::setFlash('error', 'Failed to delete deadline.');
+        }
+        $response->redirect('/staff/deadlines');
+    }
+
+    public function bulkDelete(Request $request, Response $response): void
+    {
+        $rawIds = $request->input('ids', []);
+        $ids = is_array($rawIds) ? array_map('intval', array_filter($rawIds)) : [];
+
+        if (empty($ids)) {
+            if ($request->isAjax()) {
+                $response->json(['success' => false, 'message' => 'No deadlines selected for deletion.'], 422);
+                return;
+            }
+            Session::setFlash('error', 'No deadlines selected for deletion.');
+            $response->redirect('/staff/deadlines');
+            return;
+        }
+
+        $count = $this->deadlineModel->bulkSoftDelete($ids);
+        if ($count > 0) {
+            AuditService::log('deadline_bulk_deleted', 'deadlines', null, null, ['count' => $count, 'ids' => $ids]);
+            $msg = "{$count} deadline(s) deleted.";
+            if ($request->isAjax()) {
+                $response->json(['success' => true, 'message' => $msg]);
+                return;
+            }
+            Session::setFlash('success', $msg);
+        }
+        $response->redirect('/staff/deadlines');
+    }
 }

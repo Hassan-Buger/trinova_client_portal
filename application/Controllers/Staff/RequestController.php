@@ -128,4 +128,53 @@ class RequestController extends Controller
 
         $response->redirect('/staff/requests');
     }
+
+    public function delete(Request $request, Response $response): void
+    {
+        $reqId = (int)($request->input('request_id', 0) ?: $request->input('id', 0));
+        if ($reqId > 0 && $this->requestModel->softDelete($reqId)) {
+            AuditService::log('request_deleted', 'document_requests', $reqId);
+            $msg = 'Document request deleted.';
+            if ($request->isAjax()) {
+                $response->json(['success' => true, 'message' => $msg]);
+                return;
+            }
+            Session::setFlash('success', $msg);
+        } else {
+            if ($request->isAjax()) {
+                $response->json(['success' => false, 'message' => 'Failed to delete request.'], 422);
+                return;
+            }
+            Session::setFlash('error', 'Failed to delete request.');
+        }
+        $response->redirect('/staff/requests');
+    }
+
+    public function bulkDelete(Request $request, Response $response): void
+    {
+        $rawIds = $request->input('ids', []);
+        $ids = is_array($rawIds) ? array_map('intval', array_filter($rawIds)) : [];
+
+        if (empty($ids)) {
+            if ($request->isAjax()) {
+                $response->json(['success' => false, 'message' => 'No requests selected for deletion.'], 422);
+                return;
+            }
+            Session::setFlash('error', 'No requests selected for deletion.');
+            $response->redirect('/staff/requests');
+            return;
+        }
+
+        $count = $this->requestModel->bulkSoftDelete($ids);
+        if ($count > 0) {
+            AuditService::log('request_bulk_deleted', 'document_requests', null, null, ['count' => $count, 'ids' => $ids]);
+            $msg = "{$count} document request(s) deleted.";
+            if ($request->isAjax()) {
+                $response->json(['success' => true, 'message' => $msg]);
+                return;
+            }
+            Session::setFlash('success', $msg);
+        }
+        $response->redirect('/staff/requests');
+    }
 }

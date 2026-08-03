@@ -226,4 +226,38 @@ final class ClientCsvImportService
     private function path(string $token):string{if(!preg_match('/^[a-f0-9]{48}$/',$token))throw new UserFacingException('The import token is invalid.');$dir=App::get('storage_dir').'/csv-imports';if(!is_dir($dir)&&!mkdir($dir,0700,true)&&!is_dir($dir))throw new UserFacingException('The secure import workspace is unavailable.');return $dir.'/'.$token.'.json';}
     private function writeDraft(string $token,array $data):void{file_put_contents($this->path($token),json_encode($data,JSON_UNESCAPED_UNICODE|JSON_THROW_ON_ERROR),LOCK_EX);}
     private function readDraft(string $token):array{$path=$this->path($token);if(!is_file($path))throw new UserFacingException('This import preview has expired.');$data=json_decode((string)file_get_contents($path),true,512,JSON_THROW_ON_ERROR);if((int)($data['user_id']??0)!==(int)\Application\Core\Session::get('user_id')||time()-(int)($data['created_at']??0)>3600)throw new UserFacingException('This import preview has expired or belongs to another user.');return $data;}
+
+    public function deleteImportBatch(int $id): bool
+    {
+        $stmt = $this->db->prepare("UPDATE client_csv_imports SET deleted_at = NOW() WHERE id = :id");
+        $success = $stmt->execute(['id' => $id]);
+        if ($success) {
+            \Application\Services\AuditService::log('csv_import_batch_deleted', 'client_csv_imports', $id);
+        }
+        return $success;
+    }
+
+    public function restoreImportBatch(int $id): bool
+    {
+        $stmt = $this->db->prepare("UPDATE client_csv_imports SET deleted_at = NULL WHERE id = :id");
+        $success = $stmt->execute(['id' => $id]);
+        if ($success) {
+            \Application\Services\AuditService::log('csv_import_batch_restored', 'client_csv_imports', $id);
+        }
+        return $success;
+    }
+
+    public function getAllBatches(): array
+    {
+        $stmt = $this->db->prepare("SELECT i.*, u.name AS imported_by FROM client_csv_imports i LEFT JOIN users u ON u.id = i.created_by_user_id WHERE i.deleted_at IS NULL ORDER BY i.created_at DESC");
+        $stmt->execute();
+        return $stmt->fetchAll();
+    }
+
+    public function getSoftDeletedBatches(): array
+    {
+        $stmt = $this->db->prepare("SELECT i.*, u.name AS imported_by FROM client_csv_imports i LEFT JOIN users u ON u.id = i.created_by_user_id WHERE i.deleted_at IS NOT NULL ORDER BY i.deleted_at DESC");
+        $stmt->execute();
+        return $stmt->fetchAll();
+    }
 }

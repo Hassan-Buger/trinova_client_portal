@@ -274,4 +274,39 @@ class DocumentController extends Controller
 
         return [$doc, $filePath];
     }
+
+    public function delete(Request $request, Response $response): void
+    {
+        $docId = (int)($request->input('document_id', 0) ?: $request->input('id', 0));
+        $userId = (int)Session::get('user_id');
+
+        $doc = $docId > 0 ? $this->documentModel->find($docId) : null;
+
+        if (!$doc || (int)$doc['uploaded_by_user_id'] !== $userId) {
+            if ($request->isAjax()) {
+                $response->json(['success' => false, 'message' => 'You can only delete documents you uploaded.'], 403);
+                return;
+            }
+            Session::setFlash('error', 'You can only delete documents you uploaded.');
+            $response->redirect('/client/documents/my-uploads');
+            return;
+        }
+
+        if ($this->documentModel->softDelete($docId)) {
+            AuditService::log('document_deleted', 'documents', $docId);
+            $msg = 'Document deleted.';
+            if ($request->isAjax()) {
+                $response->json(['success' => true, 'message' => $msg]);
+                return;
+            }
+            Session::setFlash('success', $msg);
+        } else {
+            if ($request->isAjax()) {
+                $response->json(['success' => false, 'message' => 'Failed to delete document.'], 422);
+                return;
+            }
+            Session::setFlash('error', 'Failed to delete document.');
+        }
+        $response->redirect('/client/documents/my-uploads');
+    }
 }

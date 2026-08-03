@@ -28,4 +28,16 @@ final class SchemaGuard
         $available=array_map('strtolower',$stmt->fetchAll(\PDO::FETCH_COLUMN));
         if(array_diff($required,$available))throw new SystemSetupException('Directors Importer schema migration is incomplete.');
     }
+
+    public static function assertDeleteSchemaReady(): void
+    {
+        $db = Database::getInstance();
+        $tables = ['users', 'clients', 'client_entities', 'entity_directors', 'documents', 'document_requests', 'messages', 'deadlines', 'meetings', 'client_csv_imports'];
+        foreach ($tables as $table) {
+            $stmt = $db->query("SELECT COUNT(*) FROM information_schema.columns WHERE table_schema=DATABASE() AND table_name='{$table}' AND column_name='deleted_at'");
+            if (!(int)$stmt->fetchColumn()) {
+                $db->exec("ALTER TABLE `{$table}` ADD COLUMN `deleted_at` DATETIME NULL");
+            }
+        }
+    }
 }

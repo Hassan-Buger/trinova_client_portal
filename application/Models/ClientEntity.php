@@ -11,7 +11,7 @@ class ClientEntity extends Model
     {
         $stmt = $this->db->prepare("
             SELECT * FROM client_entities
-            WHERE client_id = :client_id
+            WHERE client_id = :client_id AND deleted_at IS NULL
             ORDER BY company_name ASC
         ");
         $stmt->execute(['client_id' => $clientId]);
@@ -20,7 +20,7 @@ class ClientEntity extends Model
 
     public function findById(int $id): ?array
     {
-        $stmt = $this->db->prepare("SELECT * FROM client_entities WHERE id = :id LIMIT 1");
+        $stmt = $this->db->prepare("SELECT * FROM client_entities WHERE id = :id AND deleted_at IS NULL LIMIT 1");
         $stmt->execute(['id' => $id]);
         $row = $stmt->fetch();
         return $row ? $this->hydrate($row) : null;
@@ -28,7 +28,7 @@ class ClientEntity extends Model
 
     public function getAllWithClient(): array
     {
-        $stmt = $this->db->query("SELECT e.*, u.name AS client_name FROM client_entities e JOIN clients c ON c.id=e.client_id JOIN users u ON u.id=c.user_id ORDER BY u.name,e.company_name");
+        $stmt = $this->db->query("SELECT e.*, u.name AS client_name FROM client_entities e JOIN clients c ON c.id=e.client_id JOIN users u ON u.id=c.user_id WHERE e.deleted_at IS NULL AND c.deleted_at IS NULL ORDER BY u.name,e.company_name");
         return array_map([$this, 'hydrate'], $stmt->fetchAll());
     }
 
@@ -48,6 +48,62 @@ class ClientEntity extends Model
             'attributes'     => json_encode($data['attributes'] ?? [], JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR),
         ]);
         return (int) $this->db->lastInsertId();
+    }
+
+    public function softDelete(int $id): bool
+    {
+        $stmt = $this->db->prepare("UPDATE client_entities SET deleted_at = NOW() WHERE id = :id");
+        $success = $stmt->execute(['id' => $id]);
+        if ($success) {
+            $this->db->prepare("UPDATE entity_directors SET deleted_at = NOW() WHERE entity_id = :entity_id")->execute(['entity_id' => $id]);
+            $this->db->prepare("UPDATE documents SET deleted_at = NOW() WHERE entity_id = :entity_id")->execute(['entity_id' => $id]);
+            $this->db->prepare("UPDATE document_requests SET deleted_at = NOW() WHERE entity_id = :entity_id")->execute(['entity_id' => $id]);
+            $this->db->prepare("UPDATE messages SET deleted_at = NOW() WHERE entity_id = :entity_id")->execute(['entity_id' => $id]);
+            $this->db->prepare("UPDATE deadlines SET deleted_at = NOW() WHERE entity_id = :entity_id")->execute(['entity_id' => $id]);
+        }
+        return $success;
+    }
+
+    public function bulkSoftDelete(array $ids): int
+    {
+        $count = 0;
+        foreach ($ids as $id) {
+            if ($this->softDelete((int)$id)) {
+                $count++;
+            }
+        }
+        return $count;
+    }
+
+    public function restore(int $id): bool
+    {
+        $stmt = $this->db->prepare("UPDATE client_entities SET deleted_at = NULL WHERE id = :id");
+        $success = $stmt->execute(['id' => $id]);
+        if ($success) {
+            $this->db->prepare("UPDATE entity_directors SET deleted_at = NULL WHERE entity_id = :entity_id")->execute(['entity_id' => $id]);
+            $this->db->prepare("UPDATE documents SET deleted_at = NULL WHERE entity_id = :entity_id")->execute(['entity_id' => $id]);
+            $this->db->prepare("UPDATE document_requests SET deleted_at = NULL WHERE entity_id = :entity_id")->execute(['entity_id' => $id]);
+            $this->db->prepare("UPDATE messages SET deleted_at = NULL WHERE entity_id = :entity_id")->execute(['entity_id' => $id]);
+            $this->db->prepare("UPDATE deadlines SET deleted_at = NULL WHERE entity_id = :entity_id")->execute(['entity_id' => $id]);
+        }
+        return $success;
+    }
+
+    public function bulkRestore(array $ids): int
+    {
+        $count = 0;
+        foreach ($ids as $id) {
+            if ($this->restore((int)$id)) {
+                $count++;
+            }
+        }
+        return $count;
+    }
+
+    public function getSoftDeleted(): array
+    {
+        $stmt = $this->db->query("SELECT e.*, u.name AS client_name FROM client_entities e JOIN clients c ON c.id=e.client_id JOIN users u ON u.id=c.user_id WHERE e.deleted_at IS NOT NULL ORDER BY e.deleted_at DESC");
+        return array_map([$this, 'hydrate'], $stmt->fetchAll());
     }
 
     private function hydrate(array $row): array

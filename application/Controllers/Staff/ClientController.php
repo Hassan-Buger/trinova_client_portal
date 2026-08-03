@@ -380,4 +380,48 @@ class ClientController extends Controller
             $this->deadlineModel->create(['client_id'=>$clientId, 'entity_id'=>$entityId, 'scope'=>$entity['entity_scope']??'company', 'type'=>$type, 'due_date'=>$date, 'status'=>'Pending']);
         }
     }
+
+    public function bulkDelete(Request $request, Response $response): void
+    {
+        $rawIds = $request->input('ids', []);
+        $ids = is_array($rawIds) ? array_map('intval', array_filter($rawIds)) : [];
+
+        if (empty($ids)) {
+            if ($request->isAjax()) {
+                $response->json(['success' => false, 'message' => 'No clients selected for deletion.'], 422);
+                return;
+            }
+            Session::setFlash('error', 'No clients selected for deletion.');
+            $response->redirect('/staff/clients');
+            return;
+        }
+
+        $count = $this->clientModel->bulkSoftDelete($ids);
+        if ($count > 0) {
+            \Application\Services\AuditService::log('client_bulk_deleted', 'clients', null, null, ['count' => $count, 'ids' => $ids]);
+            $msg = "{$count} client account(s) deleted successfully.";
+            if ($request->isAjax()) {
+                $response->json(['success' => true, 'message' => $msg, 'redirect' => '/staff/clients']);
+                return;
+            }
+            Session::setFlash('success', $msg);
+        }
+        $response->redirect('/staff/clients');
+    }
+
+    public function deleteEntity(Request $request, Response $response): void
+    {
+        $body = $request->getBody();
+        $entityId = (int)($body['entity_id'] ?? 0);
+        $clientId = (int)($body['client_id'] ?? 0);
+
+        if ($entityId > 0 && $this->entityModel->softDelete($entityId)) {
+            \Application\Services\AuditService::log('entity_deleted', 'client_entities', $entityId);
+            Session::setFlash('success', 'Business entity removed.');
+        } else {
+            Session::setFlash('error', 'Failed to remove business entity.');
+        }
+
+        $response->redirect('/staff/clients/' . $clientId);
+    }
 }

@@ -115,8 +115,34 @@
         </div>
     </div>
 
+    <!-- Delete Confirmation Modal -->
+    <div id="deleteDocModal" style="display:none;position:fixed;inset:0;background:rgba(20,40,35,.45);backdrop-filter:blur(6px);z-index:199;align-items:center;justify-content:center;padding:20px">
+        <div style="background:#fff;border-radius:24px;width:100%;max-width:440px;padding:32px;box-shadow:0 24px 60px -28px rgba(0,0,0,.4);animation:tnpop .25s ease">
+            <h3 style="margin:0 0 12px;font-size:19px;font-weight:800">Delete Document?</h3>
+            <p style="color:#61756e;font-size:14px;margin:0 0 24px">This document will be soft-deleted and can be restored from the Trash workspace.</p>
+            <form action="/staff/documents/delete" method="POST" data-ajax-form>
+                <input type="hidden" name="csrf_token" value="<?= htmlspecialchars(\Application\Core\Session::csrfToken()) ?>">
+                <input type="hidden" name="document_id" id="deleteDocId">
+                <div style="display:flex;justify-content:flex-end;gap:12px">
+                    <button type="button" onclick="document.getElementById('deleteDocModal').style.display='none'" style="background:#f0f5f3;color:#5f726c;border:none;padding:11px 20px;border-radius:12px;font-weight:700;cursor:pointer">Cancel</button>
+                    <button type="submit" style="background:#dc2626;color:#fff;border:none;padding:11px 22px;border-radius:12px;font-weight:700;cursor:pointer">Delete</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
     <!-- Documents Table -->
     <div style="background:#fff;border-radius:24px;padding:26px;box-shadow:0 1px 2px rgba(16,54,45,.04),0 14px 34px -24px rgba(16,54,45,.4)">
+        <!-- Bulk Action Bar -->
+        <div id="docBulkBar" style="display:none;align-items:center;gap:12px;padding:12px 16px;background:#fff8ee;border-radius:14px;margin-bottom:16px;border:1px solid #f6dfc0">
+            <span id="docBulkCount" style="font-weight:700;color:#e07d24;font-size:13.5px">0 selected</span>
+            <form action="/staff/documents/bulk-delete" method="POST" data-ajax-form id="docBulkForm" style="display:inline">
+                <input type="hidden" name="csrf_token" value="<?= htmlspecialchars(\Application\Core\Session::csrfToken()) ?>">
+                <div id="docBulkIds"></div>
+                <button type="submit" onclick="return confirm('Delete all selected documents? They can be restored from Trash.')" style="background:#dc2626;color:#fff;border:none;padding:8px 18px;border-radius:10px;font-weight:700;font-size:13px;cursor:pointer">Delete Selected</button>
+            </form>
+            <button type="button" onclick="tnDocSelectNone()" style="background:#f0f5f3;color:#5f726c;border:none;padding:8px 14px;border-radius:10px;font-weight:700;font-size:13px;cursor:pointer">Clear</button>
+        </div>
         <?php if (empty($documents)): ?>
             <div style="padding:48px 24px;text-align:center;color:#8a9a94">
                 <?= $activeFilterLabels ? 'No documents match the selected filters.' : 'No documents recorded in the repository.' ?>
@@ -126,6 +152,7 @@
                 <table style="width:100%;border-collapse:collapse;text-align:left">
                     <thead>
                         <tr style="border-bottom:2px solid #eef4f1;color:#7d8e88;font-size:12.5px;text-transform:uppercase;letter-spacing:.05em">
+                            <th style="padding:12px 10px;font-weight:700;width:36px"><input type="checkbox" id="docCheckAll" aria-label="Select all documents" onchange="tnDocToggleAll(this)" style="width:16px;height:16px;cursor:pointer"></th>
                             <th style="padding:12px 16px;font-weight:700">Client</th>
                             <th style="padding:12px 16px;font-weight:700">Filename</th>
                             <th style="padding:12px 16px;font-weight:700">Direction</th>
@@ -138,6 +165,7 @@
                     <tbody>
                         <?php foreach ($documents as $doc): ?>
                             <tr style="border-bottom:1px solid #eef4f1">
+                                <td style="padding:10px 10px"><input type="checkbox" class="tn-doc-check" value="<?= (int)$doc['id'] ?>" aria-label="Select document <?= htmlspecialchars($doc['filename']) ?>" onchange="tnDocUpdateBar()" style="width:16px;height:16px;cursor:pointer"></td>
                                 <td style="padding:16px;font-weight:700;color:#213330">
                                     <?= htmlspecialchars($doc['client_name'] ?? 'Client') ?>
                                 </td>
@@ -166,14 +194,13 @@
                                 <td style="padding:16px;color:#7d8e88;font-size:13px">
                                     <?= date('d M Y, H:i', strtotime($doc['created_at'])) ?>
                                 </td>
-                                <td style="padding:16px;text-align:right">
+                                <td style="padding:16px;text-align:right;white-space:nowrap">
                                     <?php $previewable = in_array(strtolower(pathinfo((string)$doc['filename'], PATHINFO_EXTENSION)), ['pdf', 'png', 'jpg', 'jpeg', 'txt', 'csv'], true); ?>
                                     <?php if ($previewable): ?>
-                                        <a href="/staff/documents/download/<?= (int)$doc['id'] ?>?preview=1" target="_blank" rel="noopener" data-no-ajax data-document-preview data-document-id="<?= (int)$doc['id'] ?>" style="background:#fff;color:#41556f;border:1px solid #dfe8e4;padding:8px 14px;border-radius:10px;font-weight:700;font-size:13px;display:inline-flex;margin-right:6px">View</a>
+                                        <a href="/staff/documents/download/<?= (int)$doc['id'] ?>?preview=1" target="_blank" rel="noopener" data-no-ajax data-document-preview data-document-id="<?= (int)$doc['id'] ?>" style="background:#fff;color:#41556f;border:1px solid #dfe8e4;padding:8px 14px;border-radius:10px;font-weight:700;font-size:13px;display:inline-flex;margin-right:4px">View</a>
                                     <?php endif; ?>
-                                    <a href="/documents/download/<?= $doc['id'] ?>" style="background:#f0f5f3;color:#0d9488;padding:8px 14px;border-radius:10px;font-weight:700;font-size:13px;display:inline-flex;align-items:center;gap:6px">
-                                        Download
-                                    </a>
+                                    <a href="/documents/download/<?= $doc['id'] ?>" style="background:#f0f5f3;color:#0d9488;padding:8px 14px;border-radius:10px;font-weight:700;font-size:13px;display:inline-flex;align-items:center;gap:6px;margin-right:4px">Download</a>
+                                    <button type="button" onclick="tnDocDelete(<?= (int)$doc['id'] ?>)" style="background:#fef2f2;color:#dc2626;border:1px solid #fecaca;padding:8px 12px;border-radius:10px;font-weight:700;font-size:13px;cursor:pointer">Delete</button>
                                 </td>
                             </tr>
                         <?php endforeach; ?>
@@ -213,3 +240,31 @@
         <?php endif; ?>
     </div>
 </div>
+
+<script>
+function tnDocDelete(id) {
+    document.getElementById('deleteDocId').value = id;
+    document.getElementById('deleteDocModal').style.display = 'flex';
+}
+function tnDocToggleAll(el) {
+    document.querySelectorAll('.tn-doc-check').forEach(c => { c.checked = el.checked; });
+    tnDocUpdateBar();
+}
+function tnDocSelectNone() {
+    document.querySelectorAll('.tn-doc-check, #docCheckAll').forEach(c => { c.checked = false; });
+    tnDocUpdateBar();
+}
+function tnDocUpdateBar() {
+    const checked = [...document.querySelectorAll('.tn-doc-check:checked')];
+    const bar = document.getElementById('docBulkBar');
+    document.getElementById('docBulkCount').textContent = checked.length + ' selected';
+    const container = document.getElementById('docBulkIds');
+    container.innerHTML = '';
+    checked.forEach(c => {
+        const inp = document.createElement('input');
+        inp.type = 'hidden'; inp.name = 'ids[]'; inp.value = c.value;
+        container.appendChild(inp);
+    });
+    bar.style.display = checked.length > 0 ? 'flex' : 'none';
+}
+</script>
