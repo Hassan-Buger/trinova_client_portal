@@ -137,7 +137,7 @@ final class DirectorCsvImportService
     private function isComplete(array $data):bool{return trim((string)($data['name']??''))!==''&&filter_var((string)($data['email']??''),FILTER_VALIDATE_EMAIL)!==false&&trim((string)($data['phone']??''))!==''&&trim((string)($data['address']??''))!=='';}
     private function companyIndex():array{
         $index=[];
-        foreach($this->db->query("SELECT id,company_name,company_number,tax_reference FROM client_entities WHERE entity_scope='company' AND company_name IS NOT NULL")->fetchAll() as $row){
+        foreach($this->db->query("SELECT id,company_name,company_number,tax_reference FROM client_entities WHERE company_name IS NOT NULL AND TRIM(company_name) <> '' AND deleted_at IS NULL")->fetchAll() as $row){
             $norm=$this->normalizeCompany((string)$row['company_name']);
             if($norm!==''){$index[$norm][]=$row;}
             if(!empty($row['company_number'])){
