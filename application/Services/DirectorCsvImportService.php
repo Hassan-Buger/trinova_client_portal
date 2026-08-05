@@ -59,16 +59,36 @@ final class DirectorCsvImportService
     public function commit(string $token):array
     {
         SchemaGuard::assertDirectorImporterReady();$draft=$this->readDraft($token);if(!isset($draft['preview']))throw new UserFacingException('Preview the directors CSV before importing it.');$importId=(int)$draft['import_id'];$report=[];
-        $claim=$this->db->prepare("UPDATE client_csv_imports SET status='processing',started_at=NOW() WHERE id=:id AND practice_key=:practice AND import_type='director_csv' AND status='pending'");$claim->execute(['id'=>$importId,'practice'=>$this->practiceKey()]);
-        if($claim->rowCount()!==1){$saved=$this->reportById($importId);return $saved+['duplicate'=>true];}
-        foreach($draft['preview'] as $row){if($row['errors']){$row['result']='Failed';$report[]=$this->reportRow($row);continue;}$this->db->beginTransaction();try{$processed=$this->commitRow($row,$importId);$this->db->commit();$report[]=$this->reportRow($processed);}catch(\Throwable $e){if($this->db->inTransaction())$this->db->rollBack();ErrorHandler::report(new \RuntimeException('Director import row '.$row['line'].' failed; import '.$importId,0,$e));$row['result']='Failed';$row['errors'][]='This row could not be imported safely.';$report[]=$this->reportRow($row);}}
-        $summary=$this->summary($report);$result=['import_id'=>$importId,'filename'=>$draft['filename'],'completed_at'=>date('c'),'summary'=>$summary,'rows'=>$report];$status=$summary['failed']>0?'partially_completed':'completed';
-        $stmt=$this->db->prepare("UPDATE client_csv_imports SET status=:status,completed_at=NOW(),total_rows=:total,created_count=:created,updated_count=:updated,skipped_count=:skipped,flagged_count=:flagged,failed_count=:failed,report_json=:report,safe_error=NULL WHERE id=:id AND practice_key=:practice AND import_type='director_csv'");$stmt->execute(['status'=>$status,'total'=>$summary['total'],'created'=>$summary['directors_created'],'updated'=>$summary['directors_updated']+$summary['placeholders_upgraded'],'skipped'=>$summary['rows_skipped'],'flagged'=>$summary['rows_flagged'],'failed'=>$summary['failed'],'report'=>json_encode($result,JSON_UNESCAPED_UNICODE|JSON_UNESCAPED_SLASHES|JSON_THROW_ON_ERROR),'id'=>$importId,'practice'=>$this->practiceKey()]);
-        try{AuditService::log('director_csv_import_completed','client_csv_imports',$importId,null,['import_id'=>$importId,'total'=>$summary['total'],'created'=>$summary['directors_created'],'updated'=>$summary['directors_updated'],'flagged'=>$summary['rows_flagged'],'failed'=>$summary['failed']]);}catch(\Throwable $e){ErrorHandler::report($e);}
-        $draft['report']=$result;$this->writeDraft($token,$draft);return $result+['token'=>$token];
+        try {
+            $claim=$this->db->prepare("UPDATE client_csv_imports SET status='processing',started_at=NOW() WHERE id=:id AND practice_key=:practice AND import_type='director_csv' AND status='pending'");$claim->execute(['id'=>$importId,'practice'=>$this->practiceKey()]);
+            if($claim->rowCount()!==1){$saved=$this->reportById($importId);return $saved+['duplicate'=>true];}
+            foreach($draft['preview'] as $row){if($row['errors']){$row['result']='Failed';$report[]=$this->reportRow($row);continue;}$this->db->beginTransaction();try{$processed=$this->commitRow($row,$importId);$this->db->commit();$report[]=$this->reportRow($processed);}catch(\Throwable $e){if($this->db->inTransaction())$this->db->rollBack();ErrorHandler::report(new \RuntimeException('Director import row '.$row['line'].' failed; import '.$importId,0,$e));$row['result']='Failed';$row['errors'][]='This row could not be imported safely.';$report[]=$this->reportRow($row);}}
+            $summary=$this->summary($report);$result=['import_id'=>$importId,'filename'=>$draft['filename'],'completed_at'=>date('c'),'summary'=>$summary,'rows'=>$report];$status=$summary['failed']>0?'partially_completed':'completed';
+            $stmt=$this->db->prepare("UPDATE client_csv_imports SET status=:status,completed_at=NOW(),total_rows=:total,created_count=:created,updated_count=:updated,skipped_count=:skipped,flagged_count=:flagged,failed_count=:failed,report_json=:report,safe_error=NULL WHERE id=:id AND practice_key=:practice AND import_type='director_csv'");$stmt->execute(['status'=>$status,'total'=>$summary['total'],'created'=>$summary['directors_created'],'updated'=>$summary['directors_updated']+$summary['placeholders_upgraded'],'skipped'=>$summary['rows_skipped'],'flagged'=>$summary['rows_flagged'],'failed'=>$summary['failed'],'report'=>json_encode($result,JSON_UNESCAPED_UNICODE|JSON_UNESCAPED_SLASHES|JSON_THROW_ON_ERROR),'id'=>$importId,'practice'=>$this->practiceKey()]);
+            try{AuditService::log('director_csv_import_completed','client_csv_imports',$importId,null,['import_id'=>$importId,'total'=>$summary['total'],'created'=>$summary['directors_created'],'updated'=>$summary['directors_updated'],'flagged'=>$summary['rows_flagged'],'failed'=>$summary['failed']]);}catch(\Throwable $e){ErrorHandler::report($e);}
+            $draft['report']=$result;$this->writeDraft($token,$draft);return $result+['token'=>$token];
+        }catch(\Throwable $e){
+            if($this->db->inTransaction())$this->db->rollBack();
+            $this->failImport($importId,'The directors import could not be completed safely. Please review the file and try again.');
+            ErrorHandler::report(new \RuntimeException('Director CSV commit failed for import '.$importId.'; Cause: '.$e->getMessage(),0,$e));
+            throw $e;
+        }
     }
 
-    public function reportById(int $id):array{$stmt=$this->db->prepare("SELECT report_json FROM client_csv_imports WHERE id=:id AND practice_key=:practice AND import_type='director_csv' AND status IN('completed','partially_completed')");$stmt->execute(['id'=>$id,'practice'=>$this->practiceKey()]);$json=$stmt->fetchColumn();$report=$json?json_decode((string)$json,true):null;if(!is_array($report))throw new UserFacingException('The requested Directors Import Report is unavailable.');return $report;}
+    public function reportById(int $id):array{
+        $stmt=$this->db->prepare("SELECT report_json,status,safe_error FROM client_csv_imports WHERE id=:id AND practice_key=:practice AND import_type='director_csv'");
+        $stmt->execute(['id'=>$id,'practice'=>$this->practiceKey()]);$row=$stmt->fetch();
+        if(!$row)throw new UserFacingException('The requested Directors Import Report is unavailable.');
+        $json=$row['report_json']??null;$report=$json?json_decode((string)$json,true):null;
+        if(!is_array($report)){
+            if($row['status']==='failed')return ['import_id'=>$id,'status'=>'failed','error'=>$row['safe_error']??'Import failed'];
+            throw new UserFacingException('The requested Directors Import Report is unavailable.');
+        }
+        return $report;
+    }
+
+    private function failImport(int $id,string $message):void{if($id<1)return;try{$this->db->prepare("UPDATE client_csv_imports SET status='failed',safe_error=:error,completed_at=NOW() WHERE id=:id AND status<>'completed'")->execute(['error'=>$message,'id'=>$id]);}catch(\Throwable $ignored){}}
+
 
     private function planRow(int $line,array $data,bool $malformed,array $index):array
     {
@@ -172,7 +192,19 @@ final class DirectorCsvImportService
         sort($normalized);
         return hash('sha256',json_encode($normalized,JSON_UNESCAPED_UNICODE|JSON_THROW_ON_ERROR));
     }
-    private function reserve(string $fileHash,string $contentHash,string $filename,int $rows,string $token):array{$existing=$this->findImport($fileHash,$contentHash);if($existing&&$existing['status']!=='failed')return ['duplicate'=>true,'record'=>$existing];if($existing){$stmt=$this->db->prepare("UPDATE client_csv_imports SET file_hash=:file,content_hash=:content,original_filename=:filename,created_by_user_id=:user,draft_token=:token,status='pending',total_rows=:rows,report_json=NULL,safe_error=NULL,started_at=NULL,completed_at=NULL WHERE id=:id AND status='failed'");$stmt->execute(['file'=>$fileHash,'content'=>$contentHash,'filename'=>$filename,'user'=>(int)Session::get('user_id'),'token'=>$token,'rows'=>$rows,'id'=>$existing['id']]);return ['duplicate'=>false,'record'=>['id'=>(int)$existing['id']]];}try{$stmt=$this->db->prepare("INSERT INTO client_csv_imports(practice_key,import_type,file_hash,content_hash,original_filename,created_by_user_id,draft_token,status,total_rows) VALUES(:practice,'director_csv',:file,:content,:filename,:user,:token,'pending',:rows)");$stmt->execute(['practice'=>$this->practiceKey(),'file'=>$fileHash,'content'=>$contentHash,'filename'=>$filename,'user'=>(int)Session::get('user_id'),'token'=>$token,'rows'=>$rows]);return ['duplicate'=>false,'record'=>['id'=>(int)$this->db->lastInsertId()]];}catch(PDOException $e){if($e->getCode()!=='23000')throw $e;$existing=$this->findImport($fileHash,$contentHash);if(!$existing)throw $e;return ['duplicate'=>true,'record'=>$existing];}}
+    private function reserve(string $fileHash,string $contentHash,string $filename,int $rows,string $token):array{
+        $existing=$this->findImport($fileHash,$contentHash);
+        if($existing){
+            $isStale = in_array($existing['status'],['pending','processing'],true) && (strtotime((string)($existing['updated_at']??'')) < time() - 900);
+            if($existing['status']==='failed' || $isStale){
+                $stmt=$this->db->prepare("UPDATE client_csv_imports SET file_hash=:file,content_hash=:content,original_filename=:filename,created_by_user_id=:user,draft_token=:token,status='pending',total_rows=:rows,report_json=NULL,safe_error=NULL,started_at=NULL,completed_at=NULL WHERE id=:id");
+                $stmt->execute(['file'=>$fileHash,'content'=>$contentHash,'filename'=>$filename,'user'=>(int)Session::get('user_id'),'token'=>$token,'rows'=>$rows,'id'=>$existing['id']]);
+                return ['duplicate'=>false,'record'=>['id'=>(int)$existing['id']]];
+            }
+            return ['duplicate'=>true,'record'=>$existing];
+        }
+        try{$stmt=$this->db->prepare("INSERT INTO client_csv_imports(practice_key,import_type,file_hash,content_hash,original_filename,created_by_user_id,draft_token,status,total_rows) VALUES(:practice,'director_csv',:file,:content,:filename,:user,:token,'pending',:rows)");$stmt->execute(['practice'=>$this->practiceKey(),'file'=>$fileHash,'content'=>$contentHash,'filename'=>$filename,'user'=>(int)Session::get('user_id'),'token'=>$token,'rows'=>$rows]);return ['duplicate'=>false,'record'=>['id'=>(int)$this->db->lastInsertId()]];}catch(PDOException $e){if($e->getCode()!=='23000')throw $e;$existing=$this->findImport($fileHash,$contentHash);if(!$existing)throw $e;return ['duplicate'=>true,'record'=>$existing];}
+    }
     private function findImport(string $file,string $content):?array{$stmt=$this->db->prepare("SELECT i.*,u.name imported_by FROM client_csv_imports i LEFT JOIN users u ON u.id=i.created_by_user_id WHERE i.practice_key=:practice AND i.import_type='director_csv' AND(i.file_hash=:file OR i.content_hash=:content) ORDER BY i.id DESC LIMIT 1");$stmt->execute(['practice'=>$this->practiceKey(),'file'=>$file,'content'=>$content]);return $stmt->fetch()?:null;}
     private function duplicateDetails(array $r):array{return ['id'=>(int)$r['id'],'status'=>$r['status'],'filename'=>$r['original_filename'],'imported_by'=>$r['imported_by']??'Staff user','completed_at'=>$r['completed_at']??null,'report_url'=>in_array($r['status'],['completed','partially_completed'],true)?'/staff/directors/import/report/'.(int)$r['id']:null];}
     private function summary(array $rows):array{$s=['total'=>count($rows),'directors_created'=>0,'directors_updated'=>0,'placeholders_upgraded'=>0,'directors_reused'=>0,'links_created'=>0,'links_reused'=>0,'rows_flagged'=>0,'rows_skipped'=>0,'failed'=>0,'companies_not_found'=>0,'ambiguous_companies'=>0,'needing_details'=>0];foreach($rows as $r){$m=$r['metrics']??[];$s['directors_created']+=(int)($m['created']??0);$s['directors_updated']+=(int)($m['updated']??0);$s['placeholders_upgraded']+=(int)($m['upgraded']??0);$s['directors_reused']+=(int)($m['reused']??0);$s['links_created']+=(int)($m['links_created']??0);$s['links_reused']+=(int)($m['links_reused']??0);$s['needing_details']+=(int)($m['needs']??0);$s['companies_not_found']+=count($r['not_found']??[]);$s['ambiguous_companies']+=count($r['ambiguous']??[]);if($r['warnings']??[])$s['rows_flagged']++;if(($r['result']??'')==='Failed')$s['failed']++;if(($r['result']??'')==='Manual review required')$s['rows_skipped']++;}return $s;}
