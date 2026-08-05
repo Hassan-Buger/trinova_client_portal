@@ -24,7 +24,7 @@ final class DirectorCsvImportService
         $handle=fopen((string)$file['tmp_name'],'rb');if(!$handle)throw new UserFacingException('The directors CSV could not be read.');
         [$headers,$headerLine]=$this->findHeaders($handle);$mapping=DirectorCsv::mapping($headers);
         if(!isset($mapping['name'],$mapping['companies'])){fclose($handle);throw new UserFacingException('The selected file does not contain the required Director Name and Linked Company/ies columns.');}
-        $rows=[];$line=$headerLine;while(($values=fgetcsv($handle))!==false){$line++;if(count($rows)>=DirectorCsv::MAX_ROWS){fclose($handle);throw new UserFacingException('The directors CSV exceeds the 5,000 row limit.');}if(!array_filter($values,fn($v)=>trim((string)$v)!==''))continue;$rows[]=['line'=>$line,'malformed'=>count($values)!==count($headers),'values'=>array_map(fn($v)=>trim((string)$v),$values)];}fclose($handle);
+        $rows=[];$line=$headerLine;while(($values=fgetcsv($handle))!==false){$line++;if(count($rows)>=DirectorCsv::MAX_ROWS){fclose($handle);throw new UserFacingException('The directors CSV exceeds the 5,000 row limit.');}if(!array_filter($values,fn($v)=>trim((string)$v)!==''))continue;$rows[]=['line'=>$line,'malformed'=>count($values)!==count($headers),'values'=>array_map(fn($v)=>$this->sanitizeString((string)$v),$values)];}fclose($handle);
         if(!$rows)throw new UserFacingException('The directors CSV contains no data rows.');
         $contentHash=$this->contentHash($headers,$rows);$token=bin2hex(random_bytes(24));$reservation=$this->reserve($rawHash,$contentHash,basename((string)$file['name']),count($rows),$token);
         if($reservation['duplicate'])return ['duplicate'=>true,'existing'=>$this->duplicateDetails($reservation['record'])];
@@ -35,7 +35,24 @@ final class DirectorCsvImportService
     public function preview(string $token):array
     {
         SchemaGuard::assertDirectorImporterReady();$draft=$this->readDraft($token);$companies=$this->companyIndex();$planned=[];
-        foreach($draft['rows'] as $raw){$data=[];foreach(DirectorCsv::fields() as $key=>$definition)$data[$key]=isset($draft['mapping'][$key])?trim((string)($raw['values'][$draft['mapping'][$key]]??'')):'';$planned[]=$this->planRow((int)$raw['line'],$data,!empty($raw['malformed']),$companies);}
+        foreach($draft['rows'] as $raw){
+            $data=[];
+            foreach(DirectorCsv::fields() as $key=>$definition){
+                if($key==='companies'){
+                    $indices=is_array($draft['mapping']['companies']??null)?$draft['mapping']['companies']:(isset($draft['mapping']['companies'])?[$draft['mapping']['companies']]:[]);
+                    $vals=[];
+                    foreach($indices as $idx){
+                        $val=$this->sanitizeString((string)($raw['values'][$idx]??''));
+                        if($val!==''){$vals[]=$val;}
+                    }
+                    $data['companies']=implode('; ',array_unique($vals));
+                }else{
+                    $idx=$draft['mapping'][$key]??null;
+                    $data[$key]=$idx!==null?$this->sanitizeString((string)($raw['values'][$idx]??'')):'';
+                }
+            }
+            $planned[]=$this->planRow((int)$raw['line'],$data,!empty($raw['malformed']),$companies);
+        }
         $draft['preview']=$planned;$this->writeDraft($token,$draft);return ['token'=>$token,'filename'=>$draft['filename'],'rows'=>$planned,'summary'=>$this->summary($planned)];
     }
 
@@ -58,7 +75,21 @@ final class DirectorCsvImportService
         $errors=[];$warnings=[];$matches=[];$notFound=[];$ambiguous=[];
         if($malformed)$errors[]='Column count does not match the header.';if($data['name']==='')$errors[]='Director Name is required.';if($data['companies']==='')$errors[]='Linked Company/ies is required.';
         if($data['email']!==''&&!filter_var($data['email'],FILTER_VALIDATE_EMAIL)){$warnings[]='Email address is invalid and will not be imported.';$data['email']='';}
-        foreach($this->companyNames($data['companies']) as $company){$key=$this->normalizeCompany($company);$ids=$index[$key]??[];if(count($ids)===1)$matches[]=['id'=>(int)$ids[0]['id'],'name'=>(string)$ids[0]['company_name'],'input'=>$company];elseif(count($ids)>1)$ambiguous[]=$company;else $notFound[]=$company;}
+        $matchedIds=[];
+        foreach($this->companyNames($data['companies']) as $company){
+            $key=$this->normalizeCompany($company);
+            $ids=$index[$key]??[];
+            if(!$ids && preg_match('/^[a-z0-9]{6,10}$/i', $company)){
+                $ids = $index['num:'.strtolower($company)] ?? [];
+            }
+            if(count($ids)===1){
+                $entityId=(int)$ids[0]['id'];
+                if(!isset($matchedIds[$entityId])){
+                    $matchedIds[$entityId]=true;
+                    $matches[]=['id'=>$entityId,'name'=>(string)$ids[0]['company_name'],'input'=>$company];
+                }
+            }elseif(count($ids)>1){$ambiguous[]=$company;}else{$notFound[]=$company;}
+        }
         if(!$matches)$warnings[]='No company could be linked; no director will be created.';foreach($notFound as $name)$warnings[]='Linked company not found: '.$name;foreach($ambiguous as $name)$warnings[]='Multiple matching companies found for '.$name.'. Manual review is required.';
         return ['line'=>$line,'data'=>$data,'companies'=>$matches,'not_found'=>$notFound,'ambiguous'=>$ambiguous,'result'=>'Planned','director_result'=>'Pending','link_result'=>'Pending','profile_status'=>'Pending','warnings'=>$warnings,'errors'=>$errors];
     }
@@ -84,14 +115,63 @@ final class DirectorCsvImportService
     private function profileChanges(array $current,array $data):array{$map=['original_full_name'=>'name','email'=>'email','phone'=>'phone','director_utr'=>'utr','address'=>'address','id_number'=>'id_number','ch_verification_number'=>'verification_number'];$changes=[];foreach($map as $column=>$key)if(trim((string)($current[$column]??''))===''&&$data[$key]!=='')$changes[$column]=$data[$key];$merged=array_merge($current,$changes);$needed=$this->isComplete(['name'=>$merged['name']??$data['name'],'email'=>$merged['email']??'','phone'=>$merged['phone']??'','address'=>$merged['address']??''])?0:1;if((int)($current['needs_contact_details']??1)!==$needed)$changes['needs_contact_details']=$needed;return $changes;}
     private function updateContact(int $id,array $changes,int $import):void{$allowed=['original_full_name','email','phone','director_utr','address','id_number','ch_verification_number','needs_contact_details'];$set=[];$params=['id'=>$id,'import'=>$import];foreach($changes as $column=>$value)if(in_array($column,$allowed,true)){$set[]="$column=:$column";$params[$column]=$value;}$set[]='last_director_import_id=:import';$this->db->prepare('UPDATE entity_contacts SET '.implode(',',$set).' WHERE id=:id')->execute($params);}
     private function isComplete(array $data):bool{return trim((string)($data['name']??''))!==''&&filter_var((string)($data['email']??''),FILTER_VALIDATE_EMAIL)!==false&&trim((string)($data['phone']??''))!==''&&trim((string)($data['address']??''))!=='';}
-    private function companyIndex():array{$index=[];foreach($this->db->query("SELECT id,company_name FROM client_entities WHERE entity_scope='company' AND company_name IS NOT NULL")->fetchAll() as $row)$index[$this->normalizeCompany((string)$row['company_name'])][]=$row;return $index;}
-    private function companyNames(string $value):array{return array_values(array_unique(array_filter(array_map('trim',preg_split('/[;|\r\n]+/u',$value)?:[]))));}
-    private function normalizeCompany(string $value):string{$value=strtolower(trim($value));$value=preg_replace('/\blimited\b/u','ltd',$value);return trim(preg_replace('/[^a-z0-9]+/u',' ',$value)??'');}
-    private function normalizePerson(string $value):string{return trim(preg_replace('/[^a-z0-9]+/u',' ',strtolower($value))??'');}
+    private function companyIndex():array{
+        $index=[];
+        foreach($this->db->query("SELECT id,company_name,company_number,tax_reference FROM client_entities WHERE entity_scope='company' AND company_name IS NOT NULL")->fetchAll() as $row){
+            $norm=$this->normalizeCompany((string)$row['company_name']);
+            if($norm!==''){$index[$norm][]=$row;}
+            if(!empty($row['company_number'])){
+                $normNum=strtolower(trim((string)$row['company_number']));
+                if($normNum!==''){$index['num:'.$normNum][]=$row;}
+            }
+        }
+        return $index;
+    }
+    private function companyNames(string $value):array{
+        $names=preg_split('/[;|\r\n]+/u',$value)?:[];
+        $clean=[];
+        foreach($names as $n){
+            $s=$this->sanitizeString((string)$n);
+            if($s!==''){$clean[]=$s;}
+        }
+        return array_values(array_unique($clean));
+    }
+    private function sanitizeString(string $value):string{
+        $value=str_replace(["\xEF\xBB\xBF","\t"],['',' '],$value);
+        $value=preg_replace('/[\x00-\x1F\x7F\x80-\x9F]/u','',$value)??$value;
+        return trim(preg_replace('/\s+/u',' ',$value)??'');
+    }
+    private function normalizeCompany(string $value):string{$value=strtolower($this->sanitizeString($value));$value=preg_replace('/\blimited\b/u','ltd',$value);return trim(preg_replace('/[^a-z0-9]+/u',' ',$value)??'');}
+    private function normalizePerson(string $value):string{return trim(preg_replace('/[^a-z0-9]+/u',' ',strtolower($this->sanitizeString($value)))??'');}
     private function identifier(string $value):string{return strtoupper(preg_replace('/[^A-Za-z0-9]/','',$value)??'');}
 
-    private function findHeaders($handle):array{for($line=1;$line<=10&&($row=fgetcsv($handle))!==false;$line++){$headers=array_map(fn($v)=>trim((string)$v," \t\n\r\0\x0B\xEF\xBB\xBF"),$row);$map=DirectorCsv::mapping($headers);if(isset($map['name'],$map['companies']))return [$headers,$line];}throw new UserFacingException('The selected file does not contain the required director columns.');}
-    private function contentHash(array $headers,array $rows):string{$map=DirectorCsv::mapping($headers);$normalized=[];foreach($rows as $row){$record=[];foreach(DirectorCsv::fields() as $key=>$f)if(isset($map[$key]))$record[$key]=strtolower(preg_replace('/\s+/u',' ',trim((string)($row['values'][$map[$key]]??'')))??'');ksort($record);$normalized[]=json_encode($record,JSON_UNESCAPED_UNICODE|JSON_THROW_ON_ERROR);}sort($normalized);return hash('sha256',json_encode($normalized,JSON_UNESCAPED_UNICODE|JSON_THROW_ON_ERROR));}
+    private function findHeaders($handle):array{for($line=1;$line<=10&&($row=fgetcsv($handle))!==false;$line++){$headers=array_map(fn($v)=>$this->sanitizeString((string)$v),$row);$map=DirectorCsv::mapping($headers);if(isset($map['name'],$map['companies']))return [$headers,$line];}throw new UserFacingException('The selected file does not contain the required director columns.');}
+    private function contentHash(array $headers,array $rows):string{
+        $map=DirectorCsv::mapping($headers);
+        $normalized=[];
+        foreach($rows as $row){
+            $record=[];
+            foreach(DirectorCsv::fields() as $key=>$f){
+                if(isset($map[$key])){
+                    if($key==='companies'){
+                        $indices=is_array($map['companies'])?$map['companies']:[$map['companies']];
+                        $vals=[];
+                        foreach($indices as $idx){
+                            $v=strtolower(preg_replace('/\s+/u',' ',$this->sanitizeString((string)($row['values'][$idx]??'')))??'');
+                            if($v!==''){$vals[]=$v;}
+                        }
+                        $record[$key]=implode('; ',array_unique($vals));
+                    }else{
+                        $record[$key]=strtolower(preg_replace('/\s+/u',' ',$this->sanitizeString((string)($row['values'][$map[$key]]??'')))??'');
+                    }
+                }
+            }
+            ksort($record);
+            $normalized[]=json_encode($record,JSON_UNESCAPED_UNICODE|JSON_THROW_ON_ERROR);
+        }
+        sort($normalized);
+        return hash('sha256',json_encode($normalized,JSON_UNESCAPED_UNICODE|JSON_THROW_ON_ERROR));
+    }
     private function reserve(string $fileHash,string $contentHash,string $filename,int $rows,string $token):array{$existing=$this->findImport($fileHash,$contentHash);if($existing&&$existing['status']!=='failed')return ['duplicate'=>true,'record'=>$existing];if($existing){$stmt=$this->db->prepare("UPDATE client_csv_imports SET file_hash=:file,content_hash=:content,original_filename=:filename,created_by_user_id=:user,draft_token=:token,status='pending',total_rows=:rows,report_json=NULL,safe_error=NULL,started_at=NULL,completed_at=NULL WHERE id=:id AND status='failed'");$stmt->execute(['file'=>$fileHash,'content'=>$contentHash,'filename'=>$filename,'user'=>(int)Session::get('user_id'),'token'=>$token,'rows'=>$rows,'id'=>$existing['id']]);return ['duplicate'=>false,'record'=>['id'=>(int)$existing['id']]];}try{$stmt=$this->db->prepare("INSERT INTO client_csv_imports(practice_key,import_type,file_hash,content_hash,original_filename,created_by_user_id,draft_token,status,total_rows) VALUES(:practice,'director_csv',:file,:content,:filename,:user,:token,'pending',:rows)");$stmt->execute(['practice'=>$this->practiceKey(),'file'=>$fileHash,'content'=>$contentHash,'filename'=>$filename,'user'=>(int)Session::get('user_id'),'token'=>$token,'rows'=>$rows]);return ['duplicate'=>false,'record'=>['id'=>(int)$this->db->lastInsertId()]];}catch(PDOException $e){if($e->getCode()!=='23000')throw $e;$existing=$this->findImport($fileHash,$contentHash);if(!$existing)throw $e;return ['duplicate'=>true,'record'=>$existing];}}
     private function findImport(string $file,string $content):?array{$stmt=$this->db->prepare("SELECT i.*,u.name imported_by FROM client_csv_imports i LEFT JOIN users u ON u.id=i.created_by_user_id WHERE i.practice_key=:practice AND i.import_type='director_csv' AND(i.file_hash=:file OR i.content_hash=:content) ORDER BY i.id DESC LIMIT 1");$stmt->execute(['practice'=>$this->practiceKey(),'file'=>$file,'content'=>$content]);return $stmt->fetch()?:null;}
     private function duplicateDetails(array $r):array{return ['id'=>(int)$r['id'],'status'=>$r['status'],'filename'=>$r['original_filename'],'imported_by'=>$r['imported_by']??'Staff user','completed_at'=>$r['completed_at']??null,'report_url'=>in_array($r['status'],['completed','partially_completed'],true)?'/staff/directors/import/report/'.(int)$r['id']:null];}

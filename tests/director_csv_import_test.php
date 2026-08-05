@@ -40,4 +40,14 @@ $existing=array_merge($placeholder,['email'=>'kept@example.invalid','phone'=>'07
 ok(!isset($changes['email'],$changes['phone']),'Blank CSV values overwrite reliable profile data.');
 $safe=$call('reportRow',[['data'=>$data,'line'=>3]]);
 ok(array_keys($safe['data'])===['name','companies']&&!str_contains(json_encode($safe),'0012345678'),'Sensitive values remain in persistent reports.');
-echo "Directors Importer structural and header tests passed.\n";
+
+// Test multi-column duplicate headers mapping (5 company name columns)
+$multiHeaders=DirectorCsv::mapping(['Director Name','UTR','company name','company name','company name','company name','company name']);
+ok(is_array($multiHeaders['companies'])&&count($multiHeaders['companies'])===5&&$multiHeaders['companies']===[2,3,4,5,6],'Multiple duplicate company name columns were not all captured.');
+
+// Test tab and whitespace sanitization
+ok($call('sanitizeString',["Kevin Gardiner\t\t"])==='Kevin Gardiner','Embedded trailing tabs were not sanitized.');
+ok($call('normalizeCompany',[" Trinova Accounting\t\t "])==='trinova accounting','Tab sanitization failed during company normalization.');
+
+echo "Directors Importer structural, multi-header, tab sanitization, and company linking tests passed.\n";
+
