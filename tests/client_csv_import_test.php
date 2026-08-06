@@ -134,7 +134,11 @@ expect(str_contains($source,"\$this->commitStage='updating_company_record'"),'Ma
 expect(str_contains($source,"\$row['database_state']=(string)\$e->getCode()"),'Database failures do not expose a safe SQLSTATE diagnostic.');
 expect(!str_contains($source,"company_number=CASE WHEN :number"),'Matched-company updates still use the fragile combined conditional statement.');
 expect(str_contains($source,"Nothing from this row was saved.")&&str_contains($source,"Reference '.\$reference"),'Technical row failures are not reported safely.');
-expect(str_contains($source,'failed_count>=total_rows'),'A previously all-failed CSV cannot be retried under the warning-only validation policy.');
+expect(str_contains($source,'$allRowsFailed=')&&str_contains($source,"(int)(\$existing['failed_count']??0)>=(int)\$existing['total_rows']"),'A previously all-failed CSV cannot be retried under the warning-only validation policy.');
+expect(str_contains($source,'completedImportTargetsAreInactive'),'A completed CSV cannot be retried after all of its imported targets are removed.');
+expect(str_contains($source,"['created', 'updated']"),'Retry target detection does not cover both newly created and matched companies.');
+expect(str_contains($source,'e.deleted_at IS NULL AND c.deleted_at IS NULL AND u.deleted_at IS NULL'),'CSV retry safety does not verify that all original company targets are inactive.');
+expect(str_contains($source,'$allRowsFailed||$targetsRemoved'),'Completed-import retry does not combine failed-import and removed-record recovery safely.');
 expect(str_contains($source,"(\$row['result'] ?? '') !== 'created'"),'Batch cleanup is not restricted to companies created by that import.');
 expect(str_contains($source,"practice_key=:practice AND import_type='business_clients' FOR UPDATE"),'Batch deletion is not tenant-scoped and transactionally locked.');
 expect(str_contains($source,"if (!empty(\$batch['deleted_at']))"),'Repeated batch deletion is not idempotent.');

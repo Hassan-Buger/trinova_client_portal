@@ -208,8 +208,10 @@ final class ClientCsvImportService
     {
         $practice=$this->practiceKey();$existing=$this->findTrackedImport($fileHash,$contentHash);
         if($existing){
-            if($existing['status']==='completed'&&(int)($existing['total_rows']??0)>0&&(int)($existing['failed_count']??0)>=(int)$existing['total_rows']){
-                $retry=$this->db->prepare("UPDATE client_csv_imports SET file_hash=:file_hash,content_hash=:content_hash,original_filename=:filename,created_by_user_id=:user,draft_token=:token,status='pending',total_rows=:rows,created_count=0,updated_count=0,skipped_count=0,flagged_count=0,failed_count=0,safe_error=NULL,started_at=NULL,completed_at=NULL,report_json=NULL,deleted_at=NULL WHERE id=:id AND practice_key=:practice AND import_type='business_clients' AND status='completed' AND total_rows>0 AND failed_count>=total_rows");
+            $allRowsFailed=$existing['status']==='completed'&&(int)($existing['total_rows']??0)>0&&(int)($existing['failed_count']??0)>=(int)$existing['total_rows'];
+            $targetsRemoved=$existing['status']==='completed'&&$this->completedImportTargetsAreInactive($existing);
+            if($allRowsFailed||$targetsRemoved){
+                $retry=$this->db->prepare("UPDATE client_csv_imports SET file_hash=:file_hash,content_hash=:content_hash,original_filename=:filename,created_by_user_id=:user,draft_token=:token,status='pending',total_rows=:rows,created_count=0,updated_count=0,skipped_count=0,flagged_count=0,failed_count=0,safe_error=NULL,started_at=NULL,completed_at=NULL,report_json=NULL,deleted_at=NULL WHERE id=:id AND practice_key=:practice AND import_type='business_clients' AND status='completed'");
                 $retry->execute(['file_hash'=>$fileHash,'content_hash'=>$contentHash,'filename'=>$filename,'user'=>$userId?:null,'token'=>$token,'rows'=>$rows,'id'=>$existing['id'],'practice'=>$practice]);
                 if($retry->rowCount()>0)return ['duplicate'=>false,'record'=>['id'=>(int)$existing['id']]];
                 $existing=$this->findTrackedImport($fileHash,$contentHash);
@@ -237,6 +239,29 @@ final class ClientCsvImportService
         return $userId>0
             && ($record['status']??'')==='pending'
             && (int)($record['created_by_user_id']??0)===$userId;
+    }
+
+    private function completedImportTargetsAreInactive(array $record): bool
+    {
+        if (($record['status'] ?? '') !== 'completed') return false;
+        try {
+            $report = $this->decodeReport($record);
+        } catch (\Throwable $e) {
+            return false;
+        }
+
+        $entityIds = [];
+        foreach (($report['rows'] ?? []) as $row) {
+            if (!in_array(($row['result'] ?? ''), ['created', 'updated'], true)) continue;
+            $entityId = (int)($row['entity_id'] ?? 0);
+            if ($entityId > 0) $entityIds[$entityId] = $entityId;
+        }
+        if (!$entityIds) return false;
+
+        $placeholders = implode(',', array_fill(0, count($entityIds), '?'));
+        $stmt = $this->db->prepare("SELECT COUNT(*) FROM client_entities e JOIN clients c ON c.id=e.client_id JOIN users u ON u.id=c.user_id WHERE e.id IN ({$placeholders}) AND e.deleted_at IS NULL AND c.deleted_at IS NULL AND u.deleted_at IS NULL");
+        $stmt->execute(array_values($entityIds));
+        return (int)$stmt->fetchColumn() === 0;
     }
 
     private function duplicateDetails(array $record): array
