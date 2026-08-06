@@ -11,6 +11,8 @@ $diagnosticRows=array_map(static fn(array $row):array=>[
     'result'=>(string)($row['result']??'unknown'),
     'stage'=>(string)(($row['failure_stage']??'')?:((($row['result']??'')==='failed')?'unknown (older report)':'completed')),
     'reference'=>(string)($row['diagnostic_reference']??''),
+    'database_state'=>(string)($row['database_state']??''),
+    'database_driver_code'=>(string)($row['database_driver_code']??''),
     'warnings'=>implode('; ',$row['warnings']??[]),
     'errors'=>implode('; ',$row['errors']??[]),
 ],$result['rows']??[]);

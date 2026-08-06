@@ -102,8 +102,13 @@ final class ClientCsvImportService
                 $row['result']='failed';
                 $row['failure_stage']=$stage;
                 $row['diagnostic_reference']=$reference;
+                if($e instanceof PDOException){
+                    $row['database_state']=(string)$e->getCode();
+                    $row['database_driver_code']=(string)($e->errorInfo[1]??'');
+                }
                 $message=$e instanceof UserFacingException?$e->getMessage():'A database operation failed';
-                $row['errors'][]=$message.' during '.$stage.'. Nothing from this row was saved. Reference '.$reference.'.';
+                $databaseState=!empty($row['database_state'])?' Database state '.$row['database_state'].'.':'';
+                $row['errors'][]=$message.' during '.$stage.'. Nothing from this row was saved.'.$databaseState.' Reference '.$reference.'.';
                 $report[]=$row;
             }
         }
@@ -293,14 +298,31 @@ final class ClientCsvImportService
             if(!empty($entity['client_deleted_at']))(new Client())->restore($clientId);
             elseif(!empty($entity['user_deleted_at']))$this->db->prepare('UPDATE users SET deleted_at=NULL WHERE id=:id')->execute(['id'=>$userId]);
             if(!empty($entity['entity_deleted_at'])&&empty($entity['client_deleted_at']))(new ClientEntity())->restore($entityId);
+            $this->commitStage='encoding_company_attributes';
             $attrs=json_decode((string)($entity['attributes']??'{}'),true)?:[];
             foreach($this->businessAttributes($d) as $k=>$v)if($v['value']!=='')$attrs[$k]=$v;
-            $this->commitStage='updating_matched_company';
-            $this->db->prepare('UPDATE client_entities SET company_name=:name,company_number=CASE WHEN :number<>\'\' THEN :number2 ELSE company_number END,tax_reference=CASE WHEN :utr<>\'\' THEN :utr2 ELSE tax_reference END,attributes=:attrs WHERE id=:id')->execute(['name'=>$companyName,'number'=>$companyNumber,'number2'=>$companyNumber,'utr'=>$utr,'utr2'=>$utr,'attrs'=>json_encode($attrs,JSON_UNESCAPED_UNICODE|JSON_THROW_ON_ERROR),'id'=>$entityId]);
-            $this->db->prepare('UPDATE clients SET phone=CASE WHEN :phone<>\'\' THEN :phone2 ELSE phone END,address=CASE WHEN :address<>\'\' THEN :address2 ELSE address END,notes=CASE WHEN :notes<>\'\' THEN :notes2 ELSE notes END WHERE id=:id')->execute(['phone'=>$d['phone']??'','phone2'=>$d['phone']??'','address'=>$d['address']??'','address2'=>$d['address']??'','notes'=>$d['status_notes']??'','notes2'=>$d['status_notes']??'','id'=>$clientId]);
+            $encodedAttrs=json_encode($attrs,JSON_UNESCAPED_UNICODE|JSON_THROW_ON_ERROR);
+            $entityUpdates=['company_name=:name','attributes=:attrs'];
+            $entityParams=['name'=>$companyName,'attrs'=>$encodedAttrs,'id'=>$entityId];
+            if($companyNumber!==''){$entityUpdates[]='company_number=:company_number';$entityParams['company_number']=$companyNumber;}
+            if($utr!==''){$entityUpdates[]='tax_reference=:tax_reference';$entityParams['tax_reference']=$utr;}
+            $this->commitStage='updating_company_record';
+            $this->db->prepare('UPDATE client_entities SET '.implode(',',$entityUpdates).' WHERE id=:id')->execute($entityParams);
+
+            $clientUpdates=[];$clientParams=['id'=>$clientId];
+            foreach(['phone','address','status_notes'] as $field){
+                $value=trim((string)($d[$field]??''));if($value==='')continue;
+                $column=$field==='status_notes'?'notes':$field;$clientUpdates[]=$column.'=:'.$column;$clientParams[$column]=$value;
+            }
+            if($clientUpdates){$this->commitStage='updating_client_profile';$this->db->prepare('UPDATE clients SET '.implode(',',$clientUpdates).' WHERE id=:id')->execute($clientParams);}
+
+            $this->commitStage='checking_client_email';
             $updateEmail=$this->emailAvailableToUser($suppliedEmail,$userId)?$suppliedEmail:'';
             if($suppliedEmail!==''&&$updateEmail==='')$row['warnings'][]='The supplied email already belongs to another account, so the existing company account email was kept.';
-            $this->db->prepare('UPDATE users SET name=:name,email=CASE WHEN :email<>\'\' THEN :email2 ELSE email END WHERE id=:id')->execute(['name'=>$companyName,'email'=>$updateEmail,'email2'=>$updateEmail,'id'=>$userId]);
+            $userUpdates=['name=:name'];$userParams=['name'=>$companyName,'id'=>$userId];
+            if($updateEmail!==''){$userUpdates[]='email=:email';$userParams['email']=$updateEmail;}
+            $this->commitStage='updating_client_login';
+            $this->db->prepare('UPDATE users SET '.implode(',',$userUpdates).' WHERE id=:id')->execute($userParams);
         }else{
             $this->commitStage='resolving_client_account';
             $user=$this->db->prepare('SELECT u.id,u.role,u.deleted_at,c.id AS client_id,c.deleted_at AS client_deleted_at FROM users u LEFT JOIN clients c ON c.user_id=u.id WHERE u.email=:email LIMIT 1 FOR UPDATE');$user->execute(['email'=>$primaryEmail]);$existingUser=$user->fetch();
@@ -386,7 +408,7 @@ final class ClientCsvImportService
     private function internalEmail(string $companyName):string{$slug=preg_replace('/[^a-z0-9]/','',strtolower($companyName))?:'company';return 'client.'.$slug.'.'.bin2hex(random_bytes(6)).'@trinova.invalid';}
     private function emailAvailableToUser(string $email,int $userId):bool{if($email==='')return false;$stmt=$this->db->prepare('SELECT id FROM users WHERE email=:email AND id<>:id LIMIT 1');$stmt->execute(['email'=>$email,'id'=>$userId]);return !$stmt->fetchColumn();}
     private function diagnosticReference(int $importId,int $line):string{return 'CSV-'.$importId.'-'.$line.'-'.strtoupper(bin2hex(random_bytes(4)));}
-    private function safeStage(string $stage):string{return ['starting_row'=>'starting the row','loading_matched_company'=>'loading the matched company','restoring_matched_company'=>'restoring the matched company','updating_matched_company'=>'updating the matched company','resolving_client_account'=>'resolving the client account','repairing_client_profile'=>'repairing the client profile','restoring_client_account'=>'restoring the client account','creating_client_account'=>'creating the client account','creating_company'=>'creating the company','linking_company_owner'=>'linking the company owner','linking_directors'=>'linking directors','creating_deadlines'=>'creating deadlines','completed'=>'completing the row'][$stage]??'processing the row';}
+    private function safeStage(string $stage):string{return ['starting_row'=>'starting the row','loading_matched_company'=>'loading the matched company','restoring_matched_company'=>'restoring the matched company','encoding_company_attributes'=>'preparing company attributes','updating_company_record'=>'updating the company record','updating_client_profile'=>'updating the client profile','checking_client_email'=>'checking the client email','updating_client_login'=>'updating the client login','resolving_client_account'=>'resolving the client account','repairing_client_profile'=>'repairing the client profile','restoring_client_account'=>'restoring the client account','creating_client_account'=>'creating the client account','creating_company'=>'creating the company','linking_company_owner'=>'linking the company owner','linking_directors'=>'linking directors','creating_deadlines'=>'creating deadlines','completed'=>'completing the row'][$stage]??'processing the row';}
     private function parseDate(string $v):string{$v=trim($v);if($v==='')return '';$v=preg_replace('/^[A-Za-z]{3}\s+/','',$v);foreach(['!d M Y','!j M Y','!Y-m-d','!d/m/Y','!d-m-Y'] as $f){$d=\DateTimeImmutable::createFromFormat($f,$v,new \DateTimeZone('UTC'));if($d&&\DateTimeImmutable::getLastErrors()!==false&&\DateTimeImmutable::getLastErrors()['warning_count']===0&&\DateTimeImmutable::getLastErrors()['error_count']===0)return $d->format('Y-m-d');if($d&&\DateTimeImmutable::getLastErrors()===false)return $d->format('Y-m-d');}return '';}
     private function vatMonths(string $v):array{$map=['jan'=>1,'feb'=>2,'mar'=>3,'apr'=>4,'may'=>5,'jun'=>6,'jul'=>7,'aug'=>8,'sep'=>9,'oct'=>10,'nov'=>11,'dec'=>12];$parts=array_map(fn($p)=>strtolower(substr(trim($p),0,3)),explode('/',$v));if(count($parts)!==4)return [];$months=[];foreach($parts as $p){if(!isset($map[$p]))return [];$months[]=$map[$p];}sort($months);for($i=1;$i<4;$i++)if(($months[$i]-$months[$i-1])!==3)return [];return $months;}
     private function nextVatDeadline(string $pattern):?string{$months=$this->vatMonths($pattern);if(!$months)return null;$today=new \DateTimeImmutable('today',new \DateTimeZone('UTC'));foreach([$today->format('Y'),(string)((int)$today->format('Y')+1)] as $year)foreach($months as $month){$end=(new \DateTimeImmutable(sprintf('%s-%02d-01',$year,$month),new \DateTimeZone('UTC')))->modify('last day of this month');$due=$end->modify('+'.ClientCsv::VAT_DEADLINE_OFFSET_DAYS.' days');if($due>=$today)return $due->format('Y-m-d');}return null;}

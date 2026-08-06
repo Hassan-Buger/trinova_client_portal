@@ -130,7 +130,10 @@ expect(str_contains($source,'Duplicates CSV row {$seen[$key][$id]} by {$key}; da
 expect(str_contains($source,"'accounting_year_end'=>['label'=>'Accounting year end','value'=>\$yearEnd]"),'Invalid accounting-year values are not skipped from canonical attributes.');
 expect(str_contains($source,"\$this->commitStage='repairing_client_profile'"),'An orphaned client login cannot be repaired during import.');
 expect(str_contains($source,"\$row['diagnostic_reference']=\$reference"),'Technical row failures do not include a support reference.');
-expect(str_contains($source,"Nothing from this row was saved. Reference"),'Technical row failures are not reported safely.');
+expect(str_contains($source,"\$this->commitStage='updating_company_record'"),'Matched-company updates are not diagnosed at the company-record operation.');
+expect(str_contains($source,"\$row['database_state']=(string)\$e->getCode()"),'Database failures do not expose a safe SQLSTATE diagnostic.');
+expect(!str_contains($source,"company_number=CASE WHEN :number"),'Matched-company updates still use the fragile combined conditional statement.');
+expect(str_contains($source,"Nothing from this row was saved.")&&str_contains($source,"Reference '.\$reference"),'Technical row failures are not reported safely.');
 expect(str_contains($source,'failed_count>=total_rows'),'A previously all-failed CSV cannot be retried under the warning-only validation policy.');
 expect(str_contains($source,"(\$row['result'] ?? '') !== 'created'"),'Batch cleanup is not restricted to companies created by that import.');
 expect(str_contains($source,"practice_key=:practice AND import_type='business_clients' FOR UPDATE"),'Batch deletion is not tenant-scoped and transactionally locked.');
