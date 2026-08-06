@@ -22,6 +22,9 @@ expect($line===2,'The title row was not skipped.');
 expect((ClientCsv::defaultMapping($detected)['client_name']??null)===0,'BOM/case-insensitive Client Name mapping failed.');
 fclose($stream);
 
+$cleanCsvValue=$reflection->getMethod('cleanCsvValue');
+expect($cleanCsvValue->invoke($service,"office@example.com\xC2\xA0")==='office@example.com','A non-breaking space from spreadsheet CSV export was not removed.');
+
 $uniqueHeaders=$reflection->getMethod('uniqueHeaders');
 $directorColumns=$reflection->getMethod('directorColumns');
 $mergeDirectors=$reflection->getMethod('mergeDirectorColumns');
@@ -101,5 +104,7 @@ expect(str_contains($controllerSource,"'/staff/trash?tab=batches'"),'Successful 
 expect(!str_contains($controllerSource,"'Failed to delete batch.'"),'Batch deletion still hides every failure behind the old generic toast.');
 $databaseSql=file_get_contents(dirname(__DIR__).'/config/database.sql');
 expect(str_contains($databaseSql,'`deleted_at` DATETIME NULL'),'The canonical CSV import schema does not support soft deletion.');
+$schemaGuardSource=file_get_contents(dirname(__DIR__).'/application/Services/SchemaGuard.php');
+expect(str_contains($schemaGuardSource,'self::assertImportBatchDeletionReady();'),'CSV readiness does not verify the soft-delete schema used by import retry and persistence.');
 
 echo "Client CSV focused tests passed\n";

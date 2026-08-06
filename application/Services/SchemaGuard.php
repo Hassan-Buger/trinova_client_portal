@@ -18,6 +18,12 @@ final class SchemaGuard
         }
         $tracking=$db->query("SELECT COUNT(*) FROM information_schema.tables WHERE table_schema=DATABASE() AND table_name='client_csv_imports'")->fetchColumn();
         if(!(int)$tracking)throw new SystemSetupException('Client CSV duplicate-tracking migration is incomplete.');
+
+        // Import retry, matching, commit and batch cleanup all use the soft-delete
+        // columns introduced by the delete-functionality migration.  Checking only
+        // that the tracking table exists allowed an out-of-date production schema
+        // to fail later with a generic database exception.
+        self::assertImportBatchDeletionReady();
     }
 
     public static function assertDirectorImporterReady():void

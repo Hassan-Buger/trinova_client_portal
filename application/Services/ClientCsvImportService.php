@@ -64,7 +64,7 @@ final class ClientCsvImportService
         }
         $identifiers=$this->existingIdentifiers();$preview=[];$seen=[];
         foreach($draft['rows'] as $raw){
-            $data=[];foreach($clean as $key=>$index)$data[$key]=trim((string)($raw['values'][$index]??''));
+            $data=[];foreach($clean as $key=>$index)$data[$key]=$this->cleanCsvValue((string)($raw['values'][$index]??''));
             $data['_source_fields']=[];foreach($draft['headers'] as $index=>$header)$data['_source_fields'][(string)$header]=(string)($raw['values'][$index]??'');
             $planned=$this->validateRow((int)$raw['_line'],$data,!empty($raw['_malformed']),$identifiers);
             foreach(['company_number','utr','vat_number'] as $key){$id=$this->identifier($data[$key]??'');if($id==='')continue;if(isset($seen[$key][$id])){$planned['warnings'][]="Duplicates CSV row {$seen[$key][$id]} by {$key}; database matching will determine whether this company is created or updated.";break;}$seen[$key][$id]=(int)$raw['_line'];}
@@ -126,7 +126,7 @@ final class ClientCsvImportService
     private function findHeaders($handle): array
     {
         for($line=1;$line<=10 && ($candidate=fgetcsv($handle))!==false;$line++){
-            $candidate=array_map(fn($value)=>trim((string)$value," \t\n\r\0\x0B\xEF\xBB\xBF"),$candidate);
+            $candidate=array_map(fn($value)=>$this->cleanCsvValue((string)$value),$candidate);
             $mapping=ClientCsv::defaultMapping($candidate);
             if(isset($mapping['client_name'])&&count($mapping)>=2)return [$candidate,$line];
         }
