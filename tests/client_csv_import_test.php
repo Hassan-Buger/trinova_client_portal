@@ -145,6 +145,8 @@ expect(str_contains($reportViewSource,'name="batch_id"'),'The import report does
 expect(str_contains($mappingViewSource,'console.table(mapping)'),'The mapping page does not expose safe column diagnostics in the console.');
 expect(str_contains($previewViewSource,'console.table(rows)'),'The preview page does not expose row planning diagnostics in the console.');
 expect(str_contains($appJsSource,"[Client CSV Import] request failed"),'AJAX importer failures are not logged to the console.');
+expect(str_contains($appJsSource,"2026.08.07-csv-import-debug-v1.4"),'The console does not expose the current importer build identifier.');
+expect(!str_contains($appJsSource,'8493files-v1.3'),'The obsolete deployment banner can still be mistaken for the latest importer build.');
 expect(str_contains($controllerSource,"'/staff/trash?tab=batches'"),'Successful deletion does not redirect to the CSV batch history in Trash.');
 expect(!str_contains($controllerSource,"'Failed to delete batch.'"),'Batch deletion still hides every failure behind the old generic toast.');
 $databaseSql=file_get_contents(dirname(__DIR__).'/config/database.sql');

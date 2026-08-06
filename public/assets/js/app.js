@@ -6,13 +6,24 @@
 (() => {
     'use strict';
 
+    const portalBuild = '2026.08.07-csv-import-debug-v1.4';
+    const appScriptUrl = document.currentScript?.src
+        || Array.from(document.scripts).find((script) => script.src.includes('/assets/js/app.js'))?.src
+        || '';
+    const assetVersion = appScriptUrl ? new URL(appScriptUrl, window.location.origin).searchParams.get('v') || 'unversioned' : 'unknown';
+
     console.log(
-        '%c TriNova Client Portal %c Build: 8493files-v1.3 %c Deployed & Active ',
+        '%c TriNova Client Portal %c CSV Import Debug v1.4 %c Active ',
         'background:#0d9488;color:#fff;font-weight:bold;padding:3px 6px;border-radius:4px 0 0 4px;',
         'background:#374151;color:#fff;font-weight:bold;padding:3px 6px;',
         'background:#10b981;color:#fff;font-weight:bold;padding:3px 6px;border-radius:0 4px 4px 0;'
     );
-    console.log('[TriNova Deployment] Sync verified: CSV Importers, Trash Module & 8493files Autoloader Active');
+    console.log('[TriNova Deployment]', {
+        build: portalBuild,
+        assetVersion,
+        extendedClientMapping: true,
+        clientImportDiagnostics: true,
+    });
 
     const state = {
         navigating: false,
