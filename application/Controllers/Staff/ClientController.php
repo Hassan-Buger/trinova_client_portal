@@ -125,7 +125,7 @@ class ClientController extends Controller
         foreach($entities as $entity){$entityId=(int)$entity['id'];$directorsByEntity[$entityId]=$accessModel->directors($entityId);$contactsByEntity[$entityId]=$accessModel->contacts($entityId);}
 
         $this->render('staff/clients/show', [
-            'pageTitle'   => "Client: {$client['name']}",
+            'pageTitle'   => 'Client profile',
             'client'      => $client,
             'entities'    => $entities,
             'outstanding' => $outstanding,

@@ -6,25 +6,6 @@
 (() => {
     'use strict';
 
-    const portalBuild = '2026.08.07-csv-import-debug-v1.4';
-    const appScriptUrl = document.currentScript?.src
-        || Array.from(document.scripts).find((script) => script.src.includes('/assets/js/app.js'))?.src
-        || '';
-    const assetVersion = appScriptUrl ? new URL(appScriptUrl, window.location.origin).searchParams.get('v') || 'unversioned' : 'unknown';
-
-    console.log(
-        '%c TriNova Client Portal %c CSV Import Debug v1.4 %c Active ',
-        'background:#0d9488;color:#fff;font-weight:bold;padding:3px 6px;border-radius:4px 0 0 4px;',
-        'background:#374151;color:#fff;font-weight:bold;padding:3px 6px;',
-        'background:#10b981;color:#fff;font-weight:bold;padding:3px 6px;border-radius:0 4px 4px 0;'
-    );
-    console.log('[TriNova Deployment]', {
-        build: portalBuild,
-        assetVersion,
-        extendedClientMapping: true,
-        clientImportDiagnostics: true,
-    });
-
     const state = {
         navigating: false,
         messageTimer: null,
@@ -33,21 +14,6 @@
 
     const content = () => document.getElementById('portal-content');
     const progress = () => document.getElementById('tnPageProgress');
-
-    function isClientImportUrl(value) {
-        try {
-            return new URL(value, window.location.origin).pathname.startsWith('/staff/clients/import');
-        } catch (_) {
-            return false;
-        }
-    }
-
-    function logClientImport(event, details = {}) {
-        console.log(`[Client CSV Import] ${event}`, {
-            time: new Date().toISOString(),
-            ...details,
-        });
-    }
 
     function setBusy(isBusy) {
         state.navigating = isBusy;
@@ -237,17 +203,6 @@
         }
         if (importOverlay) importOverlay.hidden = false;
 
-        const isClientImport = isClientImportUrl(form.action);
-        if (isClientImport) {
-            const upload = form.querySelector('input[type="file"][name="csv_file"]')?.files?.[0];
-            logClientImport('request started', {
-                method,
-                endpoint: new URL(form.action, window.location.origin).pathname,
-                form: form.matches('[data-import-commit-form]') ? 'commit' : (upload ? 'upload' : 'mapping/preview'),
-                file: upload ? { name: upload.name, size: upload.size, type: upload.type || 'unknown' } : undefined,
-            });
-        }
-
         try {
             const response = await fetch(form.action, {
                 method,
@@ -255,14 +210,6 @@
                 body: new FormData(form),
                 credentials: 'same-origin',
             });
-            if (isClientImport) {
-                logClientImport('response received', {
-                    status: response.status,
-                    ok: response.ok,
-                    endpoint: new URL(response.url || form.action, window.location.origin).pathname,
-                    contentType: response.headers.get('Content-Type') || 'unknown',
-                });
-            }
             if (new URL(response.url).pathname.endsWith('/login')) {
                 window.location.assign(response.url);
                 return;
@@ -298,7 +245,6 @@
                 await navigate(window.location.href, { push: false, fallback: false });
             }
         } catch (error) {
-            if (isClientImport) console.error('[Client CSV Import] request failed', error);
             showToast(error.message || 'The operation could not be completed.', 'error');
         } finally {
             form.dataset.submitting = 'false';

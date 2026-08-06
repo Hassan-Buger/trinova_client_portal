@@ -25,22 +25,3 @@
     @keyframes tn-import-spin{to{transform:rotate(360deg)}}
     @media (prefers-reduced-motion:reduce){.tn-import-loading__spinner{animation-duration:1.8s}}
 </style>
-<?php $previewDiagnostics=array_map(static fn(array $row):array=>[
-    'row'=>(int)($row['line']??0),
-    'company'=>(string)($row['data']['client_name']??''),
-    'action'=>(string)($row['action']??'unknown'),
-    'matched_by'=>(string)($row['match']['field']??''),
-    'directors'=>count($row['directors']??[]),
-    'warnings'=>implode('; ',$row['warnings']??[]),
-    'errors'=>implode('; ',$row['errors']??[]),
-],$preview['rows']??[]); ?>
-<script>
-(() => {
-  const rows = <?= json_encode($previewDiagnostics,JSON_UNESCAPED_UNICODE|JSON_UNESCAPED_SLASHES|JSON_HEX_TAG|JSON_HEX_AMP|JSON_HEX_APOS|JSON_HEX_QUOT) ?>;
-  console.groupCollapsed(`[Client CSV Import] preview diagnostics (${rows.length} rows)`);
-  console.table(rows);
-  const blocked = rows.filter(row => row.errors);
-  if (blocked.length) console.error('[Client CSV Import] rows blocked before commit', blocked);
-  console.groupEnd();
-})();
-</script>

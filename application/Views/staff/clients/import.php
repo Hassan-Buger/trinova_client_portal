@@ -31,27 +31,5 @@
         </div>
         <button style="margin-top:20px;border:0;border-radius:13px;background:#0d9488;color:#fff;padding:12px 22px;font-weight:800">Validate and preview</button>
     </form>
-    <?php
-    $mappingDiagnostics=[];
-    foreach($fields as $key=>$field){
-        $index=$upload['mapping'][$key]??null;
-        $mappingDiagnostics[]=[
-            'portal_field'=>$field['header'],
-            'required'=>(bool)$field['required'],
-            'csv_column'=>$index!==null&&isset($upload['headers'][$index])?(string)$upload['headers'][$index]:'Ignore / not available',
-            'mapped'=>$index!==null,
-        ];
-    }
-    ?>
-    <script>
-    (() => {
-      const mapping = <?= json_encode($mappingDiagnostics,JSON_UNESCAPED_UNICODE|JSON_UNESCAPED_SLASHES|JSON_HEX_TAG|JSON_HEX_AMP|JSON_HEX_APOS|JSON_HEX_QUOT) ?>;
-      console.groupCollapsed(<?= json_encode('[Client CSV Import] column mapping: '.(string)$upload['filename'],JSON_HEX_TAG|JSON_HEX_AMP|JSON_HEX_APOS|JSON_HEX_QUOT) ?>);
-      console.table(mapping);
-      const unmappedRequired = mapping.filter(field => field.required && !field.mapped);
-      if (unmappedRequired.length) console.error('[Client CSV Import] required fields are unmapped', unmappedRequired);
-      console.groupEnd();
-    })();
-    </script>
 <?php endif; ?>
 </section>

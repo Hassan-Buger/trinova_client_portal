@@ -145,11 +145,12 @@ $previewViewSource=file_get_contents(dirname(__DIR__).'/application/Views/staff/
 $appJsSource=file_get_contents(dirname(__DIR__).'/public/assets/js/app.js');
 expect(str_contains($controllerSource,"input('import_id', 0)"),'The batch endpoint does not accept legacy import_id submissions.');
 expect(str_contains($reportViewSource,'name="batch_id"'),'The import report does not submit the batch identifier expected by the endpoint.');
-expect(str_contains($mappingViewSource,'console.table(mapping)'),'The mapping page does not expose safe column diagnostics in the console.');
-expect(str_contains($previewViewSource,'console.table(rows)'),'The preview page does not expose row planning diagnostics in the console.');
-expect(str_contains($appJsSource,"[Client CSV Import] request failed"),'AJAX importer failures are not logged to the console.');
-expect(str_contains($appJsSource,"2026.08.07-csv-import-debug-v1.4"),'The console does not expose the current importer build identifier.');
-expect(!str_contains($appJsSource,'8493files-v1.3'),'The obsolete deployment banner can still be mistaken for the latest importer build.');
+expect(!str_contains($mappingViewSource,'console.'),'The mapping page still exposes import diagnostics in the browser console.');
+expect(!str_contains($previewViewSource,'console.'),'The preview page still exposes import diagnostics in the browser console.');
+expect(!str_contains($reportViewSource,'console.'),'The report page still exposes import diagnostics in the browser console.');
+expect(!str_contains($appJsSource,'[Client CSV Import]')&&!str_contains($appJsSource,'TriNova Deployment'),'The portal JavaScript still exposes importer deployment diagnostics.');
+expect(str_contains($reportViewSource,'import-report-premium')&&str_contains($reportViewSource,'Company results'),'The import report is missing the premium client-facing results layout.');
+expect(!str_contains($reportViewSource,'Director placeholders')&&!str_contains($reportViewSource,'diagnostic_reference'),'The import report still exposes technical importer language.');
 expect(str_contains($controllerSource,"'/staff/trash?tab=batches'"),'Successful deletion does not redirect to the CSV batch history in Trash.');
 expect(!str_contains($controllerSource,"'Failed to delete batch.'"),'Batch deletion still hides every failure behind the old generic toast.');
 $databaseSql=file_get_contents(dirname(__DIR__).'/config/database.sql');
