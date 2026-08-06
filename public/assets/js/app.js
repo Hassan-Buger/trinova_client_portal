@@ -143,7 +143,42 @@
         return true;
     }
 
+    async function openDocumentPreview(link) {
+        const documentId = Number(link.dataset.documentId || 0);
+        if (documentId <= 0) {
+            showToast('This document could not be opened.', 'error');
+            return;
+        }
+
+        const originalText = link.textContent;
+        link.setAttribute('aria-busy', 'true');
+        link.style.pointerEvents = 'none';
+        link.textContent = 'Checking…';
+        try {
+            const response = await fetch(`/documents/availability/${documentId}`, {
+                headers: { 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
+                credentials: 'same-origin',
+                cache: 'no-store',
+            });
+            const payload = await response.json();
+            if (!response.ok || payload.success === false) {
+                throw new Error(payload.message || 'This document is currently unavailable.');
+            }
+            // Navigate only after the server confirms the artifact exists. This
+            // avoids popup blockers and prevents an empty error tab.
+            window.location.assign(link.href);
+        } catch (error) {
+            showToast(error.message || 'This document is currently unavailable.', 'error');
+        } finally {
+            link.removeAttribute('aria-busy');
+            link.style.pointerEvents = '';
+            link.textContent = originalText;
+        }
+    }
+
     async function submitAjaxForm(form) {
+        if (form.dataset.submitting === 'true') return;
+
         const method = (form.method || 'GET').toUpperCase();
         if (method === 'GET') {
             const url = new URL(form.action || window.location.href, window.location.origin);
@@ -157,10 +192,16 @@
 
         const submitter = form.querySelector('[type="submit"]');
         const originalLabel = submitter?.textContent;
+        const importOverlay = form.matches('[data-import-commit-form]')
+            ? document.getElementById('csvCommitOverlay')
+            : null;
+        form.dataset.submitting = 'true';
         if (submitter) {
             submitter.disabled = true;
+            submitter.setAttribute('aria-busy', 'true');
             submitter.textContent = submitter.dataset.loadingText || 'Working…';
         }
+        if (importOverlay) importOverlay.hidden = false;
 
         try {
             const response = await fetch(form.action, {
@@ -206,8 +247,11 @@
         } catch (error) {
             showToast(error.message || 'The operation could not be completed.', 'error');
         } finally {
+            form.dataset.submitting = 'false';
+            if (importOverlay?.isConnected) importOverlay.hidden = true;
             if (submitter) {
                 submitter.disabled = false;
+                submitter.removeAttribute('aria-busy');
                 submitter.textContent = originalLabel;
             }
         }
@@ -454,6 +498,11 @@
 
     document.addEventListener('click', (event) => {
         const link = event.target.closest('a[href]');
+        if (link?.matches('[data-document-preview]')) {
+            event.preventDefault();
+            openDocumentPreview(link);
+            return;
+        }
         if (!link || !shouldEnhanceLink(link, event)) return;
         event.preventDefault();
         navigate(link.href);

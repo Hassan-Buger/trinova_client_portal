@@ -66,6 +66,7 @@
                             <th style="padding:12px 16px;font-weight:700">Meeting Type</th>
                             <th style="padding:12px 16px;font-weight:700">Booking Reference</th>
                             <th style="padding:12px 16px;font-weight:700">Date Requested</th>
+                            <th style="padding:12px 16px;font-weight:700;text-align:right">Action</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -80,6 +81,9 @@
                                 <td style="padding:16px;color:#7d8e88;font-size:13.5px">
                                     <?= date('d M Y, H:i', strtotime($m['created_at'])) ?>
                                 </td>
+                                <td style="padding:16px;text-align:right">
+                                    <button type="button" onclick="tnClientDeleteMeeting(<?= (int)$m['id'] ?>)" style="background:#fef2f2;color:#dc2626;border:1px solid #fecaca;padding:8px 12px;border-radius:10px;font-weight:700;font-size:13px;cursor:pointer">Cancel Request</button>
+                                </td>
                             </tr>
                         <?php endforeach; ?>
                     </tbody>
@@ -88,3 +92,26 @@
         <?php endif; ?>
     </div>
 </div>
+
+<!-- Delete Meeting Modal -->
+<div id="deleteClientMeetingModal" style="display:none;position:fixed;inset:0;background:rgba(20,40,35,.45);backdrop-filter:blur(6px);z-index:199;align-items:center;justify-content:center;padding:20px">
+    <div style="background:#fff;border-radius:24px;width:100%;max-width:440px;padding:32px;box-shadow:0 24px 60px -28px rgba(0,0,0,.4)">
+        <h3 style="margin:0 0 12px;font-size:19px;font-weight:800">Cancel Meeting Request?</h3>
+        <p style="color:#61756e;font-size:14px;margin:0 0 24px">This meeting request will be cancelled and soft-deleted.</p>
+        <form action="/client/meetings/delete" method="POST" data-ajax-form>
+            <input type="hidden" name="csrf_token" value="<?= htmlspecialchars(\Application\Core\Session::csrfToken()) ?>">
+            <input type="hidden" name="meeting_id" id="deleteClientMeetingId">
+            <div style="display:flex;justify-content:flex-end;gap:12px">
+                <button type="button" onclick="document.getElementById('deleteClientMeetingModal').style.display='none'" style="background:#f0f5f3;color:#5f726c;border:none;padding:11px 20px;border-radius:12px;font-weight:700;cursor:pointer">Keep Meeting</button>
+                <button type="submit" style="background:#dc2626;color:#fff;border:none;padding:11px 22px;border-radius:12px;font-weight:700;cursor:pointer">Cancel Request</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<script>
+function tnClientDeleteMeeting(id) {
+    document.getElementById('deleteClientMeetingId').value = id;
+    document.getElementById('deleteClientMeetingModal').style.display = 'flex';
+}
+</script>

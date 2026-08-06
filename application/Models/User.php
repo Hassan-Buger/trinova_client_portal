@@ -9,6 +9,13 @@ class User extends Model
 {
     public function findByEmail(string $email): ?array
     {
+        $stmt = $this->db->prepare("SELECT * FROM users WHERE email = :email AND deleted_at IS NULL LIMIT 1");
+        $stmt->execute(['email' => $email]);
+        return $stmt->fetch() ?: null;
+    }
+
+    public function findByEmailIncludingDeleted(string $email): ?array
+    {
         $stmt = $this->db->prepare("SELECT * FROM users WHERE email = :email LIMIT 1");
         $stmt->execute(['email' => $email]);
         return $stmt->fetch() ?: null;
@@ -16,7 +23,7 @@ class User extends Model
 
     public function findById(int $id): ?array
     {
-        $stmt = $this->db->prepare("SELECT * FROM users WHERE id = :id LIMIT 1");
+        $stmt = $this->db->prepare("SELECT * FROM users WHERE id = :id AND deleted_at IS NULL LIMIT 1");
         $stmt->execute(['id' => $id]);
         return $stmt->fetch() ?: null;
     }
@@ -68,14 +75,14 @@ class User extends Model
 
     public function getAllStaff(): array
     {
-        $stmt = $this->db->prepare("SELECT id, name, email, role, status, last_login_at FROM users WHERE role = 'staff' ORDER BY name ASC");
+        $stmt = $this->db->prepare("SELECT id, name, email, role, status, last_login_at FROM users WHERE role = 'staff' AND deleted_at IS NULL ORDER BY name ASC");
         $stmt->execute();
         return $stmt->fetchAll();
     }
 
     public function getAll(): array
     {
-        $stmt = $this->db->prepare("SELECT id, name, email, role, status, created_at, last_login_at FROM users ORDER BY role ASC, name ASC");
+        $stmt = $this->db->prepare("SELECT id, name, email, role, status, created_at, last_login_at FROM users WHERE deleted_at IS NULL ORDER BY role ASC, name ASC");
         $stmt->execute();
         return $stmt->fetchAll();
     }
@@ -84,7 +91,7 @@ class User extends Model
     {
         $page = max(1, $page);
         $perPage = max(10, min($perPage, 50));
-        $where = [];
+        $where = ['u.deleted_at IS NULL'];
         $params = [];
         if (($filters['search'] ?? '') !== '') {
             $like = '%' . $filters['search'] . '%';
@@ -258,7 +265,46 @@ class User extends Model
 
     public function delete(int $id): bool
     {
-        $stmt = $this->db->prepare("DELETE FROM users WHERE id = :id");
+        return $this->softDelete($id);
+    }
+
+    public function softDelete(int $id): bool
+    {
+        $stmt = $this->db->prepare("UPDATE users SET deleted_at = NOW() WHERE id = :id");
         return $stmt->execute(['id' => $id]);
+    }
+
+    public function bulkSoftDelete(array $ids): int
+    {
+        $count = 0;
+        foreach ($ids as $id) {
+            if ($this->softDelete((int)$id)) {
+                $count++;
+            }
+        }
+        return $count;
+    }
+
+    public function restore(int $id): bool
+    {
+        $stmt = $this->db->prepare("UPDATE users SET deleted_at = NULL WHERE id = :id");
+        return $stmt->execute(['id' => $id]);
+    }
+
+    public function bulkRestore(array $ids): int
+    {
+        $count = 0;
+        foreach ($ids as $id) {
+            if ($this->restore((int)$id)) {
+                $count++;
+            }
+        }
+        return $count;
+    }
+
+    public function getSoftDeleted(): array
+    {
+        $stmt = $this->db->query("SELECT id, name, email, role, status, deleted_at FROM users WHERE deleted_at IS NOT NULL ORDER BY deleted_at DESC");
+        return $stmt->fetchAll();
     }
 }

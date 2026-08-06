@@ -75,7 +75,14 @@ class Router
                 continue;
             }
 
-            $pattern = preg_replace('/\{([a-zA-Z0-9_]+)\}/', '(?P<\1>[a-zA-Z0-9_]+)', $route['path']);
+            // Every current {id} route targets an integer controller argument.
+            // Restrict it at the routing boundary so named sibling routes such
+            // as /clients/import can never be consumed as an ID.
+            $pattern = preg_replace_callback('/\{([a-zA-Z0-9_]+)\}/', static function(array $match): string {
+                $name=$match[1];
+                $valuePattern=$name==='id'?'\\d+':'[a-zA-Z0-9_]+';
+                return '(?P<'.$name.'>'.$valuePattern.')';
+            }, $route['path']);
             $pattern = "#^" . $pattern . "$#";
 
             if (preg_match($pattern, $path, $matches)) {

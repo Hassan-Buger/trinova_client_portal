@@ -35,13 +35,10 @@
             <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:14px">
                 <?php foreach ($entities as $e): ?>
                     <div style="border:1px solid rgba(20,60,50,.08);border-radius:18px;padding:18px;background:#fbfdfc">
-                        <div style="font-weight:800;font-size:16px;color:#213330;margin-bottom:6px"><?= htmlspecialchars($e['company_name']) ?></div>
-                        <div style="font-size:13px;color:#61756e">
-                            Company No: <strong><?= htmlspecialchars($e['company_number'] ?: 'N/A') ?></strong>
-                        </div>
-                        <div style="font-size:13px;color:#61756e;margin-top:2px">
-                            Tax Ref: <strong><?= htmlspecialchars($e['tax_reference'] ?: 'N/A') ?></strong>
-                        </div>
+                        <div style="display:flex;justify-content:space-between;gap:10px;margin-bottom:10px"><div style="font-weight:800;font-size:16px;color:#213330"><?= htmlspecialchars($e['company_name']) ?></div><span style="font-size:11px;font-weight:700;background:#eef4f1;padding:4px 9px;border-radius:999px"><?= htmlspecialchars($e['entity_type']) ?></span></div>
+                        <?php if($e['company_number']): ?><div style="font-size:13px;color:#61756e">Company number: <strong><?= htmlspecialchars($e['company_number']) ?></strong></div><?php endif; ?>
+                        <?php if($e['tax_reference']): ?><div style="font-size:13px;color:#61756e;margin-top:2px">Tax reference: <strong><?= htmlspecialchars($e['tax_reference']) ?></strong></div><?php endif; ?>
+                        <?php foreach($e['attributes'] as $attribute): ?><div style="font-size:13px;color:#61756e;margin-top:2px"><?= htmlspecialchars($attribute['label'] ?? '') ?>: <strong><?= htmlspecialchars($attribute['value'] ?? '') ?></strong></div><?php endforeach; ?>
                     </div>
                 <?php endforeach; ?>
             </div>

@@ -1,0 +1,4 @@
+-- Directors Importer rollback. Back up the database first; imported profile values will be removed.
+SET @db=DATABASE();
+SET @sql=IF((SELECT COUNT(*) FROM information_schema.statistics WHERE table_schema=@db AND table_name='entity_contacts' AND index_name='idx_contact_entity_email')>0,'DROP INDEX idx_contact_entity_email ON entity_contacts','SELECT 1'); PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+SET @sql=IF((SELECT COUNT(*) FROM information_schema.columns WHERE table_schema=@db AND table_name='entity_contacts' AND column_name='original_full_name')>0,'ALTER TABLE entity_contacts DROP COLUMN original_full_name, DROP COLUMN director_utr, DROP COLUMN address, DROP COLUMN id_number, DROP COLUMN ch_verification_number, DROP COLUMN last_director_import_id','SELECT 1'); PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;

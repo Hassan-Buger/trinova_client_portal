@@ -162,5 +162,5 @@ Ensure `/public_html/.htaccess` has URL rewriting enabled:
 
 1. Visit your temporary domain in a browser: `https://your-temp-domain.com/login`
 2. Log in using default credentials:
-   - **Staff Login:** `kirsty@trinova.co.uk` / `password123`
-   - **Client Login:** `nick@powellelectrical.co.uk` / `password123`
+   - **Staff Login:** `staff.one@example.invalid` / `password123`
+   - **Client Login:** `test.client.alpha@example.invalid` / `password123`

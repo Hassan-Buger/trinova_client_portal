@@ -35,6 +35,16 @@ class Session
         $_SESSION[$key] = $value;
     }
 
+    public static function regenerate(): void
+    {
+        self::start();
+        if (!session_regenerate_id(true)) {
+            throw new \RuntimeException('The authenticated session could not be renewed.');
+        }
+        // A login boundary should rotate both the session identifier and CSRF token.
+        $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
+    }
+
     public static function remove(string $key): void
     {
         self::start();

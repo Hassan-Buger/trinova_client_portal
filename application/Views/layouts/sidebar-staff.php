@@ -27,16 +27,8 @@ function renderStaffIcon(string $ic): string {
 ?>
 
 <aside class="tn-side" style="width:262px;flex-shrink:0;background:#fff;border-right:1px solid rgba(20,60,50,.07);display:flex;flex-direction:column;padding:22px 16px;position:sticky;top:0;height:100vh">
-    <div style="display:flex;align-items:center;gap:11px;padding:4px 8px 22px">
-        <svg width="38" height="38" viewBox="0 0 40 40" fill="none">
-            <rect x="0" y="0" width="40" height="40" rx="12" fill="#41556f"/>
-            <path d="M20 9 L30 28 L10 28 Z" fill="#fff" opacity="0.92"/>
-            <path d="M20 17 L26 28 L14 28 Z" fill="#ef8f3c"/>
-        </svg>
-        <div class="tn-brandword">
-            <div style="font-weight:800;font-size:15.5px;letter-spacing:-.01em;line-height:1.1">TriNova</div>
-            <div style="font-size:9.5px;color:#8a9a94;font-weight:700;letter-spacing:.16em;text-transform:uppercase">Staff Portal</div>
-        </div>
+    <div class="tn-sidebar-brand" style="display:flex;align-items:center;padding:4px 8px 22px">
+        <img class="tn-brand-logo" src="/assets/images/trinova-staff-portal-logo.png" alt="TriNova Staff Portal">
     </div>
     <nav style="display:flex;flex-direction:column;gap:3px;flex:1">
         <?php foreach ($nav as $item): ?>
@@ -51,10 +43,13 @@ function renderStaffIcon(string $ic): string {
             </a>
         <?php endforeach; ?>
     </nav>
-    <a href="/logout" class="tn-navitem" style="display:flex;align-items:center;gap:12px;padding:12px 14px;border-radius:15px;cursor:pointer;color:#61756e;font-weight:600;font-size:14.5px;margin-top:8px">
+    <form action="/logout" method="post" style="margin:8px 0 0">
+    <input type="hidden" name="csrf_token" value="<?= htmlspecialchars(\Application\Core\Session::csrfToken(), ENT_QUOTES, 'UTF-8') ?>">
+    <button type="submit" class="tn-navitem" style="display:flex;width:100%;align-items:center;gap:12px;padding:12px 14px;border:0;background:transparent;border-radius:15px;cursor:pointer;color:#61756e;font-weight:600;font-size:14.5px">
         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
             <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4 m16 17 5-5-5-5 M21 12H9"/>
         </svg>
         <span class="tn-logout-label tn-navlabel">Logout</span>
-    </a>
+    </button>
+    </form>
 </aside>

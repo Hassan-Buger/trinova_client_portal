@@ -31,9 +31,10 @@ class DashboardController extends Controller
         $clientId = Session::get('client_id');
         $client = $clientId ? $this->clientModel->findById($clientId) : null;
 
-        $requests = $clientId ? $this->requestModel->getOutstandingByClientId($clientId) : [];
-        $deadlines = $clientId ? $this->deadlineModel->getUpcomingByClient($clientId) : [];
-        $unreadMessages = $clientId ? $this->messageModel->getUnreadCountByClient($clientId) : 0;
+        $userId=(int)Session::get('user_id');
+        $requests = $this->requestModel->getAccessibleByUser($userId, true);
+        $deadlines = $this->deadlineModel->getAccessibleByUser($userId);
+        $unreadMessages = $this->messageModel->getUnreadCountByUser($userId);
 
         $this->render('client/dashboard', [
             'pageTitle'       => 'Dashboard',

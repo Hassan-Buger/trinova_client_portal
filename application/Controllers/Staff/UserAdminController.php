@@ -3,6 +3,7 @@
 namespace Application\Controllers\Staff;
 
 use Application\Core\Controller;
+use Application\Core\Database;
 use Application\Core\Request;
 use Application\Core\Response;
 use Application\Core\Session;
@@ -10,6 +11,7 @@ use Application\Models\Client;
 use Application\Models\User;
 use Application\Services\AuditService;
 use Application\Services\NotificationService;
+use Application\Services\ErrorHandler;
 
 class UserAdminController extends Controller
 {
@@ -84,7 +86,7 @@ class UserAdminController extends Controller
     {
         $body  = $request->getBody();
         $name  = trim($body['name'] ?? '');
-        $email = trim($body['email'] ?? '');
+        $email = strtolower(trim($body['email'] ?? ''));
         $role  = trim($body['role'] ?? 'client');
         $pass  = trim($body['password'] ?? 'password123');
 
@@ -98,8 +100,11 @@ class UserAdminController extends Controller
             return;
         }
 
-        if ($this->userModel->findByEmail($email)) {
-            $message = "An account with email '{$email}' already exists.";
+        $existing = $this->userModel->findByEmailIncludingDeleted($email);
+        if ($existing) {
+            $message = !empty($existing['deleted_at'])
+                ? "An account with email '{$email}' is in Trash. Restore that account instead of creating a duplicate."
+                : "An account with email '{$email}' already exists.";
             if ($request->isAjax()) {
                 $response->json(['success' => false, 'message' => $message], 409);
             }
@@ -108,42 +113,57 @@ class UserAdminController extends Controller
             return;
         }
 
-        $hash = password_hash($role === 'client' ? bin2hex(random_bytes(32)) : $pass, PASSWORD_BCRYPT);
-        $userId = $this->userModel->create([
-            'name'          => $name,
-            'email'         => $email,
-            'password_hash' => $hash,
-            'role'          => $role,
-            'status'        => $role === 'client' ? 'pending_activation' : 'active',
-        ]);
+        $db = Database::getInstance();
+        $activationToken = null;
+        $activationCode = null;
+        try {
+            $db->beginTransaction();
+            $hash = password_hash($role === 'client' ? bin2hex(random_bytes(32)) : $pass, PASSWORD_BCRYPT);
+            $userId = $this->userModel->create([
+                'name'          => $name,
+                'email'         => $email,
+                'password_hash' => $hash,
+                'role'          => $role,
+                'status'        => $role === 'client' ? 'pending_activation' : 'active',
+            ]);
 
-        if ($role === 'client') {
-            try {
+            if ($role === 'client') {
                 (new Client())->create([
                     'user_id' => $userId,
                     'aml_status' => 'Action Required',
                 ]);
-            } catch (\Throwable $e) {
-                $this->userModel->delete($userId);
-                $message = 'The client profile could not be created. No user account was saved.';
-                if ($request->isAjax()) {
-                    $response->json(['success' => false, 'message' => $message], 500);
-                }
-                Session::setFlash('error', $message);
-                $response->redirect('/staff/users');
-                return;
+                $activationToken = bin2hex(random_bytes(32));
+                $this->userModel->storeActivationToken($userId, $activationToken);
+                $otp = (new \Application\Models\OtpChallenge())->issue($userId, $email, \Application\Models\OtpChallenge::ACTIVATION);
+                if (!$otp['ok']) throw new \RuntimeException('The activation challenge could not be created.');
+                $activationCode = $otp['code'];
             }
-            $activationToken=bin2hex(random_bytes(32)); $this->userModel->storeActivationToken($userId,$activationToken);
-            $otpModel=new \Application\Models\OtpChallenge(); $otp=$otpModel->issue($userId,$email,\Application\Models\OtpChallenge::ACTIVATION);
-            $link=rtrim(\Application\Config\App::get('url'),'/').'/activate?token='.urlencode($activationToken);
-            if(!$otp['ok']||!NotificationService::sendWelcomeActivationEmail($email,$name,$link,$otp['code'])){ if($otp['ok'])$otpModel->invalidate($userId,\Application\Models\OtpChallenge::ACTIVATION); Session::setFlash('error','Client created, but the activation email could not be sent.'); $response->redirect('/staff/users'); return; }
+            $db->commit();
+        } catch (\Throwable $e) {
+            if ($db->inTransaction()) $db->rollBack();
+            ErrorHandler::report(new \RuntimeException('User provisioning transaction failed.', 0, $e), $request);
+            $message = 'The account could not be created. No user or client record was saved.';
+            if ($request->isAjax()) $response->json(['success' => false, 'message' => $message], 500);
+            Session::setFlash('error', $message);
+            $response->redirect('/staff/users');
+            return;
         }
 
         AuditService::log('user_provisioned', 'users', $userId);
-        if ($role !== 'client') NotificationService::sendPromptEmail($email, 'Welcome to TriNova Accounting Portal', 'A staff account has been provisioned for you.');
         $message = "User account '{$name}' created successfully.";
+        $emailSent = true;
+        if ($role === 'client') {
+            $link = rtrim(\Application\Config\App::get('url'), '/') . '/activate?token=' . urlencode((string)$activationToken);
+            $emailSent = NotificationService::sendWelcomeActivationEmail($email, $name, $link, (string)$activationCode);
+            $localCapture = in_array((string)\Application\Config\App::get('env', 'local'), ['local', 'testing'], true)
+                && (string)\Application\Config\App::get('resend_api_key', '') === '';
+            if ($localCapture) $message .= ' Local activation details were captured in storage/logs/mail.log.';
+            elseif (!$emailSent) $message .= ' The account is saved, but the activation email was not sent. Configure RESEND_API_KEY and resend activation before the client signs in.';
+        } else {
+            NotificationService::sendPromptEmail($email, 'Welcome to TriNova Accounting Portal', 'A staff account has been provisioned for you.');
+        }
         if ($request->isAjax()) {
-            $response->json(['success' => true, 'message' => $message, 'redirect' => '/staff/users'], 201);
+            $response->json(['success' => true, 'message' => $message, 'redirect' => '/staff/users', 'email_sent' => $emailSent], 201);
         }
         Session::setFlash('success', $message);
         $response->redirect('/staff/users');
@@ -155,6 +175,12 @@ class UserAdminController extends Controller
         $userId = (int)($body['user_id'] ?? 0);
         $status = trim($body['status'] ?? '');
 
+        if ($userId === (int)Session::get('user_id') && $status === 'suspended') {
+            Session::setFlash('error', 'You cannot suspend your own staff account.');
+            $response->redirect('/staff/users');
+            return;
+        }
+
         if ($userId > 0 && in_array($status, ['active', 'suspended'], true)) {
             $this->userModel->updateStatus($userId, $status);
             AuditService::log('user_status_toggled', 'users', $userId);
@@ -162,5 +188,101 @@ class UserAdminController extends Controller
         }
 
         $response->redirect('/staff/users');
+    }
+
+    public function resendActivation(Request $request, Response $response): void
+    {
+        $userId = (int)$request->input('user_id', 0);
+        $user = $userId > 0 ? $this->userModel->findById($userId) : null;
+        if (!$user || $user['role'] !== 'client' || $user['status'] !== 'pending_activation') {
+            $message = 'Choose a client account that is awaiting activation.';
+            if ($request->isAjax()) $response->json(['success' => false, 'message' => $message], 422);
+            Session::setFlash('error', $message);
+            $response->redirect('/staff/users');
+            return;
+        }
+
+        $token = bin2hex(random_bytes(32));
+        $this->userModel->storeActivationToken($userId, $token);
+        $otp = (new \Application\Models\OtpChallenge())->issue($userId, $user['email'], \Application\Models\OtpChallenge::ACTIVATION, true);
+        $link = rtrim(\Application\Config\App::get('url'), '/') . '/activate?token=' . urlencode($token);
+        $delivered = $otp['ok'] && NotificationService::sendWelcomeActivationEmail($user['email'], $user['name'], $link, $otp['code']);
+        $localCapture = in_array((string)\Application\Config\App::get('env', 'local'), ['local', 'testing'], true)
+            && (string)\Application\Config\App::get('resend_api_key', '') === '';
+        $message = $delivered
+            ? ($localCapture ? 'New activation details were captured in storage/logs/mail.log.' : 'A new activation email was sent successfully.')
+            : 'The activation email could not be sent. Check the email configuration and try again.';
+        if ($request->isAjax()) $response->json(['success' => $delivered, 'message' => $message], $delivered ? 200 : 422);
+        Session::setFlash($delivered ? 'success' : 'error', $message);
+        $response->redirect('/staff/users');
+    }
+
+    public function delete(Request $request, Response $response): void
+    {
+        $userId = (int)($request->input('user_id', 0) ?: $request->input('id', 0));
+        if ($userId === (int)Session::get('user_id')) {
+            $msg = 'You cannot delete your own staff account.';
+            if ($request->isAjax()) $response->json(['success' => false, 'message' => $msg], 422);
+            Session::setFlash('error', $msg);
+            $response->redirect('/staff/users');
+            return;
+        }
+        if ($userId > 0 && $this->softDeleteAccount($userId)) {
+            AuditService::log('user_deleted', 'users', $userId);
+            $msg = 'User account deleted.';
+            if ($request->isAjax()) {
+                $response->json(['success' => true, 'message' => $msg]);
+                return;
+            }
+            Session::setFlash('success', $msg);
+        } else {
+            if ($request->isAjax()) {
+                $response->json(['success' => false, 'message' => 'Failed to delete user account.'], 422);
+                return;
+            }
+            Session::setFlash('error', 'Failed to delete user account.');
+        }
+        $response->redirect('/staff/users');
+    }
+
+    public function bulkDelete(Request $request, Response $response): void
+    {
+        $rawIds = $request->input('ids', []);
+        $ids = is_array($rawIds) ? array_values(array_unique(array_map('intval', array_filter($rawIds)))) : [];
+        $ids = array_values(array_filter($ids, fn(int $id): bool => $id !== (int)Session::get('user_id')));
+
+        if (empty($ids)) {
+            if ($request->isAjax()) {
+                $response->json(['success' => false, 'message' => 'No users selected for deletion.'], 422);
+                return;
+            }
+            Session::setFlash('error', 'No users selected for deletion.');
+            $response->redirect('/staff/users');
+            return;
+        }
+
+        $count = 0;
+        foreach ($ids as $id) if ($this->softDeleteAccount($id)) $count++;
+        if ($count > 0) {
+            AuditService::log('user_bulk_deleted', 'users', null, null, ['count' => $count, 'ids' => $ids]);
+            $msg = "{$count} user account(s) deleted.";
+            if ($request->isAjax()) {
+                $response->json(['success' => true, 'message' => $msg]);
+                return;
+            }
+            Session::setFlash('success', $msg);
+        }
+        $response->redirect('/staff/users');
+    }
+
+    private function softDeleteAccount(int $userId): bool
+    {
+        $user = $this->userModel->findById($userId);
+        if (!$user) return false;
+        if ($user['role'] === 'client') {
+            $client = (new Client())->findByUserId($userId);
+            return $client ? (new Client())->softDelete((int)$client['id']) : $this->userModel->softDelete($userId);
+        }
+        return $this->userModel->softDelete($userId);
     }
 }

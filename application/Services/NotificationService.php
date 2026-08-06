@@ -11,15 +11,19 @@ class NotificationService
      */
     public static function sendResendEmail(string $toEmail, string $subject, string $htmlContent): bool
     {
-        $apiKey = App::get('resend_api_key') ?: getenv('RESEND_API_KEY') ?: ($_ENV['RESEND_API_KEY'] ?? '');
-        $from   = App::get('email_from', 'TriNova Portal <onboarding@resend.dev>');
+        $apiKey = trim((string) (App::get('resend_api_key') ?: getenv('RESEND_API_KEY') ?: ($_ENV['RESEND_API_KEY'] ?? '')));
+        $from   = trim((string) App::get('email_from', 'TriNova Accounting <onboarding@resend.dev>'));
 
         // Log locally first
         self::logEmail($toEmail, $subject, '[Email body omitted from logs]');
 
         if (empty($apiKey)) {
+            if (in_array((string)App::get('env', 'local'), ['local', 'testing'], true)) {
+                self::logEmail($toEmail, $subject, "[LOCAL MAIL CAPTURE - NOT SENT]\n" . $htmlContent);
+                return true;
+            }
             self::logEmail($toEmail, $subject, "[RESEND SKIPPED: RESEND_API_KEY is empty in .env]");
-            return true; // Unconfigured API key silently logs to mail.log
+            return false;
         }
 
         $payload = json_encode([
@@ -27,7 +31,12 @@ class NotificationService
             'to'      => [$toEmail],
             'subject' => $subject,
             'html'    => $htmlContent,
-        ]);
+        ], JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
+
+        if ($payload === false) {
+            self::logEmail($toEmail, $subject, '[RESEND ERROR: Unable to encode email payload]');
+            return false;
+        }
 
         $response = false;
         $httpCode = 0;
@@ -47,8 +56,12 @@ class NotificationService
             ]);
 
             $response = curl_exec($ch);
+            $curlError = curl_error($ch);
             $httpCode = (int) curl_getinfo($ch, CURLINFO_HTTP_CODE);
             curl_close($ch);
+            if ($response === false) {
+                self::logEmail($toEmail, $subject, '[RESEND CONNECTION ERROR]: ' . ($curlError ?: 'Unknown cURL error'));
+            }
         } else {
             // Fallback to file_get_contents if cURL extension is not enabled
             $opts = [
@@ -69,7 +82,8 @@ class NotificationService
         }
 
         if ($httpCode < 200 || $httpCode >= 300) {
-            self::logEmail($toEmail, $subject, "[RESEND API ERROR HTTP {$httpCode}]: " . ($response ?: 'No response'));
+            $safeResponse = self::safeApiError($response);
+            self::logEmail($toEmail, $subject, "[RESEND API ERROR HTTP {$httpCode}]: {$safeResponse}");
         }
 
         return $httpCode >= 200 && $httpCode < 300;
@@ -152,7 +166,7 @@ class NotificationService
             $logDir  = dirname($logFile);
 
             if (!is_dir($logDir)) {
-                @mkdir($logDir, 0755, true);
+                @mkdir($logDir, 0700, true);
             }
 
             $logEntry = sprintf(
@@ -163,9 +177,21 @@ class NotificationService
                 $textBody
             );
 
-            @file_put_contents($logFile, $logEntry, FILE_APPEND);
+            @file_put_contents($logFile, $logEntry, FILE_APPEND | LOCK_EX);
+            @chmod($logFile, 0600);
         } catch (\Throwable $e) {
             // Ignore logging errors silently
         }
+    }
+
+    private static function safeApiError(string|false $response): string
+    {
+        if (!$response) {
+            return ' No response';
+        }
+
+        $decoded = json_decode($response, true);
+        $message = is_array($decoded) ? (string) ($decoded['message'] ?? $decoded['name'] ?? 'Request rejected') : 'Request rejected';
+        return ' ' . substr(preg_replace('/[\r\n]+/', ' ', $message), 0, 500);
     }
 }

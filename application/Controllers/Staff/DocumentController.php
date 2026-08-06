@@ -10,7 +10,10 @@ use Application\Core\Session;
 use Application\Models\Client;
 use Application\Models\Document;
 use Application\Models\Notification;
+use Application\Models\ClientEntity;
+use Application\Models\EntityAccess;
 use Application\Services\AuditService;
+use Application\Services\FileStorageService;
 
 class DocumentController extends Controller
 {
@@ -45,11 +48,13 @@ class DocumentController extends Controller
         }
         $pagination = $this->documentModel->paginateWithDetails($filters, $page, $perPage);
         $clients   = $this->clientModel->getAllWithUsers();
+        $entities  = (new ClientEntity())->getAllWithClient();
 
         $this->render('staff/documents/index', [
             'pageTitle' => 'Document Management',
             'documents' => $pagination['items'],
             'clients'   => $clients,
+            'entities'  => $entities,
             'statuses' => $statuses,
             'filters' => $filters,
             'pagination' => $pagination,
@@ -68,7 +73,9 @@ class DocumentController extends Controller
     public function upload(Request $request, Response $response): void
     {
         $staffUserId = Session::get('user_id');
-        $clientId    = (int)($request->getBody()['client_id'] ?? 0);
+        $entityId    = (int)($request->getBody()['entity_id'] ?? 0);
+        $entity      = $entityId > 0 ? (new ClientEntity())->findById($entityId) : null;
+        $clientId    = (int)($entity['client_id'] ?? 0);
         $description = trim($request->getBody()['description'] ?? '');
 
         if ($clientId <= 0 || empty($_FILES['file']['name'])) {
@@ -77,40 +84,39 @@ class DocumentController extends Controller
             return;
         }
 
-        $file     = $_FILES['file'];
-        $filename = basename($file['name']);
-        $ext      = strtolower(pathinfo($filename, PATHINFO_EXTENSION));
-
-        $targetDir = App::get('storage_dir') . '/uploads';
-        if (!is_dir($targetDir)) {
-            mkdir($targetDir, 0755, true);
-        }
-
-        $storedName = bin2hex(random_bytes(16)) . '.' . $ext;
-        $targetFile = $targetDir . '/' . $storedName;
-
-        if (!move_uploaded_file($file['tmp_name'], $targetFile)) {
-            Session::setFlash('error', 'Failed to store file in repository.');
+        try {
+            $stored = FileStorageService::store($_FILES['file']);
+        } catch (\Throwable $e) {
+            $message = $e->getMessage();
+            if ($request->isAjax()) $response->json(['success' => false, 'message' => $message], 422);
+            Session::setFlash('error', $message);
             $response->redirect('/staff/documents');
             return;
         }
 
-        $docId = $this->documentModel->create([
-            'client_id'           => $clientId,
-            'uploaded_by_user_id' => $staffUserId,
-            'direction'           => 'from_trinova',
-            'filename'            => $filename,
-            'stored_path'         => $storedName,
-            'description'        => $description,
-            'status'              => 'Ready',
-        ]);
+        $filename = $stored['original_filename'];
+        try {
+            $docId = $this->documentModel->create([
+                'client_id'           => $clientId,
+                'entity_id'           => $entityId,
+                'scope'               => $entity['entity_scope'],
+                'uploaded_by_user_id' => $staffUserId,
+                'direction'           => 'from_trinova',
+                'filename'            => $filename,
+                'stored_path'         => $stored['stored_path'],
+                'description'         => $description,
+                'status'              => 'Ready',
+            ]);
+        } catch (\Throwable $e) {
+            FileStorageService::remove($stored['stored_path']);
+            throw $e;
+        }
 
         AuditService::log('staff_upload', 'documents', $docId);
         try {
-            $client = $this->clientModel->findById($clientId);
-            if ($client && !empty($client['user_id'])) {
+            foreach ((new EntityAccess())->recipients($entityId) as $client) {
                 (new Notification())->create(
-                    (int)$client['user_id'],
+                    (int)$client['id'],
                     'document_received',
                     'document:' . $docId,
                     'New Document Available',
@@ -172,5 +178,54 @@ class DocumentController extends Controller
         header('Content-Length: ' . filesize($filePath));
         readfile($filePath);
         exit;
+    }
+
+    public function delete(Request $request, Response $response): void
+    {
+        $docId = (int)($request->input('document_id', 0) ?: $request->input('id', 0));
+        if ($docId > 0 && $this->documentModel->softDelete($docId)) {
+            AuditService::log('document_deleted', 'documents', $docId);
+            $msg = 'Document deleted successfully.';
+            if ($request->isAjax()) {
+                $response->json(['success' => true, 'message' => $msg]);
+                return;
+            }
+            Session::setFlash('success', $msg);
+        } else {
+            if ($request->isAjax()) {
+                $response->json(['success' => false, 'message' => 'Failed to delete document.'], 422);
+                return;
+            }
+            Session::setFlash('error', 'Failed to delete document.');
+        }
+        $response->redirect('/staff/documents');
+    }
+
+    public function bulkDelete(Request $request, Response $response): void
+    {
+        $rawIds = $request->input('ids', []);
+        $ids = is_array($rawIds) ? array_map('intval', array_filter($rawIds)) : [];
+
+        if (empty($ids)) {
+            if ($request->isAjax()) {
+                $response->json(['success' => false, 'message' => 'No documents selected for deletion.'], 422);
+                return;
+            }
+            Session::setFlash('error', 'No documents selected for deletion.');
+            $response->redirect('/staff/documents');
+            return;
+        }
+
+        $count = $this->documentModel->bulkSoftDelete($ids);
+        if ($count > 0) {
+            AuditService::log('document_bulk_deleted', 'documents', null, null, ['count' => $count, 'ids' => $ids]);
+            $msg = "{$count} document(s) deleted successfully.";
+            if ($request->isAjax()) {
+                $response->json(['success' => true, 'message' => $msg]);
+                return;
+            }
+            Session::setFlash('success', $msg);
+        }
+        $response->redirect('/staff/documents');
     }
 }

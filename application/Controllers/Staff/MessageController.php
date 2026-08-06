@@ -33,6 +33,7 @@ class MessageController extends Controller
         }
 
         $messages = $selectedClientId > 0 ? $this->messageModel->getByClientId($selectedClientId) : [];
+        $entities=(new \Application\Models\ClientEntity())->getAllWithClient();
         $activeClient = $selectedClientId > 0 ? $this->clientModel->findById($selectedClientId) : null;
 
         $this->render('staff/messages/index', [
@@ -41,6 +42,7 @@ class MessageController extends Controller
             'selectedClientId' => $selectedClientId,
             'activeClient'     => $activeClient,
             'messages'         => $messages,
+            'entities'         => $entities,
         ], 'main');
     }
 
@@ -65,10 +67,16 @@ class MessageController extends Controller
         $clientId    = (int)($body['client_id'] ?? 0);
         $senderId    = Session::get('user_id');
         $messageText = trim($body['body'] ?? '');
+        $entityId=(int)($body['entity_id']??0);
+        $entity=$entityId ? (new \Application\Models\ClientEntity())->findById($entityId) : null;
+        if(!$entity && $clientId){$owned=(new \Application\Models\ClientEntity())->getByClientId($clientId);$entity=$owned[0]??null;$entityId=(int)($entity['id']??0);}
+        if($entity) $clientId=(int)$entity['client_id'];
 
-        if ($clientId > 0 && $senderId && !empty($messageText) && $this->clientModel->findById($clientId)) {
+        if ($clientId > 0 && $senderId && !empty($messageText) && $entity) {
             $msgId = $this->messageModel->create([
-                'client_id' => $clientId,
+                'client_id' => (int)$entity['client_id'],
+                'entity_id' => $entityId,
+                'scope' => $entity['entity_scope'],
                 'sender_id' => $senderId,
                 'body'      => $messageText,
             ]);
@@ -109,5 +117,78 @@ class MessageController extends Controller
             'created_at' => date(DATE_ATOM, strtotime($message['created_at'])),
             'read_at' => $message['read_at'] ?? null,
         ], $messages);
+    }
+
+    public function delete(Request $request, Response $response): void
+    {
+        $msgId = (int)($request->input('message_id', 0) ?: $request->input('id', 0));
+        $clientId = (int)($request->input('client_id', 0));
+        if ($msgId > 0 && $this->messageModel->softDelete($msgId)) {
+            AuditService::log('message_deleted', 'messages', $msgId);
+            $msg = 'Message deleted.';
+            if ($request->isAjax()) {
+                $response->json(['success' => true, 'message' => $msg]);
+                return;
+            }
+            Session::setFlash('success', $msg);
+        } else {
+            if ($request->isAjax()) {
+                $response->json(['success' => false, 'message' => 'Failed to delete message.'], 422);
+                return;
+            }
+            Session::setFlash('error', 'Failed to delete message.');
+        }
+        $response->redirect('/staff/messages' . ($clientId ? '?client_id=' . $clientId : ''));
+    }
+
+    public function deleteThread(Request $request, Response $response): void
+    {
+        $clientId = (int)($request->input('client_id', 0));
+        $threadId = (int)($request->input('thread_id', 1));
+        if ($clientId > 0 && $this->messageModel->softDeleteThread($threadId, $clientId)) {
+            AuditService::log('message_thread_deleted', 'messages', null, null, ['client_id' => $clientId, 'thread_id' => $threadId]);
+            $msg = 'Entire message thread deleted.';
+            if ($request->isAjax()) {
+                $response->json(['success' => true, 'message' => $msg]);
+                return;
+            }
+            Session::setFlash('success', $msg);
+        } else {
+            if ($request->isAjax()) {
+                $response->json(['success' => false, 'message' => 'Failed to delete message thread.'], 422);
+                return;
+            }
+            Session::setFlash('error', 'Failed to delete message thread.');
+        }
+        $response->redirect('/staff/messages');
+    }
+
+    public function bulkDelete(Request $request, Response $response): void
+    {
+        $rawIds = $request->input('ids', []);
+        $ids = is_array($rawIds) ? array_map('intval', array_filter($rawIds)) : [];
+        $clientId = (int)($request->input('client_id', 0));
+
+        if (empty($ids)) {
+            if ($request->isAjax()) {
+                $response->json(['success' => false, 'message' => 'No messages selected for deletion.'], 422);
+                return;
+            }
+            Session::setFlash('error', 'No messages selected for deletion.');
+            $response->redirect('/staff/messages' . ($clientId ? '?client_id=' . $clientId : ''));
+            return;
+        }
+
+        $count = $this->messageModel->bulkSoftDelete($ids);
+        if ($count > 0) {
+            AuditService::log('message_bulk_deleted', 'messages', null, null, ['count' => $count, 'ids' => $ids]);
+            $msg = "{$count} message(s) deleted.";
+            if ($request->isAjax()) {
+                $response->json(['success' => true, 'message' => $msg]);
+                return;
+            }
+            Session::setFlash('success', $msg);
+        }
+        $response->redirect('/staff/messages' . ($clientId ? '?client_id=' . $clientId : ''));
     }
 }

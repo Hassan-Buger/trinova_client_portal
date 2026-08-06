@@ -7,12 +7,26 @@ use PDO;
 
 class Deadline extends Model
 {
+    public function find(int $id): ?array
+    {
+        $stmt = $this->db->prepare("SELECT * FROM deadlines WHERE id = :id AND deleted_at IS NULL LIMIT 1");
+        $stmt->execute(['id' => $id]);
+        return $stmt->fetch() ?: null;
+    }
+
+    public function getDistinctTypes(): array
+    {
+        return $this->db->query("SELECT DISTINCT type FROM deadlines WHERE deleted_at IS NULL ORDER BY type")->fetchAll(PDO::FETCH_COLUMN);
+    }
+
     public function getAllByClient(int $clientId): array
     {
         $stmt = $this->db->prepare("
-            SELECT * FROM deadlines
-            WHERE client_id = :client_id
-            ORDER BY due_date ASC
+            SELECT d.*, e.company_name AS entity_name, e.entity_type
+            FROM deadlines d
+            JOIN client_entities e ON e.id = d.entity_id
+            WHERE d.client_id = :client_id AND d.deleted_at IS NULL AND e.deleted_at IS NULL
+            ORDER BY e.company_name ASC, d.due_date ASC
         ");
         $stmt->execute(['client_id' => $clientId]);
         return $stmt->fetchAll();
@@ -23,13 +37,42 @@ class Deadline extends Model
         return $this->getAllByClient($clientId);
     }
 
+    public function getAccessibleByUser(int $userId): array
+    {
+        $stmt=$this->db->prepare("SELECT DISTINCT d.*,e.company_name AS entity_name,e.entity_type,e.entity_scope FROM deadlines d JOIN client_entities e ON e.id=d.entity_id JOIN clients c ON c.id=e.client_id LEFT JOIN entity_directors ed ON ed.entity_id=e.id AND ed.user_id=:director_user WHERE d.deleted_at IS NULL AND ((d.scope='company' AND ed.user_id IS NOT NULL) OR (d.scope='personal' AND c.user_id=:owner_user)) ORDER BY e.company_name,d.due_date");
+        $stmt->execute(['director_user'=>$userId,'owner_user'=>$userId]);
+        return $stmt->fetchAll();
+    }
+
+    public function getGroupedByUser(int $userId): array
+    {
+        $grouped=[];
+        foreach($this->getAccessibleByUser($userId) as $deadline){$id=(int)$deadline['entity_id'];if(!isset($grouped[$id]))$grouped[$id]=['entity_id'=>$id,'entity_name'=>$deadline['entity_name'],'entity_type'=>$deadline['entity_type'],'deadlines'=>[]];$grouped[$id]['deadlines'][]=$deadline;}
+        return array_values($grouped);
+    }
+
+    public function getGroupedByClient(int $clientId): array
+    {
+        $grouped = [];
+        foreach ($this->getAllByClient($clientId) as $deadline) {
+            $id = (int)$deadline['entity_id'];
+            if (!isset($grouped[$id])) {
+                $grouped[$id] = ['entity_id'=>$id, 'entity_name'=>$deadline['entity_name'], 'entity_type'=>$deadline['entity_type'], 'deadlines'=>[]];
+            }
+            $grouped[$id]['deadlines'][] = $deadline;
+        }
+        return array_values($grouped);
+    }
+
     public function getAllWithDetails(): array
     {
         $stmt = $this->db->prepare("
-            SELECT d.*, c_user.name AS client_name
+            SELECT d.*, c_user.name AS client_name, e.company_name AS entity_name, e.entity_type
             FROM deadlines d
+            JOIN client_entities e ON e.id = d.entity_id
             JOIN clients c ON c.id = d.client_id
             JOIN users c_user ON c_user.id = c.user_id
+            WHERE d.deleted_at IS NULL
             ORDER BY d.due_date ASC
         ");
         $stmt->execute();
@@ -39,11 +82,13 @@ class Deadline extends Model
     public function create(array $data): int
     {
         $stmt = $this->db->prepare("
-            INSERT INTO deadlines (client_id, type, due_date, status)
-            VALUES (:client_id, :type, :due_date, :status)
+            INSERT INTO deadlines (client_id, entity_id, scope, type, due_date, status)
+            VALUES (:client_id, :entity_id, :scope, :type, :due_date, :status)
         ");
         $stmt->execute([
             'client_id' => $data['client_id'],
+            'entity_id' => $data['entity_id'],
+            'scope'     => $data['scope'] ?? 'company',
             'type'      => $data['type'],
             'due_date'  => $data['due_date'],
             'status'    => $data['status'] ?? 'Pending',
@@ -61,7 +106,7 @@ class Deadline extends Model
     {
         $page = max(1, $page);
         $perPage = max(10, min($perPage, 50));
-        $where = [];
+        $where = ['d.deleted_at IS NULL'];
         $params = [];
         if (($filters['search'] ?? '') !== '') {
             $where[] = 'c_user.name LIKE :search_client';
@@ -93,7 +138,7 @@ class Deadline extends Model
             $where[] = "d.due_date >= CURRENT_DATE() AND d.status <> 'Completed'";
         }
 
-        $joins = 'JOIN clients c ON c.id = d.client_id JOIN users c_user ON c_user.id = c.user_id';
+        $joins = 'JOIN client_entities e ON e.id=d.entity_id JOIN clients c ON c.id = d.client_id JOIN users c_user ON c_user.id = c.user_id';
         $whereSql = $where ? 'WHERE ' . implode(' AND ', $where) : '';
         $countStmt = $this->db->prepare("SELECT COUNT(*) FROM deadlines d {$joins} {$whereSql}");
         $countStmt->execute($params);
@@ -103,8 +148,56 @@ class Deadline extends Model
         $offset = ($page - 1) * $perPage;
         $sorts = ['due_asc' => 'd.due_date ASC', 'due_desc' => 'd.due_date DESC', 'newest' => 'd.created_at DESC', 'client_asc' => 'c_user.name ASC, d.due_date ASC'];
         $orderBy = $sorts[$filters['sort'] ?? 'due_asc'] ?? $sorts['due_asc'];
-        $stmt = $this->db->prepare("SELECT d.*, c_user.name AS client_name FROM deadlines d {$joins} {$whereSql} ORDER BY {$orderBy} LIMIT {$perPage} OFFSET {$offset}");
+        $stmt = $this->db->prepare("SELECT d.*, c_user.name AS client_name, e.company_name AS entity_name, e.entity_type FROM deadlines d {$joins} {$whereSql} ORDER BY {$orderBy} LIMIT {$perPage} OFFSET {$offset}");
         $stmt->execute($params);
         return ['items' => $stmt->fetchAll(), 'total' => $total, 'page' => $page, 'per_page' => $perPage, 'total_pages' => $totalPages];
+    }
+
+    public function softDelete(int $id): bool
+    {
+        $stmt = $this->db->prepare("UPDATE deadlines SET deleted_at = NOW() WHERE id = :id");
+        return $stmt->execute(['id' => $id]);
+    }
+
+    public function bulkSoftDelete(array $ids): int
+    {
+        $count = 0;
+        foreach ($ids as $id) {
+            if ($this->softDelete((int)$id)) {
+                $count++;
+            }
+        }
+        return $count;
+    }
+
+    public function restore(int $id): bool
+    {
+        $stmt = $this->db->prepare("UPDATE deadlines SET deleted_at = NULL WHERE id = :id");
+        return $stmt->execute(['id' => $id]);
+    }
+
+    public function bulkRestore(array $ids): int
+    {
+        $count = 0;
+        foreach ($ids as $id) {
+            if ($this->restore((int)$id)) {
+                $count++;
+            }
+        }
+        return $count;
+    }
+
+    public function getSoftDeleted(): array
+    {
+        $stmt = $this->db->query("
+            SELECT d.*, c_user.name AS client_name, e.company_name AS entity_name
+            FROM deadlines d
+            JOIN client_entities e ON e.id = d.entity_id
+            JOIN clients c ON c.id = d.client_id
+            JOIN users c_user ON c_user.id = c.user_id
+            WHERE d.deleted_at IS NOT NULL
+            ORDER BY d.deleted_at DESC
+        ");
+        return $stmt->fetchAll();
     }
 }

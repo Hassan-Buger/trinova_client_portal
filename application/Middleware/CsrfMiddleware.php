@@ -13,6 +13,10 @@ class CsrfMiddleware
         if (in_array($request->getMethod(), ['POST', 'PUT', 'DELETE'])) {
             $token = $request->input('csrf_token') ?? '';
             if (!Session::verifyCsrf($token)) {
+                if ($request->isAjax()) {
+                    $response->json(['success' => false, 'message' => 'Your security token expired. Refresh the page and try again.'], 403);
+                    return false;
+                }
                 $response->setStatusCode(403);
                 die('CSRF Validation Failed: Security token invalid or expired.');
             }

@@ -37,7 +37,7 @@
 
                 <div style="margin-bottom:16px">
                     <label style="display:block;font-size:13px;font-weight:700;color:#3a4d47;margin-bottom:6px">Email Address</label>
-                    <input type="email" name="email" placeholder="sarah@example.co.uk" required style="width:100%;padding:13px 16px;border:1.5px solid #e0e9e5;border-radius:14px;font-size:14px;background:#fbfdfc">
+                    <input type="email" name="email" placeholder="new.user@example.invalid" required style="width:100%;padding:13px 16px;border:1.5px solid #e0e9e5;border-radius:14px;font-size:14px;background:#fbfdfc">
                 </div>
 
                 <div style="margin-bottom:16px">
@@ -75,12 +75,40 @@
         </div>
     </div>
 
+    <!-- Delete User Confirmation Modal -->
+    <div id="deleteUserModal" style="display:none;position:fixed;inset:0;background:rgba(20,40,35,.45);backdrop-filter:blur(6px);z-index:199;align-items:center;justify-content:center;padding:20px">
+        <div style="background:#fff;border-radius:24px;width:100%;max-width:440px;padding:32px;box-shadow:0 24px 60px -28px rgba(0,0,0,.4)">
+            <h3 style="margin:0 0 12px;font-size:19px;font-weight:800">Delete User Account?</h3>
+            <p style="color:#61756e;font-size:14px;margin:0 0 24px">This user account will be soft-deleted and moved to Trash.</p>
+            <form action="/staff/users/delete" method="POST" data-ajax-form>
+                <input type="hidden" name="csrf_token" value="<?= htmlspecialchars(\Application\Core\Session::csrfToken()) ?>">
+                <input type="hidden" name="user_id" id="deleteUserId">
+                <div style="display:flex;justify-content:flex-end;gap:12px">
+                    <button type="button" onclick="document.getElementById('deleteUserModal').style.display='none'" style="background:#f0f5f3;color:#5f726c;border:none;padding:11px 20px;border-radius:12px;font-weight:700;cursor:pointer">Cancel</button>
+                    <button type="submit" style="background:#dc2626;color:#fff;border:none;padding:11px 22px;border-radius:12px;font-weight:700;cursor:pointer">Delete User</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
     <!-- Users List Table -->
     <div style="background:#fff;border-radius:24px;padding:26px;box-shadow:0 1px 2px rgba(16,54,45,.04),0 14px 34px -24px rgba(16,54,45,.4)">
+        <!-- Bulk Action Bar -->
+        <div id="userBulkBar" style="display:none;align-items:center;gap:12px;padding:12px 16px;background:#fff8ee;border-radius:14px;margin-bottom:16px;border:1px solid #f6dfc0">
+            <span id="userBulkCount" style="font-weight:700;color:#e07d24;font-size:13.5px">0 selected</span>
+            <form action="/staff/users/bulk-delete" method="POST" data-ajax-form style="display:inline">
+                <input type="hidden" name="csrf_token" value="<?= htmlspecialchars(\Application\Core\Session::csrfToken()) ?>">
+                <div id="userBulkIds"></div>
+                <button type="submit" onclick="return confirm('Delete all selected users? They can be restored from Trash.')" style="background:#dc2626;color:#fff;border:none;padding:8px 18px;border-radius:10px;font-weight:700;font-size:13px;cursor:pointer">Delete Selected</button>
+            </form>
+            <button type="button" onclick="tnUserSelectNone()" style="background:#f0f5f3;color:#5f726c;border:none;padding:8px 14px;border-radius:10px;font-weight:700;font-size:13px;cursor:pointer">Clear</button>
+        </div>
+
         <div style="overflow-x:auto">
             <table style="width:100%;border-collapse:collapse;text-align:left">
                 <thead>
                     <tr style="border-bottom:2px solid #eef4f1;color:#7d8e88;font-size:12.5px;text-transform:uppercase;letter-spacing:.05em">
+                        <th style="padding:12px 10px;width:36px"><input type="checkbox" id="userCheckAll" aria-label="Select all users" onchange="tnUserToggleAll(this)" style="width:16px;height:16px;cursor:pointer"></th>
                         <th style="padding:12px 16px;font-weight:700">User Name</th>
                         <th style="padding:12px 16px;font-weight:700">Email</th>
                         <th style="padding:12px 16px;font-weight:700">Role</th>
@@ -90,9 +118,10 @@
                     </tr>
                 </thead>
                 <tbody>
-                    <?php if(empty($users)): ?><tr><td colspan="6" style="padding:42px;text-align:center;color:#7d8e88"><?= $hasUserFilters ? 'No users match the selected filters.' : 'No users found.' ?></td></tr><?php endif; ?>
+                    <?php if(empty($users)): ?><tr><td colspan="7" style="padding:42px;text-align:center;color:#7d8e88"><?= $hasUserFilters ? 'No users match the selected filters.' : 'No users found.' ?></td></tr><?php endif; ?>
                     <?php foreach ($users as $u): ?>
                         <tr style="border-bottom:1px solid #eef4f1">
+                            <td style="padding:12px 10px"><input type="checkbox" class="tn-user-check" value="<?= (int)$u['id'] ?>" aria-label="Select user" onchange="tnUserUpdateBar()" style="width:16px;height:16px;cursor:pointer"></td>
                             <td style="padding:16px;font-weight:700;color:#213330">
                                 <?= htmlspecialchars($u['name']) ?>
                             </td>
@@ -106,33 +135,40 @@
                                     <span style="padding:4px 10px;border-radius:999px;font-size:11.5px;font-weight:700;background:#dff1ee;color:#0d9488">Client</span>
                                 <?php endif; ?>
                             </td>
-                            <td style="padding:16px">
+                            <td style="padding:16px;white-space:nowrap;min-width:145px">
                                 <?php if ($u['status'] === 'active'): ?>
-                                    <span style="padding:4px 10px;border-radius:999px;font-size:11.5px;font-weight:700;background:#e2f3ea;color:#3f9d6d">Active</span>
+                                    <span style="display:inline-flex;align-items:center;justify-content:center;white-space:nowrap;line-height:1;padding:7px 12px;border-radius:999px;font-size:11.5px;font-weight:700;background:#e2f3ea;color:#3f9d6d">Active</span>
                                 <?php elseif ($u['status'] === 'pending_activation'): ?>
-                                    <span style="padding:4px 10px;border-radius:999px;font-size:11.5px;font-weight:700;background:#e6ecf5;color:#41556f">Pending activation</span>
+                                    <span style="display:inline-flex;align-items:center;justify-content:center;white-space:nowrap;line-height:1;padding:7px 12px;border-radius:999px;font-size:11.5px;font-weight:700;background:#e6ecf5;color:#41556f">Pending activation</span>
                                 <?php else: ?>
-                                    <span style="padding:4px 10px;border-radius:999px;font-size:11.5px;font-weight:700;background:#fdecdc;color:#e07d24">Suspended</span>
+                                    <span style="display:inline-flex;align-items:center;justify-content:center;white-space:nowrap;line-height:1;padding:7px 12px;border-radius:999px;font-size:11.5px;font-weight:700;background:#fdecdc;color:#e07d24">Suspended</span>
                                 <?php endif; ?>
                             </td>
                             <td style="padding:16px;color:#7d8e88;font-size:13px">
                                 <?= $u['last_login_at'] ? date('d M Y, H:i', strtotime($u['last_login_at'])) : 'Never' ?>
                             </td>
-                            <td style="padding:16px;text-align:right">
+                            <td style="padding:16px;text-align:right;min-width:170px">
+                                <div style="display:flex;flex-direction:column;align-items:stretch;gap:8px;width:150px;margin-left:auto">
                                 <?php if($u['status'] !== 'pending_activation'): ?>
-                                    <button type="button" onclick="openUserReset(<?= (int)$u['id'] ?>, <?= htmlspecialchars(json_encode($u['name'], JSON_HEX_APOS | JSON_HEX_QUOT), ENT_QUOTES, 'UTF-8') ?>)" style="background:#fff8ee;color:#e07d24;border:1px solid #f6dfc0;padding:7px 12px;border-radius:10px;font-weight:700;font-size:12px;cursor:pointer;margin-right:6px">Reset Password</button>
+                                    <button type="button" onclick="openUserReset(<?= (int)$u['id'] ?>, <?= htmlspecialchars(json_encode($u['name'], JSON_HEX_APOS | JSON_HEX_QUOT), ENT_QUOTES, 'UTF-8') ?>)" style="width:100%;min-height:36px;background:#fff8ee;color:#e07d24;border:1px solid #f6dfc0;padding:8px 12px;border-radius:11px;font-weight:700;font-size:12px;cursor:pointer">Reset Password</button>
                                 <?php else: ?>
-                                    <span style="font-size:11.5px;color:#7d8e88;margin-right:8px">Awaiting activation</span>
+                                    <form action="/staff/users/resend-activation" method="POST" data-ajax-form style="margin:0;width:100%">
+                                        <input type="hidden" name="csrf_token" value="<?= htmlspecialchars(\Application\Core\Session::csrfToken(), ENT_QUOTES, 'UTF-8') ?>">
+                                        <input type="hidden" name="user_id" value="<?= (int)$u['id'] ?>">
+                                        <button type="submit" style="width:100%;min-height:36px;background:#eef4f1;color:#0d9488;border:1px solid #d7e7e2;padding:8px 12px;border-radius:11px;font-weight:700;font-size:12px;cursor:pointer">Resend Activation</button>
+                                    </form>
                                 <?php endif; ?>
-                                <?php if(!empty($u['client_id'])): ?><a href="/staff/clients/<?= (int)$u['client_id'] ?>" style="display:inline-block;background:#eef4f1;color:#0d9488;padding:7px 12px;border-radius:10px;font-weight:700;font-size:12px;margin-right:6px">Client Profile</a><?php endif; ?>
-                                <?php if($u['status'] !== 'pending_activation'): ?><form action="/staff/users/toggle-status" method="POST" data-ajax-form style="margin:0;display:inline-block">
+                                <?php if(!empty($u['client_id'])): ?><a href="/staff/clients/<?= (int)$u['client_id'] ?>" style="display:flex;align-items:center;justify-content:center;width:100%;min-height:36px;background:#eef4f1;color:#0d9488;padding:8px 12px;border-radius:11px;font-weight:700;font-size:12px">Client Profile</a><?php endif; ?>
+                                <?php if($u['status'] !== 'pending_activation'): ?><form action="/staff/users/toggle-status" method="POST" data-ajax-form style="margin:0;width:100%">
                                     <input type="hidden" name="csrf_token" value="<?= htmlspecialchars(\Application\Core\Session::csrfToken()) ?>">
                                     <input type="hidden" name="user_id" value="<?= $u['id'] ?>">
                                     <input type="hidden" name="status" value="<?= $u['status'] === 'active' ? 'suspended' : 'active' ?>">
-                                    <button type="submit" style="background:#f0f5f3;color:#5f726c;border:none;padding:7px 14px;border-radius:10px;font-weight:700;font-size:12.5px;cursor:pointer">
+                                    <button type="submit" style="width:100%;min-height:36px;background:#f0f5f3;color:#5f726c;border:none;padding:8px 12px;border-radius:11px;font-weight:700;font-size:12.5px;cursor:pointer">
                                         <?= $u['status'] === 'active' ? 'Suspend' : 'Activate' ?>
                                     </button>
                                 </form><?php endif; ?>
+                                <button type="button" onclick="tnDeleteUser(<?= (int)$u['id'] ?>)" style="width:100%;min-height:36px;background:#fef2f2;color:#dc2626;border:1px solid #fecaca;padding:8px 12px;border-radius:11px;font-weight:700;font-size:12.5px;cursor:pointer">Delete</button>
+                                </div>
                             </td>
                         </tr>
                     <?php endforeach; ?>
@@ -148,5 +184,29 @@ function openUserReset(id, name) {
     document.getElementById('reset_user_id').value = id;
     document.getElementById('reset_user_name').textContent = name;
     document.getElementById('userResetModal').style.display = 'flex';
+}
+function tnDeleteUser(id) {
+    document.getElementById('deleteUserId').value = id;
+    document.getElementById('deleteUserModal').style.display = 'flex';
+}
+function tnUserToggleAll(el) {
+    document.querySelectorAll('.tn-user-check').forEach(c => { c.checked = el.checked; });
+    tnUserUpdateBar();
+}
+function tnUserSelectNone() {
+    document.querySelectorAll('.tn-user-check, #userCheckAll').forEach(c => { c.checked = false; });
+    tnUserUpdateBar();
+}
+function tnUserUpdateBar() {
+    const checked = [...document.querySelectorAll('.tn-user-check:checked')];
+    document.getElementById('userBulkCount').textContent = checked.length + ' selected';
+    const container = document.getElementById('userBulkIds');
+    container.innerHTML = '';
+    checked.forEach(c => {
+        const inp = document.createElement('input');
+        inp.type = 'hidden'; inp.name = 'ids[]'; inp.value = c.value;
+        container.appendChild(inp);
+    });
+    document.getElementById('userBulkBar').style.display = checked.length > 0 ? 'flex' : 'none';
 }
 </script>

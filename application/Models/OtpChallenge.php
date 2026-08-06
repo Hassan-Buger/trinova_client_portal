@@ -9,10 +9,10 @@ class OtpChallenge extends Model
     public const ACTIVATION = 'client_account_activation';
     public const PASSWORD_RESET = 'password_reset';
 
-    public function issue(int $userId, string $email, string $purpose): array
+    public function issue(int $userId, string $email, string $purpose, bool $force = false): array
     {
         $latest = $this->latest($userId, $purpose);
-        if ($latest && strtotime((string)$latest['created_at']) > time() - 60) {
+        if (!$force && $latest && strtotime((string)$latest['created_at']) > time() - 60) {
             return ['ok' => false, 'reason' => 'cooldown', 'retry_after' => max(1, 60 - (time() - strtotime($latest['created_at'])))];
         }
         $this->invalidate($userId, $purpose);

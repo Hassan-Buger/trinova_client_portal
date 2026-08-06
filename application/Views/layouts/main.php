@@ -49,9 +49,16 @@
         .tn-notification-time { display:block;margin-top:4px;color:#8a9a94;font-size:11px;font-weight:600; }
         .tn-notification-empty { padding:24px 17px;text-align:center;color:#8a9a94;font-size:13px; }
         .tn-side nav { min-height:0;overflow-y:auto;overflow-x:hidden;scrollbar-width:thin; }
+        [data-entity-fields] input,
+        [data-deadline-row] input,
+        form[action="/staff/deadlines/create"] input:not([type="hidden"]) { width:100%;min-width:0;padding:11px 12px;border:1px solid #dfe9e5;border-radius:11px;background:#fbfdfc;color:#213330;font-size:13px; }
+        [data-entity-fields] input:focus,
+        [data-deadline-row] input:focus { background:#fff; }
+        .tn-brand-logo { display:block;width:178px;max-width:100%;height:52px;object-fit:contain;object-position:left center; }
+        .tn-auth-logo { display:block;width:230px;max-width:78vw;height:auto;margin:0 auto 26px; }
         .tn-side > a:last-child { flex-shrink:0;background:#f6f9f8; }
         .tn-side > a:last-child:hover { background:#fdecdc;color:#b45e18 !important; }
-        @media(max-width:1080px){ .tn-navlabel, .tn-brandword, .tn-logout-label { display: none !important; } .tn-side { width: 80px !important; align-items: center; } .tn-navitem { justify-content: center; } }
+        @media(max-width:1080px){ .tn-navlabel, .tn-brandword, .tn-logout-label { display: none !important; } .tn-side { width: 80px !important; align-items: center; } .tn-navitem { justify-content: center; } .tn-sidebar-brand { width:56px;padding-left:0 !important;padding-right:0 !important;justify-content:flex-start;overflow:hidden; } .tn-brand-logo { width:150px;max-width:none;height:44px;object-position:left center; } }
         @media(max-width:760px){
             body { overflow-x:hidden; }
             .tn-side { position:fixed !important;left:0;right:0;bottom:0;top:auto !important;width:100% !important;height:76px !important;padding:7px 8px env(safe-area-inset-bottom) !important;border-right:0 !important;border-top:1px solid rgba(20,60,50,.1);z-index:20;align-items:stretch !important; }
@@ -75,6 +82,7 @@
             .tn-client-toolbar-actions input[type="search"] { min-width:0 !important;flex:1;width:100%; }
             .tn-client-toolbar-actions select { flex:0 0 108px; }
             .tn-create-client-button { width:100%; }
+            [data-entity-fields], [data-deadline-row], form[action="/staff/deadlines/create"] { grid-template-columns:1fr !important; }
             .tn-client-list { padding:0 !important;background:transparent !important;box-shadow:none !important; }
             #clientsTable, #clientsTable tbody { display:block;width:100%; }
             #clientsTable thead { display:none; }

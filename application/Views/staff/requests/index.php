@@ -35,11 +35,11 @@
                 <input type="hidden" name="csrf_token" value="<?= htmlspecialchars(\Application\Core\Session::csrfToken()) ?>">
                 
                 <div style="margin-bottom:16px">
-                    <label style="display:block;font-size:13px;font-weight:700;color:#3a4d47;margin-bottom:6px">Client Account</label>
-                    <select name="client_id" required style="width:100%;padding:13px 16px;border:1.5px solid #e0e9e5;border-radius:14px;font-size:14px;background:#fbfdfc">
-                        <option value="">-- Select Client --</option>
-                        <?php foreach ($clients as $c): ?>
-                            <option value="<?= $c['id'] ?>"><?= htmlspecialchars($c['name']) ?> (<?= htmlspecialchars($c['email']) ?>)</option>
+                    <label style="display:block;font-size:13px;font-weight:700;color:#3a4d47;margin-bottom:6px">Company or personal record</label>
+                    <select name="entity_id" required style="width:100%;padding:13px 16px;border:1.5px solid #e0e9e5;border-radius:14px;font-size:14px;background:#fbfdfc">
+                        <option value="">-- Select record --</option>
+                        <?php foreach ($entities as $entity): ?>
+                            <option value="<?= (int)$entity['id'] ?>"><?= htmlspecialchars($entity['company_name']) ?> — <?= htmlspecialchars(ucfirst($entity['entity_scope'])) ?></option>
                         <?php endforeach; ?>
                     </select>
                 </div>
@@ -67,8 +67,34 @@
         </div>
     </div>
 
+    <!-- Delete Request Confirmation Modal -->
+    <div id="deleteReqModal" style="display:none;position:fixed;inset:0;background:rgba(20,40,35,.45);backdrop-filter:blur(6px);z-index:199;align-items:center;justify-content:center;padding:20px">
+        <div style="background:#fff;border-radius:24px;width:100%;max-width:440px;padding:32px;box-shadow:0 24px 60px -28px rgba(0,0,0,.4);animation:tnpop .25s ease">
+            <h3 style="margin:0 0 12px;font-size:19px;font-weight:800">Delete Request?</h3>
+            <p style="color:#61756e;font-size:14px;margin:0 0 24px">This document request will be soft-deleted and can be restored from Trash.</p>
+            <form action="/staff/requests/delete" method="POST" data-ajax-form>
+                <input type="hidden" name="csrf_token" value="<?= htmlspecialchars(\Application\Core\Session::csrfToken()) ?>">
+                <input type="hidden" name="request_id" id="deleteReqId">
+                <div style="display:flex;justify-content:flex-end;gap:12px">
+                    <button type="button" onclick="document.getElementById('deleteReqModal').style.display='none'" style="background:#f0f5f3;color:#5f726c;border:none;padding:11px 20px;border-radius:12px;font-weight:700;cursor:pointer">Cancel</button>
+                    <button type="submit" style="background:#dc2626;color:#fff;border:none;padding:11px 22px;border-radius:12px;font-weight:700;cursor:pointer">Delete</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
     <!-- Requests List Table -->
     <div style="background:#fff;border-radius:24px;padding:26px;box-shadow:0 1px 2px rgba(16,54,45,.04),0 14px 34px -24px rgba(16,54,45,.4)">
+        <!-- Bulk Action Bar -->
+        <div id="reqBulkBar" style="display:none;align-items:center;gap:12px;padding:12px 16px;background:#fff8ee;border-radius:14px;margin-bottom:16px;border:1px solid #f6dfc0">
+            <span id="reqBulkCount" style="font-weight:700;color:#e07d24;font-size:13.5px">0 selected</span>
+            <form action="/staff/requests/bulk-delete" method="POST" data-ajax-form style="display:inline">
+                <input type="hidden" name="csrf_token" value="<?= htmlspecialchars(\Application\Core\Session::csrfToken()) ?>">
+                <div id="reqBulkIds"></div>
+                <button type="submit" onclick="return confirm('Delete all selected requests? They can be restored from Trash.')" style="background:#dc2626;color:#fff;border:none;padding:8px 18px;border-radius:10px;font-weight:700;font-size:13px;cursor:pointer">Delete Selected</button>
+            </form>
+            <button type="button" onclick="tnReqSelectNone()" style="background:#f0f5f3;color:#5f726c;border:none;padding:8px 14px;border-radius:10px;font-weight:700;font-size:13px;cursor:pointer">Clear</button>
+        </div>
         <?php if (empty($requests)): ?>
             <div style="padding:48px 24px;text-align:center;color:#8a9a94"><?= $hasRequestFilters ? 'No requests match the selected filters.' : 'No document requests active.' ?></div>
         <?php else: ?>
@@ -76,16 +102,19 @@
                 <table style="width:100%;border-collapse:collapse;text-align:left">
                     <thead>
                         <tr style="border-bottom:2px solid #eef4f1;color:#7d8e88;font-size:12.5px;text-transform:uppercase;letter-spacing:.05em">
+                            <th style="padding:12px 10px;font-weight:700;width:36px"><input type="checkbox" id="reqCheckAll" aria-label="Select all requests" onchange="tnReqToggleAll(this)" style="width:16px;height:16px;cursor:pointer"></th>
                             <th style="padding:12px 16px;font-weight:700">Client</th>
-                            <th style="padding:12px 16px;font-weight:700">Title & Instructions</th>
+                            <th style="padding:12px 16px;font-weight:700">Title &amp; Instructions</th>
                             <th style="padding:12px 16px;font-weight:700">Issued By</th>
                             <th style="padding:12px 16px;font-weight:700">Due Date</th>
                             <th style="padding:12px 16px;font-weight:700">Lifecycle Status</th>
+                            <th style="padding:12px 16px;font-weight:700;text-align:right">Action</th>
                         </tr>
                     </thead>
                     <tbody>
                         <?php foreach ($requests as $req): ?>
                             <tr style="border-bottom:1px solid #eef4f1">
+                                <td style="padding:10px 10px"><input type="checkbox" class="tn-req-check" value="<?= (int)$req['id'] ?>" aria-label="Select request <?= htmlspecialchars($req['title']) ?>" onchange="tnReqUpdateBar()" style="width:16px;height:16px;cursor:pointer"></td>
                                 <td style="padding:16px;font-weight:700;color:#213330">
                                     <?= htmlspecialchars($req['client_name'] ?? 'Client') ?>
                                 </td>
@@ -113,6 +142,9 @@
                                         </select>
                                     </form>
                                 </td>
+                                <td style="padding:16px;text-align:right">
+                                    <button type="button" onclick="tnReqDelete(<?= (int)$req['id'] ?>)" style="background:#fef2f2;color:#dc2626;border:1px solid #fecaca;padding:8px 12px;border-radius:10px;font-weight:700;font-size:13px;cursor:pointer">Delete</button>
+                                </td>
                             </tr>
                         <?php endforeach; ?>
                     </tbody>
@@ -125,3 +157,30 @@
         <?php endif; ?>
     </div>
 </div>
+
+<script>
+function tnReqDelete(id) {
+    document.getElementById('deleteReqId').value = id;
+    document.getElementById('deleteReqModal').style.display = 'flex';
+}
+function tnReqToggleAll(el) {
+    document.querySelectorAll('.tn-req-check').forEach(c => { c.checked = el.checked; });
+    tnReqUpdateBar();
+}
+function tnReqSelectNone() {
+    document.querySelectorAll('.tn-req-check, #reqCheckAll').forEach(c => { c.checked = false; });
+    tnReqUpdateBar();
+}
+function tnReqUpdateBar() {
+    const checked = [...document.querySelectorAll('.tn-req-check:checked')];
+    document.getElementById('reqBulkCount').textContent = checked.length + ' selected';
+    const container = document.getElementById('reqBulkIds');
+    container.innerHTML = '';
+    checked.forEach(c => {
+        const inp = document.createElement('input');
+        inp.type = 'hidden'; inp.name = 'ids[]'; inp.value = c.value;
+        container.appendChild(inp);
+    });
+    document.getElementById('reqBulkBar').style.display = checked.length > 0 ? 'flex' : 'none';
+}
+</script>

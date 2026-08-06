@@ -1,5 +1,11 @@
 <?php
 
+// Production-safe bootstrap: diagnostics are logged, never rendered into a
+// user response before the application exception handler is available.
+ini_set('display_errors','0');
+ini_set('display_startup_errors','0');
+ini_set('log_errors','1');
+
 /**
  * TriNova Client Portal - Front Controller
  */
@@ -8,6 +14,9 @@ $appDir = dirname(__DIR__);
 if (file_exists($appDir . '/trinova_app/vendor/autoload.php')) {
     require_once $appDir . '/trinova_app/vendor/autoload.php';
     $basePath = $appDir . '/trinova_app';
+} elseif (file_exists($appDir . '/8493files/vendor/autoload.php')) {
+    require_once $appDir . '/8493files/vendor/autoload.php';
+    $basePath = $appDir . '/8493files';
 } else {
     require_once $appDir . '/vendor/autoload.php';
     $basePath = $appDir;
@@ -30,12 +39,15 @@ use Application\Controllers\Client\MeetingController as ClientMeetingController;
 use Application\Controllers\Client\ProfileController as ClientProfileController;
 use Application\Controllers\Staff\DashboardController as StaffDashboardController;
 use Application\Controllers\Staff\ClientController as StaffClientController;
+use Application\Controllers\Staff\ClientCsvController as StaffClientCsvController;
+use Application\Controllers\Staff\DirectorCsvController as StaffDirectorCsvController;
 use Application\Controllers\Staff\DocumentController as StaffDocumentController;
 use Application\Controllers\Staff\RequestController as StaffRequestController;
 use Application\Controllers\Staff\MessageController as StaffMessageController;
 use Application\Controllers\Staff\DeadlineController as StaffDeadlineController;
 use Application\Controllers\Staff\UserAdminController as StaffUserAdminController;
 use Application\Controllers\Staff\AuditController as StaffAuditController;
+use Application\Controllers\Staff\TrashController as StaffTrashController;
 use Application\Controllers\NotificationController;
 
 // Simple dotenv loader fallback for environment variables
@@ -60,7 +72,7 @@ $app->router->get('/', function($req, $res) {
 });
 $app->router->get('/login', [AuthController::class, 'showLogin']);
 $app->router->post('/login', [AuthController::class, 'login'])->middleware([CsrfMiddleware::class]);
-$app->router->get('/logout', [AuthController::class, 'logout']);
+$app->router->post('/logout', [AuthController::class, 'logout'])->middleware([AuthMiddleware::class, CsrfMiddleware::class]);
 
 $app->router->get('/password/reset', [PasswordResetController::class, 'showRequestForm']);
 $app->router->post('/password/reset', [PasswordResetController::class, 'sendResetLink'])->middleware([CsrfMiddleware::class]);
@@ -73,14 +85,11 @@ $app->router->post('/activate', [ActivationController::class, 'processActivation
 // --- SHARED DOWNLOAD ROUTE (accessible by all authenticated users: staff & clients) ---
 $app->router->get('/documents/download/{id}', [ClientDocumentController::class, 'download'])->middleware([AuthMiddleware::class, SessionTimeoutMiddleware::class]);
 $app->router->get('/documents/view/{id}', [ClientDocumentController::class, 'view'])->middleware([AuthMiddleware::class, SessionTimeoutMiddleware::class]);
+$app->router->get('/documents/availability/{id}', [ClientDocumentController::class, 'availability'])->middleware([AuthMiddleware::class, SessionTimeoutMiddleware::class]);
 $app->router->get('/notifications/feed', [NotificationController::class, 'feed'])->middleware([AuthMiddleware::class, SessionTimeoutMiddleware::class]);
 $app->router->post('/notifications/read-all', [NotificationController::class, 'readAll'])->middleware([AuthMiddleware::class, SessionTimeoutMiddleware::class, CsrfMiddleware::class]);
 $app->router->get('/api/notifications', [NotificationController::class, 'feed'])->middleware([AuthMiddleware::class, SessionTimeoutMiddleware::class]);
 $app->router->post('/api/notifications/mark-as-read', [NotificationController::class, 'read'])->middleware([AuthMiddleware::class, SessionTimeoutMiddleware::class, CsrfMiddleware::class]);
-
-// --- EXPLICIT STAFF CLIENT ACTION ROUTES ---
-$app->router->post('/staff/clients/reset-password', [StaffClientController::class, 'resetPassword'])->middleware([AuthMiddleware::class, SessionTimeoutMiddleware::class, RoleMiddleware::class . ':staff', CsrfMiddleware::class]);
-$app->router->post('/staff/clients/delete', [StaffClientController::class, 'delete'])->middleware([AuthMiddleware::class, SessionTimeoutMiddleware::class, RoleMiddleware::class . ':staff', CsrfMiddleware::class]);
 
 // --- SECURED CLIENT ROUTES ---
 $app->router->group([
@@ -97,13 +106,16 @@ $app->router->group([
     $r->get('/messages', [ClientMessageController::class, 'index']);
     $r->get('/messages/feed', [ClientMessageController::class, 'feed']);
     $r->post('/messages/send', [ClientMessageController::class, 'send'])->middleware([CsrfMiddleware::class]);
+    $r->post('/messages/delete', [ClientMessageController::class, 'delete'])->middleware([CsrfMiddleware::class]);
     $r->get('/requests', [ClientRequestController::class, 'index']);
     $r->get('/deadlines', [ClientDeadlineController::class, 'index']);
     $r->get('/meetings/book', [ClientMeetingController::class, 'index']);
     $r->post('/meetings/book', [ClientMeetingController::class, 'book'])->middleware([CsrfMiddleware::class]);
+    $r->post('/meetings/delete', [ClientMeetingController::class, 'delete'])->middleware([CsrfMiddleware::class]);
     $r->get('/aml', [ClientProfileController::class, 'aml']);
     $r->get('/profile/details', [ClientProfileController::class, 'details']);
     $r->post('/profile/request-update', [ClientProfileController::class, 'requestUpdate'])->middleware([CsrfMiddleware::class]);
+    $r->post('/documents/delete', [ClientDocumentController::class, 'delete'])->middleware([CsrfMiddleware::class]);
 });
 
 // --- SECURED STAFF ROUTES ---
@@ -113,28 +125,61 @@ $app->router->group([
 ], function($r) {
     $r->get('/dashboard', [StaffDashboardController::class, 'index']);
     $r->get('/clients', [StaffClientController::class, 'index']);
+    $r->get('/clients/export', [StaffClientController::class, 'exportCsv']);
+    $r->get('/clients/import', [StaffClientCsvController::class, 'index']);
+    $r->post('/clients/import/upload', [StaffClientCsvController::class, 'upload'])->middleware([CsrfMiddleware::class]);
+    $r->post('/clients/import/preview', [StaffClientCsvController::class, 'preview'])->middleware([CsrfMiddleware::class]);
+    $r->post('/clients/import/commit', [StaffClientCsvController::class, 'commit'])->middleware([CsrfMiddleware::class]);
+    $r->get('/clients/import/report.csv', [StaffClientCsvController::class, 'reportCsv']);
+    $r->get('/clients/import/report/{id}', [StaffClientCsvController::class, 'showReport']);
+    $r->get('/directors/import', [StaffDirectorCsvController::class, 'index']);
+    $r->post('/directors/import/upload', [StaffDirectorCsvController::class, 'upload'])->middleware([CsrfMiddleware::class]);
+    $r->post('/directors/import/commit', [StaffDirectorCsvController::class, 'commit'])->middleware([CsrfMiddleware::class]);
+    $r->get('/directors/import/template', [StaffDirectorCsvController::class, 'template']);
+    $r->get('/directors/import/report/{id}/download', [StaffDirectorCsvController::class, 'reportCsv']);
+    $r->get('/directors/import/report/{id}', [StaffDirectorCsvController::class, 'report']);
     $r->post('/clients/create', [StaffClientController::class, 'create'])->middleware([CsrfMiddleware::class]);
     $r->post('/clients/reset-password', [StaffClientController::class, 'resetPassword'])->middleware([CsrfMiddleware::class]);
     $r->post('/clients/delete', [StaffClientController::class, 'delete'])->middleware([CsrfMiddleware::class]);
+    $r->post('/clients/bulk-delete', [StaffClientController::class, 'bulkDelete'])->middleware([CsrfMiddleware::class]);
+    $r->post('/clients/delete-entity', [StaffClientController::class, 'deleteEntity'])->middleware([CsrfMiddleware::class]);
+    $r->post('/clients/import/batch/delete', [StaffClientCsvController::class, 'deleteBatch'])->middleware([CsrfMiddleware::class]);
     $r->get('/clients/{id}', [StaffClientController::class, 'show']);
     $r->post('/clients/add-entity', [StaffClientController::class, 'addEntity'])->middleware([CsrfMiddleware::class]);
+    $r->post('/clients/link-director', [StaffClientController::class, 'linkDirector'])->middleware([CsrfMiddleware::class]);
+    $r->post('/clients/unlink-director', [StaffClientController::class, 'unlinkDirector'])->middleware([CsrfMiddleware::class]);
     $r->get('/documents', [StaffDocumentController::class, 'index']);
     $r->post('/documents/upload', [StaffDocumentController::class, 'upload'])->middleware([CsrfMiddleware::class]);
     $r->get('/documents/download/{id}', [StaffDocumentController::class, 'download']);
+    $r->post('/documents/delete', [StaffDocumentController::class, 'delete'])->middleware([CsrfMiddleware::class]);
+    $r->post('/documents/bulk-delete', [StaffDocumentController::class, 'bulkDelete'])->middleware([CsrfMiddleware::class]);
     $r->get('/requests', [StaffRequestController::class, 'index']);
     $r->post('/requests/create', [StaffRequestController::class, 'create'])->middleware([CsrfMiddleware::class]);
     $r->post('/requests/update-status', [StaffRequestController::class, 'updateStatus'])->middleware([CsrfMiddleware::class]);
+    $r->post('/requests/delete', [StaffRequestController::class, 'delete'])->middleware([CsrfMiddleware::class]);
+    $r->post('/requests/bulk-delete', [StaffRequestController::class, 'bulkDelete'])->middleware([CsrfMiddleware::class]);
     $r->get('/messages', [StaffMessageController::class, 'index']);
     $r->get('/messages/feed', [StaffMessageController::class, 'feed']);
     $r->post('/messages/send', [StaffMessageController::class, 'send'])->middleware([CsrfMiddleware::class]);
+    $r->post('/messages/delete', [StaffMessageController::class, 'delete'])->middleware([CsrfMiddleware::class]);
+    $r->post('/messages/delete-thread', [StaffMessageController::class, 'deleteThread'])->middleware([CsrfMiddleware::class]);
+    $r->post('/messages/bulk-delete', [StaffMessageController::class, 'bulkDelete'])->middleware([CsrfMiddleware::class]);
     $r->get('/deadlines', [StaffDeadlineController::class, 'index']);
     $r->post('/deadlines/create', [StaffDeadlineController::class, 'create'])->middleware([CsrfMiddleware::class]);
     $r->post('/deadlines/update-status', [StaffDeadlineController::class, 'updateStatus'])->middleware([CsrfMiddleware::class]);
+    $r->post('/deadlines/delete', [StaffDeadlineController::class, 'delete'])->middleware([CsrfMiddleware::class]);
+    $r->post('/deadlines/bulk-delete', [StaffDeadlineController::class, 'bulkDelete'])->middleware([CsrfMiddleware::class]);
     $r->get('/audit', [StaffAuditController::class, 'index']);
     $r->get('/users', [StaffUserAdminController::class, 'index']);
     $r->post('/users/create', [StaffUserAdminController::class, 'createUser'])->middleware([CsrfMiddleware::class]);
     $r->post('/users/toggle-status', [StaffUserAdminController::class, 'toggleStatus'])->middleware([CsrfMiddleware::class]);
     $r->post('/users/reset-password', [StaffUserAdminController::class, 'resetPassword'])->middleware([CsrfMiddleware::class]);
+    $r->post('/users/resend-activation', [StaffUserAdminController::class, 'resendActivation'])->middleware([CsrfMiddleware::class]);
+    $r->post('/users/delete', [StaffUserAdminController::class, 'delete'])->middleware([CsrfMiddleware::class]);
+    $r->post('/users/bulk-delete', [StaffUserAdminController::class, 'bulkDelete'])->middleware([CsrfMiddleware::class]);
+    $r->get('/trash', [StaffTrashController::class, 'index']);
+    $r->post('/trash/restore', [StaffTrashController::class, 'restore'])->middleware([CsrfMiddleware::class]);
+    $r->post('/trash/bulk-restore', [StaffTrashController::class, 'bulkRestore'])->middleware([CsrfMiddleware::class]);
 });
 
 // Security response headers

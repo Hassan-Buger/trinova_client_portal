@@ -1,3 +1,7 @@
+<?php
+// Extract the filters section and form from the original file — preserved below.
+// This view replaces the full deadlines/index.php to add delete/bulk-delete UI.
+?>
 <div class="tn-screen" style="max-width:1120px">
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:24px">
         <div>
@@ -28,37 +32,17 @@
                 <h3 style="margin:0;font-size:20px;font-weight:800">Add Compliance Deadline</h3>
                 <button onclick="document.getElementById('newDeadlineModal').style.display='none'" style="background:none;border:none;font-size:24px;cursor:pointer;color:#8a9a94">&times;</button>
             </div>
-
             <form action="/staff/deadlines/create" method="POST" data-ajax-form>
                 <input type="hidden" name="csrf_token" value="<?= htmlspecialchars(\Application\Core\Session::csrfToken()) ?>">
-                
-                <div style="margin-bottom:16px">
-                    <label style="display:block;font-size:13px;font-weight:700;color:#3a4d47;margin-bottom:6px">Client</label>
-                    <select name="client_id" required style="width:100%;padding:13px 16px;border:1.5px solid #e0e9e5;border-radius:14px;font-size:14px;background:#fbfdfc">
-                        <option value="">-- Select Client --</option>
-                        <?php foreach ($clients as $c): ?>
-                            <option value="<?= $c['id'] ?>"><?= htmlspecialchars($c['name']) ?> (<?= htmlspecialchars($c['email']) ?>)</option>
-                        <?php endforeach; ?>
-                    </select>
-                </div>
-
+                <div style="margin-bottom:16px"><label style="display:block;font-size:13px;font-weight:700;color:#3a4d47;margin-bottom:6px">Client entity</label><input type="hidden" name="client_id" id="deadlineClientId"><select name="entity_id" required onchange="document.getElementById('deadlineClientId').value=this.options[this.selectedIndex].dataset.client" style="width:100%;padding:13px 16px;border:1.5px solid #e0e9e5;border-radius:14px;font-size:14px;background:#fbfdfc"><option value="">-- Select Entity --</option><?php foreach($entities as $entity): ?><option value="<?= (int)$entity['id'] ?>" data-client="<?= (int)$entity['client_id'] ?>"><?= htmlspecialchars($entity['client_name'].' — '.$entity['company_name']) ?></option><?php endforeach; ?></select></div>
                 <div style="margin-bottom:16px">
                     <label style="display:block;font-size:13px;font-weight:700;color:#3a4d47;margin-bottom:6px">Deadline Type</label>
-                    <select name="type" required style="width:100%;padding:13px 16px;border:1.5px solid #e0e9e5;border-radius:14px;font-size:14px;background:#fbfdfc">
-                        <option value="VAT">VAT Return</option>
-                        <option value="Payroll">Payroll</option>
-                        <option value="Accounts">Annual Accounts</option>
-                        <option value="Corporation Tax">Corporation Tax</option>
-                        <option value="Self Assessment">Self Assessment</option>
-                        <option value="Confirmation Statement">Confirmation Statement</option>
-                    </select>
+                    <input name="type" list="deadlineTypes" required placeholder="e.g. Accounts Due" style="width:100%;padding:13px 16px;border:1.5px solid #e0e9e5;border-radius:14px;font-size:14px;background:#fbfdfc"><datalist id="deadlineTypes"><?php foreach(array_unique(array_merge($types,['Accounts Due','Corporation Tax Due','Next VAT Return Due','Tax Return Due','Payment Due','Payment on Account'])) as $type): ?><option value="<?= htmlspecialchars($type) ?>"><?php endforeach; ?></datalist>
                 </div>
-
                 <div style="margin-bottom:24px">
                     <label style="display:block;font-size:13px;font-weight:700;color:#3a4d47;margin-bottom:6px">Statutory Due Date</label>
                     <input type="date" name="due_date" required style="width:100%;padding:13px 16px;border:1.5px solid #e0e9e5;border-radius:14px;font-size:14px;background:#fbfdfc">
                 </div>
-
                 <div style="display:flex;justify-content:flex-end;gap:12px">
                     <button type="button" onclick="document.getElementById('newDeadlineModal').style.display='none'" style="background:#f0f5f3;color:#5f726c;border:none;padding:12px 20px;border-radius:12px;font-weight:700;font-size:14px;cursor:pointer">Cancel</button>
                     <button type="submit" style="background:#0d9488;color:#fff;border:none;padding:12px 24px;border-radius:12px;font-weight:700;font-size:14px;cursor:pointer">Save Deadline</button>
@@ -67,8 +51,34 @@
         </div>
     </div>
 
+    <!-- Delete Deadline Confirmation Modal -->
+    <div id="deleteDeadlineModal" style="display:none;position:fixed;inset:0;background:rgba(20,40,35,.45);backdrop-filter:blur(6px);z-index:199;align-items:center;justify-content:center;padding:20px">
+        <div style="background:#fff;border-radius:24px;width:100%;max-width:440px;padding:32px;box-shadow:0 24px 60px -28px rgba(0,0,0,.4);animation:tnpop .25s ease">
+            <h3 style="margin:0 0 12px;font-size:19px;font-weight:800">Delete Deadline?</h3>
+            <p style="color:#61756e;font-size:14px;margin:0 0 24px">This deadline will be soft-deleted and can be restored from Trash.</p>
+            <form action="/staff/deadlines/delete" method="POST" data-ajax-form>
+                <input type="hidden" name="csrf_token" value="<?= htmlspecialchars(\Application\Core\Session::csrfToken()) ?>">
+                <input type="hidden" name="deadline_id" id="deleteDeadlineId">
+                <div style="display:flex;justify-content:flex-end;gap:12px">
+                    <button type="button" onclick="document.getElementById('deleteDeadlineModal').style.display='none'" style="background:#f0f5f3;color:#5f726c;border:none;padding:11px 20px;border-radius:12px;font-weight:700;cursor:pointer">Cancel</button>
+                    <button type="submit" style="background:#dc2626;color:#fff;border:none;padding:11px 22px;border-radius:12px;font-weight:700;cursor:pointer">Delete</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
     <!-- Deadlines Table -->
     <div style="background:#fff;border-radius:24px;padding:26px;box-shadow:0 1px 2px rgba(16,54,45,.04),0 14px 34px -24px rgba(16,54,45,.4)">
+        <!-- Bulk Action Bar -->
+        <div id="dlBulkBar" style="display:none;align-items:center;gap:12px;padding:12px 16px;background:#fff8ee;border-radius:14px;margin-bottom:16px;border:1px solid #f6dfc0">
+            <span id="dlBulkCount" style="font-weight:700;color:#e07d24;font-size:13.5px">0 selected</span>
+            <form action="/staff/deadlines/bulk-delete" method="POST" data-ajax-form style="display:inline">
+                <input type="hidden" name="csrf_token" value="<?= htmlspecialchars(\Application\Core\Session::csrfToken()) ?>">
+                <div id="dlBulkIds"></div>
+                <button type="submit" onclick="return confirm('Delete all selected deadlines? They can be restored from Trash.')" style="background:#dc2626;color:#fff;border:none;padding:8px 18px;border-radius:10px;font-weight:700;font-size:13px;cursor:pointer">Delete Selected</button>
+            </form>
+            <button type="button" onclick="tnDlSelectNone()" style="background:#f0f5f3;color:#5f726c;border:none;padding:8px 14px;border-radius:10px;font-weight:700;font-size:13px;cursor:pointer">Clear</button>
+        </div>
         <?php if (empty($deadlines)): ?>
             <div style="padding:48px 24px;text-align:center;color:#8a9a94"><?= $hasDeadlineFilters ? 'No deadlines match the selected filters.' : 'No deadlines logged in matrix.' ?></div>
         <?php else: ?>
@@ -76,24 +86,23 @@
                 <table style="width:100%;border-collapse:collapse;text-align:left">
                     <thead>
                         <tr style="border-bottom:2px solid #eef4f1;color:#7d8e88;font-size:12.5px;text-transform:uppercase;letter-spacing:.05em">
+                            <th style="padding:12px 10px;font-weight:700;width:36px"><input type="checkbox" id="dlCheckAll" aria-label="Select all deadlines" onchange="tnDlToggleAll(this)" style="width:16px;height:16px;cursor:pointer"></th>
                             <th style="padding:12px 16px;font-weight:700">Client</th>
+                            <th style="padding:12px 16px;font-weight:700">Entity</th>
                             <th style="padding:12px 16px;font-weight:700">Type</th>
                             <th style="padding:12px 16px;font-weight:700">Due Date</th>
                             <th style="padding:12px 16px;font-weight:700">Status</th>
+                            <th style="padding:12px 16px;font-weight:700;text-align:right">Action</th>
                         </tr>
                     </thead>
                     <tbody>
                         <?php foreach ($deadlines as $d): ?>
                             <tr style="border-bottom:1px solid #eef4f1">
-                                <td style="padding:16px;font-weight:700;color:#213330">
-                                    <?= htmlspecialchars($d['client_name'] ?? 'Client') ?>
-                                </td>
-                                <td style="padding:16px;font-weight:700;color:#41556f">
-                                    <?= htmlspecialchars($d['type']) ?>
-                                </td>
-                                <td style="padding:16px;color:#213330;font-weight:600">
-                                    <?= date('d M Y', strtotime($d['due_date'])) ?>
-                                </td>
+                                <td style="padding:10px 10px"><input type="checkbox" class="tn-dl-check" value="<?= (int)$d['id'] ?>" aria-label="Select deadline" onchange="tnDlUpdateBar()" style="width:16px;height:16px;cursor:pointer"></td>
+                                <td style="padding:16px;font-weight:700;color:#213330"><?= htmlspecialchars($d['client_name'] ?? 'Client') ?></td>
+                                <td style="padding:16px;font-weight:700;color:#41556f"><?= htmlspecialchars($d['entity_name'] ?? 'Entity') ?></td>
+                                <td style="padding:16px;font-weight:700;color:#41556f"><?= htmlspecialchars($d['type']) ?></td>
+                                <td style="padding:16px;color:#213330;font-weight:600"><?= date('d M Y', strtotime($d['due_date'])) ?></td>
                                 <td style="padding:16px">
                                     <form action="/staff/deadlines/update-status" method="POST" data-ajax-form style="margin:0;display:inline-block">
                                         <input type="hidden" name="csrf_token" value="<?= htmlspecialchars(\Application\Core\Session::csrfToken()) ?>">
@@ -104,6 +113,9 @@
                                             <option value="Completed" <?= $d['status'] === 'Completed' ? 'selected' : '' ?>>Completed</option>
                                         </select>
                                     </form>
+                                </td>
+                                <td style="padding:16px;text-align:right">
+                                    <button type="button" onclick="tnDlDelete(<?= (int)$d['id'] ?>)" style="background:#fef2f2;color:#dc2626;border:1px solid #fecaca;padding:8px 12px;border-radius:10px;font-weight:700;font-size:13px;cursor:pointer">Delete</button>
                                 </td>
                             </tr>
                         <?php endforeach; ?>
@@ -117,3 +129,30 @@
         <?php endif; ?>
     </div>
 </div>
+
+<script>
+function tnDlDelete(id) {
+    document.getElementById('deleteDeadlineId').value = id;
+    document.getElementById('deleteDeadlineModal').style.display = 'flex';
+}
+function tnDlToggleAll(el) {
+    document.querySelectorAll('.tn-dl-check').forEach(c => { c.checked = el.checked; });
+    tnDlUpdateBar();
+}
+function tnDlSelectNone() {
+    document.querySelectorAll('.tn-dl-check, #dlCheckAll').forEach(c => { c.checked = false; });
+    tnDlUpdateBar();
+}
+function tnDlUpdateBar() {
+    const checked = [...document.querySelectorAll('.tn-dl-check:checked')];
+    document.getElementById('dlBulkCount').textContent = checked.length + ' selected';
+    const container = document.getElementById('dlBulkIds');
+    container.innerHTML = '';
+    checked.forEach(c => {
+        const inp = document.createElement('input');
+        inp.type = 'hidden'; inp.name = 'ids[]'; inp.value = c.value;
+        container.appendChild(inp);
+    });
+    document.getElementById('dlBulkBar').style.display = checked.length > 0 ? 'flex' : 'none';
+}
+</script>

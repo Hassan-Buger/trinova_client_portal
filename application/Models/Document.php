@@ -9,7 +9,7 @@ class Document extends Model
 {
     public function find(int $id): ?array
     {
-        $stmt = $this->db->prepare("SELECT * FROM documents WHERE id = :id LIMIT 1");
+        $stmt = $this->db->prepare("SELECT * FROM documents WHERE id = :id AND deleted_at IS NULL LIMIT 1");
         $stmt->execute(['id' => $id]);
         return $stmt->fetch() ?: null;
     }
@@ -20,7 +20,7 @@ class Document extends Model
             SELECT d.*, u.name AS uploaded_by_name, u.role AS uploaded_by_role
             FROM documents d
             JOIN users u ON u.id = d.uploaded_by_user_id
-            WHERE d.client_id = :client_id AND d.direction = :direction
+            WHERE d.client_id = :client_id AND d.direction = :direction AND d.deleted_at IS NULL
             ORDER BY d.created_at DESC
         ");
         $stmt->execute([
@@ -30,13 +30,27 @@ class Document extends Model
         return $stmt->fetchAll();
     }
 
+    public function getAccessibleByUserAndDirection(int $userId, string $direction): array
+    {
+        $stmt=$this->db->prepare("
+            SELECT d.*,u.name AS uploaded_by_name,u.role AS uploaded_by_role,e.company_name AS entity_name,e.entity_scope
+            FROM documents d JOIN users u ON u.id=d.uploaded_by_user_id JOIN client_entities e ON e.id=d.entity_id
+            JOIN clients c ON c.id=e.client_id
+            LEFT JOIN entity_directors ed ON ed.entity_id=e.id AND ed.user_id=:director_user
+            WHERE d.direction=:direction AND d.deleted_at IS NULL AND ((d.scope='company' AND ed.user_id IS NOT NULL) OR (d.scope='personal' AND c.user_id=:owner_user))
+            ORDER BY d.created_at DESC
+        ");
+        $stmt->execute(['director_user'=>$userId,'owner_user'=>$userId,'direction'=>$direction]);
+        return $stmt->fetchAll();
+    }
+
     public function getByClientId(int $clientId): array
     {
         $stmt = $this->db->prepare("
             SELECT d.*, u.name AS uploaded_by_name, u.role AS uploaded_by_role
             FROM documents d
             LEFT JOIN users u ON u.id = d.uploaded_by_user_id
-            WHERE d.client_id = :client_id
+            WHERE d.client_id = :client_id AND d.deleted_at IS NULL
             ORDER BY d.created_at DESC
         ");
         $stmt->execute(['client_id' => $clientId]);
@@ -45,7 +59,7 @@ class Document extends Model
 
     public function getRecentCount(): int
     {
-        $stmt = $this->db->query("SELECT COUNT(*) AS total FROM documents");
+        $stmt = $this->db->query("SELECT COUNT(*) AS total FROM documents WHERE deleted_at IS NULL");
         $row = $stmt->fetch();
         return (int) ($row['total'] ?? 0);
     }
@@ -53,11 +67,13 @@ class Document extends Model
     public function create(array $data): int
     {
         $stmt = $this->db->prepare("
-            INSERT INTO documents (client_id, uploaded_by_user_id, direction, filename, stored_path, description, status)
-            VALUES (:client_id, :uploaded_by_user_id, :direction, :filename, :stored_path, :description, :status)
+            INSERT INTO documents (client_id, entity_id, scope, uploaded_by_user_id, direction, filename, stored_path, description, status)
+            VALUES (:client_id, :entity_id, :scope, :uploaded_by_user_id, :direction, :filename, :stored_path, :description, :status)
         ");
         $stmt->execute([
             'client_id'           => $data['client_id'],
+            'entity_id'           => $data['entity_id'],
+            'scope'               => $data['scope'],
             'uploaded_by_user_id' => $data['uploaded_by_user_id'],
             'direction'           => $data['direction'],
             'filename'            => $data['filename'],
@@ -76,6 +92,7 @@ class Document extends Model
             JOIN users u ON u.id = d.uploaded_by_user_id
             JOIN clients c ON c.id = d.client_id
             JOIN users c_user ON c_user.id = c.user_id
+            WHERE d.deleted_at IS NULL
             ORDER BY d.created_at DESC
         ");
         $stmt->execute();
@@ -86,7 +103,7 @@ class Document extends Model
     {
         $page = max(1, $page);
         $perPage = max(10, min($perPage, 50));
-        $where = [];
+        $where = ['d.deleted_at IS NULL'];
         $params = [];
 
         $search = trim((string) ($filters['search'] ?? ''));
@@ -179,7 +196,55 @@ class Document extends Model
 
     public function getStatuses(): array
     {
-        $stmt = $this->db->query("SELECT DISTINCT status FROM documents WHERE status <> '' ORDER BY status ASC");
+        $stmt = $this->db->query("SELECT DISTINCT status FROM documents WHERE status <> '' AND deleted_at IS NULL ORDER BY status ASC");
         return array_column($stmt->fetchAll(), 'status');
+    }
+
+    public function softDelete(int $id): bool
+    {
+        $stmt = $this->db->prepare("UPDATE documents SET deleted_at = NOW() WHERE id = :id");
+        return $stmt->execute(['id' => $id]);
+    }
+
+    public function bulkSoftDelete(array $ids): int
+    {
+        $count = 0;
+        foreach ($ids as $id) {
+            if ($this->softDelete((int)$id)) {
+                $count++;
+            }
+        }
+        return $count;
+    }
+
+    public function restore(int $id): bool
+    {
+        $stmt = $this->db->prepare("UPDATE documents SET deleted_at = NULL WHERE id = :id");
+        return $stmt->execute(['id' => $id]);
+    }
+
+    public function bulkRestore(array $ids): int
+    {
+        $count = 0;
+        foreach ($ids as $id) {
+            if ($this->restore((int)$id)) {
+                $count++;
+            }
+        }
+        return $count;
+    }
+
+    public function getSoftDeleted(): array
+    {
+        $stmt = $this->db->query("
+            SELECT d.*, u.name AS uploaded_by_name, c_user.name AS client_name
+            FROM documents d
+            JOIN users u ON u.id = d.uploaded_by_user_id
+            JOIN clients c ON c.id = d.client_id
+            JOIN users c_user ON c_user.id = c.user_id
+            WHERE d.deleted_at IS NOT NULL
+            ORDER BY d.deleted_at DESC
+        ");
+        return $stmt->fetchAll();
     }
 }
