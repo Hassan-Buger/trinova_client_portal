@@ -11,12 +11,12 @@ ini_set('log_errors','1');
  */
 
 $appDir = dirname(__DIR__);
-if (file_exists($appDir . '/trinova_app/vendor/autoload.php')) {
-    require_once $appDir . '/trinova_app/vendor/autoload.php';
-    $basePath = $appDir . '/trinova_app';
-} elseif (file_exists($appDir . '/8493files/vendor/autoload.php')) {
+if (file_exists($appDir . '/8493files/vendor/autoload.php')) {
     require_once $appDir . '/8493files/vendor/autoload.php';
     $basePath = $appDir . '/8493files';
+} elseif (file_exists($appDir . '/trinova_app/vendor/autoload.php')) {
+    require_once $appDir . '/trinova_app/vendor/autoload.php';
+    $basePath = $appDir . '/trinova_app';
 } else {
     require_once $appDir . '/vendor/autoload.php';
     $basePath = $appDir;
