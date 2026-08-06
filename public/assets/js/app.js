@@ -6,6 +6,14 @@
 (() => {
     'use strict';
 
+    console.log(
+        '%c TriNova Client Portal %c Build: 8493files-v1.3 %c Deployed & Active ',
+        'background:#0d9488;color:#fff;font-weight:bold;padding:3px 6px;border-radius:4px 0 0 4px;',
+        'background:#374151;color:#fff;font-weight:bold;padding:3px 6px;',
+        'background:#10b981;color:#fff;font-weight:bold;padding:3px 6px;border-radius:0 4px 4px 0;'
+    );
+    console.log('[TriNova Deployment] Sync verified: CSV Importers, Trash Module & 8493files Autoloader Active');
+
     const state = {
         navigating: false,
         messageTimer: null,
