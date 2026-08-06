@@ -56,9 +56,16 @@ $expectedDirectors=[['Jane Dean','Kirsty Allen','Emma Dean'],['Paul Tabb']];
 foreach($suppliedRows as $index=>$values){
     $merged=$mergeDirectors->invoke($service,$values,$suppliedDirectorIndexes);
     $data=[];foreach($suppliedMapping as $key=>$column)$data[$key]=$merged[$column]??'';
+    $data['_source_fields']=array_combine($suppliedUnique,$merged);
     $planned=$reflection->getMethod('validateRow')->invoke($service,$index+2,$data,false,['company_number'=>[],'utr'=>[],'vat_number'=>[],'email_company'=>[],'contacts'=>[]]);
     expect($planned['errors']===[],"Supplied CSV row {$index} was blocked instead of remaining importable.");
     expect($planned['directors']===$expectedDirectors[$index],"Supplied CSV row {$index} linked directors to the wrong company plan.");
+    $attributes=$reflection->getMethod('businessAttributes')->invoke($service,$data);
+    expect(($attributes['ct_utr']['value']??'')===$values[2],"Supplied CSV row {$index} lost its valid UTR.");
+    expect(($attributes['vat_number']['value']??'')===$values[3],"Supplied CSV row {$index} lost its valid VAT number.");
+    expect(str_contains((string)($attributes['csv_source_data']['value']??''),$values[0]),"Supplied CSV row {$index} did not retain its original source values.");
+    if($index===0)expect(($attributes['accounting_year_end']['value']??'')===''&&($attributes['filing_deadline_raw']['value']??'')==='2027-02-22','The invalid five-digit year was not skipped independently of the valid filing deadline.');
+    if($index===1)expect(($attributes['accounting_year_end']['value']??'')==='2026-11-30'&&($attributes['vat_quarter']['value']??'')==='','The valid year end or invalid VAT quarter was handled incorrectly.');
 }
 
 $canReclaim=$reflection->getMethod('canReclaimPending');
@@ -91,12 +98,12 @@ expect(($row['match']['entity_id']??0)===77,'Email plus company-name fallback di
 
 $bad=$base;$bad['client_name']='';$bad['filing_deadline']='not-a-date';
 $row=$validate->invoke($service,5,$bad,false,$existing);
-expect($row['errors']===[],'Business validation still blocks a structurally valid company row.');
-expect(count($row['warnings'])>=2,'Business validation warnings were lost.');
+expect(count($row['errors'])===1&&str_contains($row['errors'][0],'Company name is required'),'A row without the required company name was not sent back for correction.');
+expect(count($row['warnings'])>=1,'Optional-field validation warnings were lost.');
 $malformed=$validate->invoke($service,6,$base,true,$existing);
 expect(count($malformed['errors'])===1,'A malformed CSV row is no longer a blocking technical error.');
 $attributes=$reflection->getMethod('businessAttributes')->invoke($service,$base+['_source_fields'=>['PAYE REF NUMBER'=>'123/AB456']]);
-expect(($attributes['accounting_year_end']['value']??'')==='Thu 31 Jul 2025','Accounting year-end input was normalized instead of retained.');
+expect(($attributes['accounting_year_end']['value']??'')==='2025-07-31','A valid accounting year-end was not normalized safely.');
 expect(str_contains((string)($attributes['csv_source_data']['value']??''),'PAYE REF NUMBER'),'Unmapped source fields are not retained.');
 
 $source=file_get_contents(dirname(__DIR__).'/application/Services/ClientCsvImportService.php');
@@ -108,11 +115,13 @@ expect(str_contains($migration,'UNIQUE KEY uq_csv_import_content (practice_key, 
 expect(str_contains($source,"status='completed'"),'Completed import state is not persisted.');
 expect(str_contains($source,'practice_key=:practice'),'Import/report queries are not tenant scoped.');
 expect(str_contains($source,'FOR UPDATE'),'Concurrent commit locking is missing.');
-expect(str_contains($source,'Email address format appears unusual; the supplied value will still be stored.'),'Invalid email values are not retained as warnings.');
-expect(str_contains($source,'VAT quarter format appears unusual; the supplied value will still be stored.'),'VAT format validation is not preserved as a warning.');
+expect(str_contains($source,'Email address format appears unusual and will be skipped'),'Invalid email values are not converted into non-blocking warnings.');
+expect(str_contains($source,'VAT quarter format appears unusual and will be skipped'),'VAT format validation is not preserved as a non-blocking warning.');
 expect(str_contains($source,'Duplicates CSV row {$seen[$key][$id]} by {$key}; database matching will determine whether this company is created or updated.'),'Duplicate business identifiers still block otherwise importable rows.');
-expect(str_contains($source,"'accounting_year_end'=>['label'=>'Accounting year end','value'=>(string)(\$data['year_end']??'')]"),'The raw accounting year value is not retained.');
-expect(str_contains($source,'This row could not be saved because of a technical or database error.'),'Technical row failures are not reported safely.');
+expect(str_contains($source,"'accounting_year_end'=>['label'=>'Accounting year end','value'=>\$yearEnd]"),'Invalid accounting-year values are not skipped from canonical attributes.');
+expect(str_contains($source,"\$this->commitStage='repairing_client_profile'"),'An orphaned client login cannot be repaired during import.');
+expect(str_contains($source,"\$row['diagnostic_reference']=\$reference"),'Technical row failures do not include a support reference.');
+expect(str_contains($source,"Nothing from this row was saved. Reference"),'Technical row failures are not reported safely.');
 expect(str_contains($source,'failed_count>=total_rows'),'A previously all-failed CSV cannot be retried under the warning-only validation policy.');
 expect(str_contains($source,"(\$row['result'] ?? '') !== 'created'"),'Batch cleanup is not restricted to companies created by that import.');
 expect(str_contains($source,"practice_key=:practice AND import_type='business_clients' FOR UPDATE"),'Batch deletion is not tenant-scoped and transactionally locked.');

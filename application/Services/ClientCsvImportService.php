@@ -15,6 +15,7 @@ use PDOException;
 final class ClientCsvImportService
 {
     private PDO $db;
+    private string $commitStage='not_started';
     public function __construct(){ $this->db=Database::getInstance(); }
 
     public function upload(array $file): array
@@ -91,8 +92,20 @@ final class ClientCsvImportService
         foreach($draft['preview'] as $row){
             if($row['errors']){$row['result']='failed';$report[]=$row;continue;}
             $this->db->beginTransaction();
+            $this->commitStage='starting_row';
             try{$processed=$this->commitRow($row);$this->db->commit();$report[]=$processed;}
-            catch(\Throwable $e){if($this->db->inTransaction())$this->db->rollBack();ErrorHandler::report(new \RuntimeException('Client import row '.(int)($row['line']??0).' failed; import '.$importId,0,$e));$row['result']='failed';$row['errors'][]='This row could not be saved because of a technical or database error.';$report[]=$row;}
+            catch(\Throwable $e){
+                if($this->db->inTransaction())$this->db->rollBack();
+                $reference=$this->diagnosticReference($importId,(int)($row['line']??0));
+                $stage=$this->safeStage($this->commitStage);
+                ErrorHandler::report(new \RuntimeException($reference.' client import row failed at '.$this->commitStage.'; import '.$importId.'; row '.(int)($row['line']??0),0,$e));
+                $row['result']='failed';
+                $row['failure_stage']=$stage;
+                $row['diagnostic_reference']=$reference;
+                $message=$e instanceof UserFacingException?$e->getMessage():'A database operation failed';
+                $row['errors'][]=$message.' during '.$stage.'. Nothing from this row was saved. Reference '.$reference.'.';
+                $report[]=$row;
+            }
         }
 
         $summary=$this->summarize($report);
@@ -237,20 +250,25 @@ final class ClientCsvImportService
         $errors=[];$warnings=[];$directors=[];$seenNames=[];
         foreach(preg_split('/[;,\r\n]+/u',(string)($data['directors']??''))?:[] as $name){$name=trim($name);if($name==='')continue;$normalized=$this->normalizeName($name);if(isset($seenNames[$normalized]))continue;$seenNames[$normalized]=true;$directors[]=$name;}
         if($malformed)$errors[]='Malformed row: column count does not match the header.';
-        if(($data['client_name']??'')==='')$warnings[]='Company name is blank.';
-        if(($data['company_number']??'')!==''&&!preg_match('/^[A-Za-z0-9]{6,10}$/',$data['company_number']))$warnings[]='Company Number has an unusual format.';
-        if(($data['utr']??'')!==''&&!preg_match('/^\d{10}$/',preg_replace('/\s+/','',$data['utr'])))$warnings[]='UTR should normally contain 10 digits.';
-        if(($data['vat_number']??'')!==''&&!preg_match('/^(GB)?[0-9A-Za-z ]{8,14}$/i',$data['vat_number']))$warnings[]='VAT number has an unusual format.';
-        if(($data['email']??'')!==''&&!filter_var($data['email'],FILTER_VALIDATE_EMAIL))$warnings[]='Email address format appears unusual; the supplied value will still be stored.';
+        if(($data['client_name']??'')==='')$errors[]='Company name is required. Update this row and import it again.';
+        if(($data['company_number']??'')!==''&&!$this->validCompanyNumber((string)$data['company_number']))$warnings[]='Company Number has an unusual format and will be skipped; the original remains in the import source data.';
+        if(($data['utr']??'')!==''&&!$this->validUtr((string)$data['utr']))$warnings[]='UTR should normally contain 10 digits and will be skipped; the original remains in the import source data.';
+        if(($data['vat_number']??'')!==''&&!$this->validVatNumber((string)$data['vat_number']))$warnings[]='VAT number has an unusual format and will be skipped; the original remains in the import source data.';
+        if(($data['email']??'')!==''&&!$this->validEmail((string)$data['email']))$warnings[]='Email address format appears unusual and will be skipped; an internal pending account address will be used.';
         if(!$directors)$warnings[]='No director/contact names were supplied.';
         if($directors)$warnings[]='Director names will be linked as incomplete placeholders; full profiles will be imported later.';
-        foreach(['year_end'=>'Accounting year end','filing_deadline'=>'Filing deadline'] as $key=>$label){if(($data[$key]??'')!==''&&!$this->parseDate($data[$key]))$warnings[]="{$label} appears invalid or unsupported; the supplied value will still be stored.";}
-        if(($data['vat_quarter']??'')!==''&&!$this->vatMonths($data['vat_quarter']))$warnings[]='VAT quarter format appears unusual; the supplied value will still be stored.';
+        foreach(['year_end'=>'Accounting year end','filing_deadline'=>'Filing deadline'] as $key=>$label){if(($data[$key]??'')!==''&&!$this->parseDate($data[$key]))$warnings[]="{$label} appears invalid or unsupported and will be skipped; the original remains in the import source data.";}
+        if(($data['vat_quarter']??'')!==''&&!$this->vatMonths($data['vat_quarter']))$warnings[]='VAT quarter format appears unusual and will be skipped; the original remains in the import source data.';
         $match=null;
-        foreach(['company_number','utr','vat_number'] as $key){$v=$this->identifier($data[$key]??'');if($v!==''&&isset($existing[$key][$v])){$match=['entity_id'=>$existing[$key][$v],'field'=>$key,'value'=>$data[$key]];break;}}
-        if(!$match&&($data['email']??'')!==''&&($data['client_name']??'')!==''){$emailCompany=strtolower(trim($data['email'])).'|'.$this->normalizeName($data['client_name']);if(isset($existing['email_company'][$emailCompany]))$match=['entity_id'=>$existing['email_company'][$emailCompany],'field'=>'email + company name','value'=>$data['email']];}
-        if(!$match && ($data['company_number']??'')===''&&($data['utr']??'')===''&&($data['vat_number']??'')==='')$warnings[]='No strong company identifier was supplied; safe re-import matching is limited.';
-        if(!$match && ($data['email']??'')==='')$warnings[]='No primary contact email was supplied; a pending client account will be created.';
+        foreach(['company_number','utr','vat_number'] as $key){
+            $raw=(string)($data[$key]??'');
+            $valid=match($key){'company_number'=>$this->validCompanyNumber($raw),'utr'=>$this->validUtr($raw),'vat_number'=>$this->validVatNumber($raw)};
+            $v=$valid?$this->identifier($raw):'';
+            if($v!==''&&isset($existing[$key][$v])){$match=['entity_id'=>$existing[$key][$v],'field'=>$key,'value'=>$raw];break;}
+        }
+        if(!$match&&$this->validEmail((string)($data['email']??''))&&($data['client_name']??'')!==''){$emailCompany=strtolower(trim($data['email'])).'|'.$this->normalizeName($data['client_name']);if(isset($existing['email_company'][$emailCompany]))$match=['entity_id'=>$existing['email_company'][$emailCompany],'field'=>'email + company name','value'=>$data['email']];}
+        if(!$match&&!$this->validCompanyNumber((string)($data['company_number']??''))&&!$this->validUtr((string)($data['utr']??''))&&!$this->validVatNumber((string)($data['vat_number']??'')))$warnings[]='No valid strong company identifier was supplied; safe re-import matching is limited.';
+        if(!$match&&!$this->validEmail((string)($data['email']??'')))$warnings[]='No valid primary contact email was supplied; a pending client account will be created with an internal address.';
         $existingContacts=$match?($existing['contacts'][(int)$match['entity_id']]??[]):[];$create=[];$reuse=[];
         foreach($directors as $name){if(isset($existingContacts[$this->normalizeName($name)]))$reuse[]=$name;else $create[]=$name;}
         return ['line'=>$line,'data'=>$data,'directors'=>$directors,'director_plan'=>['create'=>$create,'reuse'=>$reuse],'match'=>$match,'action'=>$match?'update':'create','errors'=>$errors,'warnings'=>$warnings,'result'=>'planned','director_names_detected'=>count($directors),'placeholder_directors_created'=>count($create),'placeholder_directors_reused'=>count($reuse),'director_links_created'=>count($create),'duplicate_director_links_skipped'=>count($reuse),'directors_needing_details'=>count($directors)];
@@ -259,43 +277,84 @@ final class ClientCsvImportService
     private function commitRow(array $row): array
     {
         $d=$row['data'];$entityId=(int)($row['match']['entity_id']??0);$created=false;$companyAccountCreated=0;$placeholderCount=0;$placeholderReused=0;$deadlines=0;
-        $primaryEmail=trim((string)($d['email']??''))!==''?$d['email']:'client.'.preg_replace('/[^a-z0-9]/','',strtolower($d['client_name']??'company')).'.'.bin2hex(random_bytes(4)).'@trinova.invalid';
+        $companyName=trim((string)($d['client_name']??''));
+        if($companyName==='')throw new UserFacingException('Company name is required. Update this row and import it again.');
+        $companyNumber=$this->validCompanyNumber((string)($d['company_number']??''))?trim((string)$d['company_number']):'';
+        $utr=$this->validUtr((string)($d['utr']??''))?preg_replace('/\s+/','',(string)$d['utr']):'';
+        $suppliedEmail=$this->validEmail((string)($d['email']??''))?strtolower(trim((string)$d['email'])):'';
+        $primaryEmail=$suppliedEmail!==''?$suppliedEmail:$this->internalEmail($companyName);
         if($entityId){
+            $this->commitStage='loading_matched_company';
             $stmt=$this->db->prepare('SELECT e.*,e.deleted_at AS entity_deleted_at,c.user_id,c.id AS client_id,c.deleted_at AS client_deleted_at,u.deleted_at AS user_deleted_at FROM client_entities e JOIN clients c ON c.id=e.client_id JOIN users u ON u.id=c.user_id WHERE e.id=:id FOR UPDATE');$stmt->execute(['id'=>$entityId]);$entity=$stmt->fetch();
             if(!$entity){throw new UserFacingException('A matched company no longer exists.');}
             $clientId=(int)$entity['client_id'];$userId=(int)$entity['user_id'];
-            if(!empty($entity['client_deleted_at'])||!empty($entity['user_deleted_at']))(new Client())->restore($clientId);
-            elseif(!empty($entity['entity_deleted_at']))(new ClientEntity())->restore($entityId);
+            $this->commitStage='restoring_matched_company';
+            if(!empty($entity['client_deleted_at']))(new Client())->restore($clientId);
+            elseif(!empty($entity['user_deleted_at']))$this->db->prepare('UPDATE users SET deleted_at=NULL WHERE id=:id')->execute(['id'=>$userId]);
+            if(!empty($entity['entity_deleted_at'])&&empty($entity['client_deleted_at']))(new ClientEntity())->restore($entityId);
             $attrs=json_decode((string)($entity['attributes']??'{}'),true)?:[];
             foreach($this->businessAttributes($d) as $k=>$v)if($v['value']!=='')$attrs[$k]=$v;
-            $this->db->prepare('UPDATE client_entities SET company_name=CASE WHEN :name<>\'\' THEN :name2 ELSE company_name END,company_number=CASE WHEN :number<>\'\' THEN :number2 ELSE company_number END,tax_reference=CASE WHEN :utr<>\'\' THEN :utr2 ELSE tax_reference END,attributes=:attrs WHERE id=:id')->execute(['name'=>$d['client_name'],'name2'=>$d['client_name'],'number'=>$d['company_number']??'','number2'=>$d['company_number']??'','utr'=>$d['utr']??'','utr2'=>$d['utr']??'','attrs'=>json_encode($attrs,JSON_UNESCAPED_UNICODE),'id'=>$entityId]);
+            $this->commitStage='updating_matched_company';
+            $this->db->prepare('UPDATE client_entities SET company_name=:name,company_number=CASE WHEN :number<>\'\' THEN :number2 ELSE company_number END,tax_reference=CASE WHEN :utr<>\'\' THEN :utr2 ELSE tax_reference END,attributes=:attrs WHERE id=:id')->execute(['name'=>$companyName,'number'=>$companyNumber,'number2'=>$companyNumber,'utr'=>$utr,'utr2'=>$utr,'attrs'=>json_encode($attrs,JSON_UNESCAPED_UNICODE|JSON_THROW_ON_ERROR),'id'=>$entityId]);
             $this->db->prepare('UPDATE clients SET phone=CASE WHEN :phone<>\'\' THEN :phone2 ELSE phone END,address=CASE WHEN :address<>\'\' THEN :address2 ELSE address END,notes=CASE WHEN :notes<>\'\' THEN :notes2 ELSE notes END WHERE id=:id')->execute(['phone'=>$d['phone']??'','phone2'=>$d['phone']??'','address'=>$d['address']??'','address2'=>$d['address']??'','notes'=>$d['status_notes']??'','notes2'=>$d['status_notes']??'','id'=>$clientId]);
-            $this->db->prepare('UPDATE users SET name=CASE WHEN :name<>\'\' THEN :name2 ELSE name END,email=CASE WHEN :email<>\'\' THEN :email2 ELSE email END WHERE id=:id')->execute(['name'=>$d['client_name']??'','name2'=>$d['client_name']??'','email'=>$d['email']??'','email2'=>$d['email']??'','id'=>$userId]);
+            $updateEmail=$this->emailAvailableToUser($suppliedEmail,$userId)?$suppliedEmail:'';
+            if($suppliedEmail!==''&&$updateEmail==='')$row['warnings'][]='The supplied email already belongs to another account, so the existing company account email was kept.';
+            $this->db->prepare('UPDATE users SET name=:name,email=CASE WHEN :email<>\'\' THEN :email2 ELSE email END WHERE id=:id')->execute(['name'=>$companyName,'email'=>$updateEmail,'email2'=>$updateEmail,'id'=>$userId]);
         }else{
-            $user=$this->db->prepare('SELECT u.id,u.deleted_at,c.id AS client_id,c.deleted_at AS client_deleted_at FROM users u LEFT JOIN clients c ON c.user_id=u.id WHERE u.email=:email LIMIT 1');$user->execute(['email'=>$primaryEmail]);$existingUser=$user->fetch();$userId=(int)($existingUser['id']??0);
-            if($userId){$clientId=(int)($existingUser['client_id']??0);if(!$clientId)throw new UserFacingException('The primary email belongs to a non-client account.');if(!empty($existingUser['deleted_at'])||!empty($existingUser['client_deleted_at']))(new Client())->restore($clientId);}
-            else{$this->db->prepare("INSERT INTO users(name,email,password_hash,role,status) VALUES(:name,:email,:hash,'client','pending_activation')")->execute(['name'=>(string)($d['client_name']??''),'email'=>$primaryEmail,'hash'=>password_hash(bin2hex(random_bytes(24)),PASSWORD_BCRYPT)]);$userId=(int)$this->db->lastInsertId();$this->db->prepare("INSERT INTO clients(user_id,phone,address,aml_status,notes) VALUES(:user,:phone,:address,'Action Required',:notes)")->execute(['user'=>$userId,'phone'=>($d['phone']??'')!==''?$d['phone']:null,'address'=>($d['address']??'')!==''?$d['address']:null,'notes'=>($d['status_notes']??'')!==''?$d['status_notes']:null]);$clientId=(int)$this->db->lastInsertId();$companyAccountCreated=1;}
+            $this->commitStage='resolving_client_account';
+            $user=$this->db->prepare('SELECT u.id,u.role,u.deleted_at,c.id AS client_id,c.deleted_at AS client_deleted_at FROM users u LEFT JOIN clients c ON c.user_id=u.id WHERE u.email=:email LIMIT 1 FOR UPDATE');$user->execute(['email'=>$primaryEmail]);$existingUser=$user->fetch();
+            if($existingUser&&($existingUser['role']??'')!=='client'){
+                $row['warnings'][]='The supplied email belongs to a staff account, so an internal pending client address was used. Update the client login email before sending an invitation.';
+                $primaryEmail=$this->internalEmail($companyName);$existingUser=false;
+            }
+            $userId=(int)($existingUser['id']??0);
+            if($userId){
+                $clientId=(int)($existingUser['client_id']??0);
+                if(!$clientId){
+                    $this->commitStage='repairing_client_profile';
+                    $this->db->prepare('UPDATE users SET role=\'client\',deleted_at=NULL WHERE id=:id')->execute(['id'=>$userId]);
+                    $this->db->prepare("INSERT INTO clients(user_id,phone,address,aml_status,notes) VALUES(:user,:phone,:address,'Action Required',:notes)")->execute(['user'=>$userId,'phone'=>($d['phone']??'')!==''?$d['phone']:null,'address'=>($d['address']??'')!==''?$d['address']:null,'notes'=>($d['status_notes']??'')!==''?$d['status_notes']:null]);
+                    $clientId=(int)$this->db->lastInsertId();$companyAccountCreated=1;
+                    $row['warnings'][]='An existing client login had no client profile; the missing profile was repaired during import.';
+                }elseif(!empty($existingUser['deleted_at'])||!empty($existingUser['client_deleted_at'])){
+                    $this->commitStage='restoring_client_account';
+                    if(!empty($existingUser['client_deleted_at']))(new Client())->restore($clientId);
+                    else $this->db->prepare('UPDATE users SET deleted_at=NULL WHERE id=:id')->execute(['id'=>$userId]);
+                }
+            }else{
+                $this->commitStage='creating_client_account';
+                $this->db->prepare("INSERT INTO users(name,email,password_hash,role,status) VALUES(:name,:email,:hash,'client','pending_activation')")->execute(['name'=>$companyName,'email'=>$primaryEmail,'hash'=>password_hash(bin2hex(random_bytes(24)),PASSWORD_BCRYPT)]);$userId=(int)$this->db->lastInsertId();
+                $this->db->prepare("INSERT INTO clients(user_id,phone,address,aml_status,notes) VALUES(:user,:phone,:address,'Action Required',:notes)")->execute(['user'=>$userId,'phone'=>($d['phone']??'')!==''?$d['phone']:null,'address'=>($d['address']??'')!==''?$d['address']:null,'notes'=>($d['status_notes']??'')!==''?$d['status_notes']:null]);$clientId=(int)$this->db->lastInsertId();$companyAccountCreated=1;
+            }
             $attrs=array_filter($this->businessAttributes($d),fn($v)=>$v['value']!=='');
-            $this->db->prepare("INSERT INTO client_entities(client_id,company_name,entity_type,entity_scope,company_number,tax_reference,attributes) VALUES(:client,:name,'Limited Company','company',:number,:utr,:attrs)")->execute(['client'=>$clientId,'name'=>(string)($d['client_name']??''),'number'=>($d['company_number']??'')!==''?$d['company_number']:null,'utr'=>($d['utr']??'')!==''?$d['utr']:null,'attrs'=>json_encode($attrs,JSON_UNESCAPED_UNICODE)]);$entityId=(int)$this->db->lastInsertId();$created=true;
+            $this->commitStage='creating_company';
+            $this->db->prepare("INSERT INTO client_entities(client_id,company_name,entity_type,entity_scope,company_number,tax_reference,attributes) VALUES(:client,:name,'Limited Company','company',:number,:utr,:attrs)")->execute(['client'=>$clientId,'name'=>$companyName,'number'=>$companyNumber!==''?$companyNumber:null,'utr'=>$utr!==''?$utr:null,'attrs'=>json_encode($attrs,JSON_UNESCAPED_UNICODE|JSON_THROW_ON_ERROR)]);$entityId=(int)$this->db->lastInsertId();$created=true;
+            $this->commitStage='linking_company_owner';
             $this->db->prepare('INSERT IGNORE INTO entity_directors(entity_id,user_id,created_by_user_id) VALUES(:entity,:user,:creator)')->execute(['entity'=>$entityId,'user'=>$userId,'creator'=>(int)\Application\Core\Session::get('user_id')]);
         }
+        $this->commitStage='linking_directors';
         $knownContacts=[];$known=$this->db->prepare('SELECT name FROM entity_contacts WHERE entity_id=:entity');$known->execute(['entity'=>$entityId]);foreach($known->fetchAll() as $contact)$knownContacts[$this->normalizeName((string)$contact['name'])]=true;
         foreach($row['directors'] as $i=>$name){$normalized=$this->normalizeName($name);if(isset($knownContacts[$normalized])){$placeholderReused++;continue;}$stmt=$this->db->prepare('INSERT IGNORE INTO entity_contacts(entity_id,user_id,name,email,phone,is_primary,needs_contact_details) VALUES(:entity,NULL,:name,NULL,NULL,:primary,1)');$stmt->execute(['entity'=>$entityId,'name'=>$name,'primary'=>$i===0?1:0]);if($stmt->rowCount()>0){$placeholderCount++;$knownContacts[$normalized]=true;}else $placeholderReused++;}
+        $this->commitStage='creating_deadlines';
         if(($date=$this->parseDate($d['filing_deadline']??''))!=='' && $this->ensureDeadline($clientId,$entityId,ClientCsv::FILING_DEADLINE_TYPE,$date))$deadlines++;
         if(($d['vat_quarter']??'')!=='' && ($date=$this->nextVatDeadline($d['vat_quarter'])) && $this->ensureDeadline($clientId,$entityId,ClientCsv::VAT_DEADLINE_TYPE,$date))$deadlines++;
-        $row['result']=$created?'created':'updated';$row['entity_id']=$entityId;$row['company_accounts_created']=$companyAccountCreated;$row['placeholder_directors_created']=$placeholderCount;$row['placeholder_directors_reused']=$placeholderReused;$row['director_links_created']=$placeholderCount;$row['duplicate_director_links_skipped']=$placeholderReused;$row['director_names_detected']=count($row['directors']);$row['directors_needing_details']=count($row['directors']);$row['deadlines_created']=$deadlines;return $row;
+        $this->commitStage='completed';
+        $row['result']=$created?'created':'updated';$row['entity_id']=$entityId;$row['failure_stage']='';$row['diagnostic_reference']='';$row['company_accounts_created']=$companyAccountCreated;$row['placeholder_directors_created']=$placeholderCount;$row['placeholder_directors_reused']=$placeholderReused;$row['director_links_created']=$placeholderCount;$row['duplicate_director_links_skipped']=$placeholderReused;$row['director_names_detected']=count($row['directors']);$row['directors_needing_details']=count($row['directors']);$row['deadlines_created']=$deadlines;return $row;
     }
 
     private function businessAttributes(array $data): array
     {
         $sourceFields=is_array($data['_source_fields']??null)?$data['_source_fields']:[];
+        $yearEnd=$this->parseDate((string)($data['year_end']??''));
+        $filingDeadline=$this->parseDate((string)($data['filing_deadline']??''));
+        $vatQuarter=$this->vatMonths((string)($data['vat_quarter']??''))?(string)$data['vat_quarter']:'';
         return [
-            'vat_number'=>['label'=>'VAT registration number','value'=>(string)($data['vat_number']??'')],
-            'ct_utr'=>['label'=>'Corporation Tax UTR','value'=>(string)($data['utr']??'')],
-            'accounting_year_end'=>['label'=>'Accounting year end','value'=>(string)($data['year_end']??'')],
-            'filing_deadline_raw'=>['label'=>'Filing deadline as supplied','value'=>(string)($data['filing_deadline']??'')],
-            'vat_quarter'=>['label'=>'VAT quarter pattern','value'=>(string)($data['vat_quarter']??'')],
-            'source_email'=>['label'=>'Email as supplied','value'=>(string)($data['email']??'')],
+            'vat_number'=>['label'=>'VAT registration number','value'=>$this->validVatNumber((string)($data['vat_number']??''))?trim((string)$data['vat_number']):''],
+            'ct_utr'=>['label'=>'Corporation Tax UTR','value'=>$this->validUtr((string)($data['utr']??''))?(string)preg_replace('/\s+/','',(string)$data['utr']):''],
+            'accounting_year_end'=>['label'=>'Accounting year end','value'=>$yearEnd],
+            'filing_deadline_raw'=>['label'=>'Filing deadline','value'=>$filingDeadline],
+            'vat_quarter'=>['label'=>'VAT quarter pattern','value'=>$vatQuarter],
+            'source_email'=>['label'=>'Email as supplied','value'=>$this->validEmail((string)($data['email']??''))?strtolower(trim((string)$data['email'])):''],
             'csv_source_data'=>['label'=>'Original CSV data','value'=>$sourceFields?json_encode($sourceFields,JSON_UNESCAPED_UNICODE|JSON_UNESCAPED_SLASHES|JSON_THROW_ON_ERROR):''],
         ];
     }
@@ -310,6 +369,14 @@ final class ClientCsvImportService
     private function attr(array $a,string $k): string{$v=$a[$k]??'';return trim((string)(is_array($v)?($v['value']??''):$v));}
     private function identifier(string $v):string{return strtoupper(preg_replace('/[^A-Za-z0-9]/','',$v)??'');}
     private function normalizeName(string $v):string{return strtolower(preg_replace('/\s+/',' ',trim($v))??'');}
+    private function validCompanyNumber(string $v):bool{$v=trim($v);return $v!==''&&preg_match('/^[A-Za-z0-9]{6,10}$/',$v)===1;}
+    private function validUtr(string $v):bool{return preg_match('/^\d{10}$/',preg_replace('/\s+/','',$v)??'')===1;}
+    private function validVatNumber(string $v):bool{$v=trim($v);return $v!==''&&preg_match('/^(GB)?[0-9A-Za-z ]{8,14}$/i',$v)===1;}
+    private function validEmail(string $v):bool{return trim($v)!==''&&filter_var(trim($v),FILTER_VALIDATE_EMAIL)!==false;}
+    private function internalEmail(string $companyName):string{$slug=preg_replace('/[^a-z0-9]/','',strtolower($companyName))?:'company';return 'client.'.$slug.'.'.bin2hex(random_bytes(6)).'@trinova.invalid';}
+    private function emailAvailableToUser(string $email,int $userId):bool{if($email==='')return false;$stmt=$this->db->prepare('SELECT id FROM users WHERE email=:email AND id<>:id LIMIT 1');$stmt->execute(['email'=>$email,'id'=>$userId]);return !$stmt->fetchColumn();}
+    private function diagnosticReference(int $importId,int $line):string{return 'CSV-'.$importId.'-'.$line.'-'.strtoupper(bin2hex(random_bytes(4)));}
+    private function safeStage(string $stage):string{return ['starting_row'=>'starting the row','loading_matched_company'=>'loading the matched company','restoring_matched_company'=>'restoring the matched company','updating_matched_company'=>'updating the matched company','resolving_client_account'=>'resolving the client account','repairing_client_profile'=>'repairing the client profile','restoring_client_account'=>'restoring the client account','creating_client_account'=>'creating the client account','creating_company'=>'creating the company','linking_company_owner'=>'linking the company owner','linking_directors'=>'linking directors','creating_deadlines'=>'creating deadlines','completed'=>'completing the row'][$stage]??'processing the row';}
     private function parseDate(string $v):string{$v=trim($v);if($v==='')return '';$v=preg_replace('/^[A-Za-z]{3}\s+/','',$v);foreach(['!d M Y','!j M Y','!Y-m-d','!d/m/Y','!d-m-Y'] as $f){$d=\DateTimeImmutable::createFromFormat($f,$v,new \DateTimeZone('UTC'));if($d&&\DateTimeImmutable::getLastErrors()!==false&&\DateTimeImmutable::getLastErrors()['warning_count']===0&&\DateTimeImmutable::getLastErrors()['error_count']===0)return $d->format('Y-m-d');if($d&&\DateTimeImmutable::getLastErrors()===false)return $d->format('Y-m-d');}return '';}
     private function vatMonths(string $v):array{$map=['jan'=>1,'feb'=>2,'mar'=>3,'apr'=>4,'may'=>5,'jun'=>6,'jul'=>7,'aug'=>8,'sep'=>9,'oct'=>10,'nov'=>11,'dec'=>12];$parts=array_map(fn($p)=>strtolower(substr(trim($p),0,3)),explode('/',$v));if(count($parts)!==4)return [];$months=[];foreach($parts as $p){if(!isset($map[$p]))return [];$months[]=$map[$p];}sort($months);for($i=1;$i<4;$i++)if(($months[$i]-$months[$i-1])!==3)return [];return $months;}
     private function nextVatDeadline(string $pattern):?string{$months=$this->vatMonths($pattern);if(!$months)return null;$today=new \DateTimeImmutable('today',new \DateTimeZone('UTC'));foreach([$today->format('Y'),(string)((int)$today->format('Y')+1)] as $year)foreach($months as $month){$end=(new \DateTimeImmutable(sprintf('%s-%02d-01',$year,$month),new \DateTimeZone('UTC')))->modify('last day of this month');$due=$end->modify('+'.ClientCsv::VAT_DEADLINE_OFFSET_DAYS.' days');if($due>=$today)return $due->format('Y-m-d');}return null;}
