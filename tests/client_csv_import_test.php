@@ -137,8 +137,14 @@ expect(str_contains($source,"practice_key=:practice AND import_type='business_cl
 expect(str_contains($source,"if (!empty(\$batch['deleted_at']))"),'Repeated batch deletion is not idempotent.');
 $controllerSource=file_get_contents(dirname(__DIR__).'/application/Controllers/Staff/ClientCsvController.php');
 $reportViewSource=file_get_contents(dirname(__DIR__).'/application/Views/staff/clients/import-report.php');
+$mappingViewSource=file_get_contents(dirname(__DIR__).'/application/Views/staff/clients/import.php');
+$previewViewSource=file_get_contents(dirname(__DIR__).'/application/Views/staff/clients/import-preview.php');
+$appJsSource=file_get_contents(dirname(__DIR__).'/public/assets/js/app.js');
 expect(str_contains($controllerSource,"input('import_id', 0)"),'The batch endpoint does not accept legacy import_id submissions.');
 expect(str_contains($reportViewSource,'name="batch_id"'),'The import report does not submit the batch identifier expected by the endpoint.');
+expect(str_contains($mappingViewSource,'console.table(mapping)'),'The mapping page does not expose safe column diagnostics in the console.');
+expect(str_contains($previewViewSource,'console.table(rows)'),'The preview page does not expose row planning diagnostics in the console.');
+expect(str_contains($appJsSource,"[Client CSV Import] request failed"),'AJAX importer failures are not logged to the console.');
 expect(str_contains($controllerSource,"'/staff/trash?tab=batches'"),'Successful deletion does not redirect to the CSV batch history in Trash.');
 expect(!str_contains($controllerSource,"'Failed to delete batch.'"),'Batch deletion still hides every failure behind the old generic toast.');
 $databaseSql=file_get_contents(dirname(__DIR__).'/config/database.sql');
