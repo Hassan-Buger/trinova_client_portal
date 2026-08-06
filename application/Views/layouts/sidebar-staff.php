@@ -43,10 +43,13 @@ function renderStaffIcon(string $ic): string {
             </a>
         <?php endforeach; ?>
     </nav>
-    <a href="/logout" class="tn-navitem" style="display:flex;align-items:center;gap:12px;padding:12px 14px;border-radius:15px;cursor:pointer;color:#61756e;font-weight:600;font-size:14.5px;margin-top:8px">
+    <form action="/logout" method="post" style="margin:8px 0 0">
+    <input type="hidden" name="csrf_token" value="<?= htmlspecialchars(\Application\Core\Session::csrfToken(), ENT_QUOTES, 'UTF-8') ?>">
+    <button type="submit" class="tn-navitem" style="display:flex;width:100%;align-items:center;gap:12px;padding:12px 14px;border:0;background:transparent;border-radius:15px;cursor:pointer;color:#61756e;font-weight:600;font-size:14.5px">
         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
             <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4 m16 17 5-5-5-5 M21 12H9"/>
         </svg>
         <span class="tn-logout-label tn-navlabel">Logout</span>
-    </a>
+    </button>
+    </form>
 </aside>

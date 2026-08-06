@@ -18,6 +18,10 @@ class NotificationService
         self::logEmail($toEmail, $subject, '[Email body omitted from logs]');
 
         if (empty($apiKey)) {
+            if (in_array((string)App::get('env', 'local'), ['local', 'testing'], true)) {
+                self::logEmail($toEmail, $subject, "[LOCAL MAIL CAPTURE - NOT SENT]\n" . $htmlContent);
+                return true;
+            }
             self::logEmail($toEmail, $subject, "[RESEND SKIPPED: RESEND_API_KEY is empty in .env]");
             return false;
         }
@@ -162,7 +166,7 @@ class NotificationService
             $logDir  = dirname($logFile);
 
             if (!is_dir($logDir)) {
-                @mkdir($logDir, 0755, true);
+                @mkdir($logDir, 0700, true);
             }
 
             $logEntry = sprintf(
@@ -173,7 +177,8 @@ class NotificationService
                 $textBody
             );
 
-            @file_put_contents($logFile, $logEntry, FILE_APPEND);
+            @file_put_contents($logFile, $logEntry, FILE_APPEND | LOCK_EX);
+            @chmod($logFile, 0600);
         } catch (\Throwable $e) {
             // Ignore logging errors silently
         }

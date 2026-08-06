@@ -13,6 +13,7 @@ use Application\Models\Notification;
 use Application\Models\ClientEntity;
 use Application\Models\EntityAccess;
 use Application\Services\AuditService;
+use Application\Services\FileStorageService;
 
 class DocumentController extends Controller
 {
@@ -83,35 +84,33 @@ class DocumentController extends Controller
             return;
         }
 
-        $file     = $_FILES['file'];
-        $filename = basename($file['name']);
-        $ext      = strtolower(pathinfo($filename, PATHINFO_EXTENSION));
-
-        $targetDir = App::get('storage_dir') . '/uploads';
-        if (!is_dir($targetDir)) {
-            mkdir($targetDir, 0755, true);
-        }
-
-        $storedName = bin2hex(random_bytes(16)) . '.' . $ext;
-        $targetFile = $targetDir . '/' . $storedName;
-
-        if (!move_uploaded_file($file['tmp_name'], $targetFile)) {
-            Session::setFlash('error', 'Failed to store file in repository.');
+        try {
+            $stored = FileStorageService::store($_FILES['file']);
+        } catch (\Throwable $e) {
+            $message = $e->getMessage();
+            if ($request->isAjax()) $response->json(['success' => false, 'message' => $message], 422);
+            Session::setFlash('error', $message);
             $response->redirect('/staff/documents');
             return;
         }
 
-        $docId = $this->documentModel->create([
-            'client_id'           => $clientId,
-            'entity_id'           => $entityId,
-            'scope'               => $entity['entity_scope'],
-            'uploaded_by_user_id' => $staffUserId,
-            'direction'           => 'from_trinova',
-            'filename'            => $filename,
-            'stored_path'         => $storedName,
-            'description'        => $description,
-            'status'              => 'Ready',
-        ]);
+        $filename = $stored['original_filename'];
+        try {
+            $docId = $this->documentModel->create([
+                'client_id'           => $clientId,
+                'entity_id'           => $entityId,
+                'scope'               => $entity['entity_scope'],
+                'uploaded_by_user_id' => $staffUserId,
+                'direction'           => 'from_trinova',
+                'filename'            => $filename,
+                'stored_path'         => $stored['stored_path'],
+                'description'         => $description,
+                'status'              => 'Ready',
+            ]);
+        } catch (\Throwable $e) {
+            FileStorageService::remove($stored['stored_path']);
+            throw $e;
+        }
 
         AuditService::log('staff_upload', 'documents', $docId);
         try {

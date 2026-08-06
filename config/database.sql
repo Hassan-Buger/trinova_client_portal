@@ -22,7 +22,9 @@ CREATE TABLE IF NOT EXISTS `users` (
   `locked_until` DATETIME NULL,
   `created_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
   `last_login_at` DATETIME NULL,
-  INDEX `idx_users_role_status` (`role`, `status`)
+  `deleted_at` DATETIME NULL,
+  INDEX `idx_users_role_status` (`role`, `status`),
+  INDEX `idx_users_deleted_at` (`deleted_at`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE IF NOT EXISTS `otp_challenges` (
@@ -43,7 +45,9 @@ CREATE TABLE IF NOT EXISTS `clients` (
   `aml_status` ENUM('Complete', 'Action Required') NOT NULL DEFAULT 'Action Required',
   `notes` TEXT NULL,
   `created_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  CONSTRAINT `fk_clients_user` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE CASCADE
+  `deleted_at` DATETIME NULL,
+  CONSTRAINT `fk_clients_user` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE CASCADE,
+  INDEX `idx_clients_deleted_at` (`deleted_at`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- Multi-business linkage per client
@@ -57,10 +61,12 @@ CREATE TABLE IF NOT EXISTS `client_entities` (
   `tax_reference` VARCHAR(50) NULL,
   `attributes` JSON NULL,
   `created_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `deleted_at` DATETIME NULL,
   CONSTRAINT `fk_entities_client` FOREIGN KEY (`client_id`) REFERENCES `clients` (`id`) ON DELETE CASCADE,
   INDEX `idx_entities_client` (`client_id`),
   INDEX `idx_entities_company_number` (`company_number`),
-  INDEX `idx_entities_tax_reference` (`tax_reference`)
+  INDEX `idx_entities_tax_reference` (`tax_reference`),
+  INDEX `idx_entities_deleted_at` (`deleted_at`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE IF NOT EXISTS `entity_directors` (
@@ -68,8 +74,10 @@ CREATE TABLE IF NOT EXISTS `entity_directors` (
   `user_id` INT UNSIGNED NOT NULL,
   `created_by_user_id` INT UNSIGNED NULL,
   `created_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `deleted_at` DATETIME NULL,
   PRIMARY KEY (`entity_id`, `user_id`),
   INDEX `idx_entity_directors_user` (`user_id`, `entity_id`),
+  INDEX `idx_entity_directors_deleted_at` (`deleted_at`),
   CONSTRAINT `fk_entity_directors_entity` FOREIGN KEY (`entity_id`) REFERENCES `client_entities` (`id`) ON DELETE CASCADE,
   CONSTRAINT `fk_entity_directors_user` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE CASCADE,
   CONSTRAINT `fk_entity_directors_creator` FOREIGN KEY (`created_by_user_id`) REFERENCES `users` (`id`) ON DELETE SET NULL
@@ -80,12 +88,19 @@ CREATE TABLE IF NOT EXISTS `entity_contacts` (
   `entity_id` INT UNSIGNED NOT NULL,
   `user_id` INT UNSIGNED NULL,
   `name` VARCHAR(100) NOT NULL,
+  `original_full_name` VARCHAR(180) NULL,
   `email` VARCHAR(150) NULL,
   `phone` VARCHAR(30) NULL,
+  `director_utr` VARCHAR(32) NULL,
+  `address` TEXT NULL,
+  `id_number` VARCHAR(120) NULL,
+  `ch_verification_number` VARCHAR(120) NULL,
   `is_primary` TINYINT(1) NOT NULL DEFAULT 0,
   `needs_contact_details` TINYINT(1) NOT NULL DEFAULT 0,
+  `last_director_import_id` BIGINT UNSIGNED NULL,
   `created_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
   UNIQUE KEY `uq_entity_contact_name` (`entity_id`,`name`),
+  INDEX `idx_contact_entity_email` (`entity_id`,`email`),
   CONSTRAINT `fk_entity_contacts_entity` FOREIGN KEY (`entity_id`) REFERENCES `client_entities` (`id`) ON DELETE CASCADE,
   CONSTRAINT `fk_entity_contacts_user` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
@@ -103,10 +118,12 @@ CREATE TABLE IF NOT EXISTS `documents` (
   `description` TEXT NULL,
   `status` VARCHAR(50) NOT NULL DEFAULT 'Ready',
   `created_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `deleted_at` DATETIME NULL,
   CONSTRAINT `fk_docs_client` FOREIGN KEY (`client_id`) REFERENCES `clients` (`id`) ON DELETE CASCADE,
   CONSTRAINT `fk_docs_entity` FOREIGN KEY (`entity_id`) REFERENCES `client_entities` (`id`) ON DELETE CASCADE,
   CONSTRAINT `fk_docs_user` FOREIGN KEY (`uploaded_by_user_id`) REFERENCES `users` (`id`),
-  INDEX `idx_docs_client_dir` (`client_id`, `direction`)
+  INDEX `idx_docs_client_dir` (`client_id`, `direction`),
+  INDEX `idx_docs_deleted_at` (`deleted_at`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- Document Requests Workflow
@@ -121,10 +138,12 @@ CREATE TABLE IF NOT EXISTS `document_requests` (
   `due_date` DATE NOT NULL,
   `status` ENUM('Awaiting Client', 'Uploaded', 'Under Review', 'Completed') NOT NULL DEFAULT 'Awaiting Client',
   `created_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `deleted_at` DATETIME NULL,
   CONSTRAINT `fk_reqs_client` FOREIGN KEY (`client_id`) REFERENCES `clients` (`id`) ON DELETE CASCADE,
   CONSTRAINT `fk_reqs_entity` FOREIGN KEY (`entity_id`) REFERENCES `client_entities` (`id`) ON DELETE CASCADE,
   CONSTRAINT `fk_reqs_user` FOREIGN KEY (`created_by_user_id`) REFERENCES `users` (`id`),
-  INDEX `idx_reqs_client_status` (`client_id`, `status`)
+  INDEX `idx_reqs_client_status` (`client_id`, `status`),
+  INDEX `idx_reqs_deleted_at` (`deleted_at`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- Threaded Messaging
@@ -138,10 +157,12 @@ CREATE TABLE IF NOT EXISTS `messages` (
   `body` TEXT NOT NULL,
   `read_at` DATETIME NULL,
   `created_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `deleted_at` DATETIME NULL,
   CONSTRAINT `fk_msg_client` FOREIGN KEY (`client_id`) REFERENCES `clients` (`id`) ON DELETE CASCADE,
   CONSTRAINT `fk_msg_entity` FOREIGN KEY (`entity_id`) REFERENCES `client_entities` (`id`) ON DELETE CASCADE,
   CONSTRAINT `fk_msg_sender` FOREIGN KEY (`sender_id`) REFERENCES `users` (`id`),
-  INDEX `idx_msg_client_read` (`client_id`, `read_at`)
+  INDEX `idx_msg_client_read` (`client_id`, `read_at`),
+  INDEX `idx_msg_deleted_at` (`deleted_at`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- Compliance Deadlines
@@ -154,9 +175,11 @@ CREATE TABLE IF NOT EXISTS `deadlines` (
   `due_date` DATE NOT NULL,
   `status` ENUM('Pending', 'Overdue', 'Completed') NOT NULL DEFAULT 'Pending',
   `created_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `deleted_at` DATETIME NULL,
   CONSTRAINT `fk_deadlines_client` FOREIGN KEY (`client_id`) REFERENCES `clients` (`id`) ON DELETE CASCADE,
   CONSTRAINT `fk_deadlines_entity` FOREIGN KEY (`entity_id`) REFERENCES `client_entities` (`id`) ON DELETE CASCADE,
-  INDEX `idx_deadlines_client_date` (`client_id`, `due_date`)
+  INDEX `idx_deadlines_client_date` (`client_id`, `due_date`),
+  INDEX `idx_deadlines_deleted_at` (`deleted_at`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- Meetings Integration Audit
@@ -166,7 +189,9 @@ CREATE TABLE IF NOT EXISTS `meetings` (
   `type` ENUM('existing_client_meeting', 'telephone_call') NOT NULL,
   `external_booking_reference` VARCHAR(100) NULL,
   `created_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  CONSTRAINT `fk_meetings_client` FOREIGN KEY (`client_id`) REFERENCES `clients` (`id`) ON DELETE CASCADE
+  `deleted_at` DATETIME NULL,
+  CONSTRAINT `fk_meetings_client` FOREIGN KEY (`client_id`) REFERENCES `clients` (`id`) ON DELETE CASCADE,
+  INDEX `idx_meetings_deleted_at` (`deleted_at`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- Compliance & Security Audit Log

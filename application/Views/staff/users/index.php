@@ -152,7 +152,11 @@
                                 <?php if($u['status'] !== 'pending_activation'): ?>
                                     <button type="button" onclick="openUserReset(<?= (int)$u['id'] ?>, <?= htmlspecialchars(json_encode($u['name'], JSON_HEX_APOS | JSON_HEX_QUOT), ENT_QUOTES, 'UTF-8') ?>)" style="width:100%;min-height:36px;background:#fff8ee;color:#e07d24;border:1px solid #f6dfc0;padding:8px 12px;border-radius:11px;font-weight:700;font-size:12px;cursor:pointer">Reset Password</button>
                                 <?php else: ?>
-                                    <span style="display:block;text-align:center;font-size:11.5px;color:#7d8e88;padding:2px 4px">Awaiting activation</span>
+                                    <form action="/staff/users/resend-activation" method="POST" data-ajax-form style="margin:0;width:100%">
+                                        <input type="hidden" name="csrf_token" value="<?= htmlspecialchars(\Application\Core\Session::csrfToken(), ENT_QUOTES, 'UTF-8') ?>">
+                                        <input type="hidden" name="user_id" value="<?= (int)$u['id'] ?>">
+                                        <button type="submit" style="width:100%;min-height:36px;background:#eef4f1;color:#0d9488;border:1px solid #d7e7e2;padding:8px 12px;border-radius:11px;font-weight:700;font-size:12px;cursor:pointer">Resend Activation</button>
+                                    </form>
                                 <?php endif; ?>
                                 <?php if(!empty($u['client_id'])): ?><a href="/staff/clients/<?= (int)$u['client_id'] ?>" style="display:flex;align-items:center;justify-content:center;width:100%;min-height:36px;background:#eef4f1;color:#0d9488;padding:8px 12px;border-radius:11px;font-weight:700;font-size:12px">Client Profile</a><?php endif; ?>
                                 <?php if($u['status'] !== 'pending_activation'): ?><form action="/staff/users/toggle-status" method="POST" data-ajax-form style="margin:0;width:100%">

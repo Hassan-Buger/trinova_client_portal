@@ -14,6 +14,10 @@ class RoleMiddleware
         $userRole = Session::get('role');
 
         if ($requiredRole && $userRole !== $requiredRole) {
+            if ($request->isAjax()) {
+                $response->json(['success' => false, 'message' => 'You do not have permission to perform this operation.'], 403);
+                return false;
+            }
             $response->setStatusCode(403);
             die('Access Denied: You do not have permission to view this resource.');
         }

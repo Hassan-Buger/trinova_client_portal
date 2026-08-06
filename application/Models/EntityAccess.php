@@ -12,9 +12,11 @@ class EntityAccess extends Model
             SELECT DISTINCT e.*, c.user_id AS owner_user_id
             FROM client_entities e
             JOIN clients c ON c.id = e.client_id
-            LEFT JOIN entity_directors ed ON ed.entity_id = e.id AND ed.user_id = :director_user
-            WHERE (e.entity_scope = 'company' AND ed.user_id IS NOT NULL)
-               OR (e.entity_scope = 'personal' AND c.user_id = :owner_user)
+            LEFT JOIN entity_directors ed ON ed.entity_id = e.id AND ed.user_id = :director_user AND ed.deleted_at IS NULL
+            WHERE e.deleted_at IS NULL AND c.deleted_at IS NULL AND (
+                (e.entity_scope = 'company' AND ed.user_id IS NOT NULL)
+                OR (e.entity_scope = 'personal' AND c.user_id = :owner_user)
+            )
             ORDER BY e.entity_scope, e.company_name
         ");
         $stmt->execute(['director_user' => $userId, 'owner_user' => $userId]);
@@ -31,8 +33,8 @@ class EntityAccess extends Model
             SELECT 1
             FROM client_entities e
             JOIN clients c ON c.id = e.client_id
-            LEFT JOIN entity_directors ed ON ed.entity_id=e.id AND ed.user_id=:director_user
-            WHERE e.id=:entity_id AND (
+            LEFT JOIN entity_directors ed ON ed.entity_id=e.id AND ed.user_id=:director_user AND ed.deleted_at IS NULL
+            WHERE e.id=:entity_id AND e.deleted_at IS NULL AND c.deleted_at IS NULL AND (
                 (e.entity_scope='company' AND ed.user_id IS NOT NULL)
                 OR (e.entity_scope='personal' AND c.user_id=:owner_user)
             ) LIMIT 1
@@ -53,10 +55,10 @@ class EntityAccess extends Model
             FROM client_entities e
             JOIN clients c ON c.id=e.client_id
             JOIN users u ON (
-                (e.entity_scope='company' AND u.id IN (SELECT ed.user_id FROM entity_directors ed WHERE ed.entity_id=e.id))
+                (e.entity_scope='company' AND u.id IN (SELECT ed.user_id FROM entity_directors ed WHERE ed.entity_id=e.id AND ed.deleted_at IS NULL))
                 OR (e.entity_scope='personal' AND u.id=c.user_id)
             )
-            WHERE e.id=:entity_id AND u.role='client'
+            WHERE e.id=:entity_id AND e.deleted_at IS NULL AND c.deleted_at IS NULL AND u.deleted_at IS NULL AND u.status='active' AND u.role='client'
         ");
         $stmt->execute(['entity_id'=>$entityId]);
         return $stmt->fetchAll();
@@ -64,7 +66,7 @@ class EntityAccess extends Model
 
     public function directors(int $entityId): array
     {
-        $stmt=$this->db->prepare("SELECT u.id,u.name,u.email FROM entity_directors ed JOIN users u ON u.id=ed.user_id WHERE ed.entity_id=:id ORDER BY u.name");
+        $stmt=$this->db->prepare("SELECT u.id,u.name,u.email FROM entity_directors ed JOIN users u ON u.id=ed.user_id WHERE ed.entity_id=:id AND ed.deleted_at IS NULL AND u.deleted_at IS NULL ORDER BY u.name");
         $stmt->execute(['id'=>$entityId]);
         return $stmt->fetchAll();
     }
@@ -78,7 +80,7 @@ class EntityAccess extends Model
 
     public function eligibleDirectors(): array
     {
-        return $this->db->query("SELECT u.id,u.name,u.email,c.id AS client_id FROM users u JOIN clients c ON c.user_id=u.id WHERE u.role='client' ORDER BY u.name")->fetchAll();
+        return $this->db->query("SELECT u.id,u.name,u.email,c.id AS client_id FROM users u JOIN clients c ON c.user_id=u.id WHERE u.role='client' AND u.deleted_at IS NULL AND c.deleted_at IS NULL ORDER BY u.name")->fetchAll();
     }
 
     public function linkDirector(int $entityId, int $userId, ?int $createdBy): bool

@@ -24,7 +24,7 @@ final class DirectorCsvImportService
         $handle=fopen((string)$file['tmp_name'],'rb');if(!$handle)throw new UserFacingException('The directors CSV could not be read.');
         [$headers,$headerLine]=$this->findHeaders($handle);$mapping=DirectorCsv::mapping($headers);
         if(!isset($mapping['name'],$mapping['companies'])){fclose($handle);throw new UserFacingException('The selected file does not contain the required Director Name and Linked Company/ies columns.');}
-        $rows=[];$line=$headerLine;while(($values=fgetcsv($handle))!==false){$line++;if(count($rows)>=DirectorCsv::MAX_ROWS){fclose($handle);throw new UserFacingException('The directors CSV exceeds the 5,000 row limit.');}if(!array_filter($values,fn($v)=>trim((string)$v)!==''))continue;$rows[]=['line'=>$line,'malformed'=>count($values)!==count($headers),'values'=>array_map(fn($v)=>$this->sanitizeString((string)$v),$values)];}fclose($handle);
+        $rows=[];$line=$headerLine;while(($values=fgetcsv($handle,null,',','"',''))!==false){$line++;if(count($rows)>=DirectorCsv::MAX_ROWS){fclose($handle);throw new UserFacingException('The directors CSV exceeds the 5,000 row limit.');}if(!array_filter($values,fn($v)=>trim((string)$v)!==''))continue;$rows[]=['line'=>$line,'malformed'=>count($values)!==count($headers),'values'=>array_map(fn($v)=>$this->sanitizeString((string)$v),$values)];}fclose($handle);
         if(!$rows)throw new UserFacingException('The directors CSV contains no data rows.');
         $contentHash=$this->contentHash($headers,$rows);$token=bin2hex(random_bytes(24));$reservation=$this->reserve($rawHash,$contentHash,basename((string)$file['name']),count($rows),$token);
         if($reservation['duplicate'])return ['duplicate'=>true,'existing'=>$this->duplicateDetails($reservation['record'])];
@@ -165,7 +165,7 @@ final class DirectorCsvImportService
     private function normalizePerson(string $value):string{return trim(preg_replace('/[^a-z0-9]+/u',' ',strtolower($this->sanitizeString($value)))??'');}
     private function identifier(string $value):string{return strtoupper(preg_replace('/[^A-Za-z0-9]/','',$value)??'');}
 
-    private function findHeaders($handle):array{for($line=1;$line<=10&&($row=fgetcsv($handle))!==false;$line++){$headers=array_map(fn($v)=>$this->sanitizeString((string)$v),$row);$map=DirectorCsv::mapping($headers);if(isset($map['name'],$map['companies']))return [$headers,$line];}throw new UserFacingException('The selected file does not contain the required director columns.');}
+    private function findHeaders($handle):array{for($line=1;$line<=10&&($row=fgetcsv($handle,null,',','"',''))!==false;$line++){$headers=array_map(fn($v)=>$this->sanitizeString((string)$v),$row);$map=DirectorCsv::mapping($headers);if(isset($map['name'],$map['companies']))return [$headers,$line];}throw new UserFacingException('The selected file does not contain the required director columns.');}
     private function contentHash(array $headers,array $rows):string{
         $map=DirectorCsv::mapping($headers);
         $normalized=[];

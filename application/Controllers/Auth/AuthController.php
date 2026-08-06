@@ -96,11 +96,12 @@ class AuthController extends Controller
         $this->userModel->resetLoginAttempts((int)$user['id']);
 
         // Initialize Session
-        Session::start();
+        Session::regenerate();
         $_SESSION['user_id']       = (int) $user['id'];
         $_SESSION['user_name']     = $user['name'];
         $_SESSION['user_email']    = $user['email'];
         $_SESSION['role']          = $user['role'];
+        $_SESSION['auth_hash']     = hash('sha256', (string)$user['password_hash']);
         $_SESSION['last_activity'] = time();
 
         // Scope Client ID

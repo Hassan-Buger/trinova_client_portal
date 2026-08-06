@@ -69,7 +69,7 @@ $app->router->get('/', function($req, $res) {
 });
 $app->router->get('/login', [AuthController::class, 'showLogin']);
 $app->router->post('/login', [AuthController::class, 'login'])->middleware([CsrfMiddleware::class]);
-$app->router->get('/logout', [AuthController::class, 'logout']);
+$app->router->post('/logout', [AuthController::class, 'logout'])->middleware([AuthMiddleware::class, CsrfMiddleware::class]);
 
 $app->router->get('/password/reset', [PasswordResetController::class, 'showRequestForm']);
 $app->router->post('/password/reset', [PasswordResetController::class, 'sendResetLink'])->middleware([CsrfMiddleware::class]);
@@ -87,10 +87,6 @@ $app->router->get('/notifications/feed', [NotificationController::class, 'feed']
 $app->router->post('/notifications/read-all', [NotificationController::class, 'readAll'])->middleware([AuthMiddleware::class, SessionTimeoutMiddleware::class, CsrfMiddleware::class]);
 $app->router->get('/api/notifications', [NotificationController::class, 'feed'])->middleware([AuthMiddleware::class, SessionTimeoutMiddleware::class]);
 $app->router->post('/api/notifications/mark-as-read', [NotificationController::class, 'read'])->middleware([AuthMiddleware::class, SessionTimeoutMiddleware::class, CsrfMiddleware::class]);
-
-// --- EXPLICIT STAFF CLIENT ACTION ROUTES ---
-$app->router->post('/staff/clients/reset-password', [StaffClientController::class, 'resetPassword'])->middleware([AuthMiddleware::class, SessionTimeoutMiddleware::class, RoleMiddleware::class . ':staff', CsrfMiddleware::class]);
-$app->router->post('/staff/clients/delete', [StaffClientController::class, 'delete'])->middleware([AuthMiddleware::class, SessionTimeoutMiddleware::class, RoleMiddleware::class . ':staff', CsrfMiddleware::class]);
 
 // --- SECURED CLIENT ROUTES ---
 $app->router->group([
@@ -175,6 +171,7 @@ $app->router->group([
     $r->post('/users/create', [StaffUserAdminController::class, 'createUser'])->middleware([CsrfMiddleware::class]);
     $r->post('/users/toggle-status', [StaffUserAdminController::class, 'toggleStatus'])->middleware([CsrfMiddleware::class]);
     $r->post('/users/reset-password', [StaffUserAdminController::class, 'resetPassword'])->middleware([CsrfMiddleware::class]);
+    $r->post('/users/resend-activation', [StaffUserAdminController::class, 'resendActivation'])->middleware([CsrfMiddleware::class]);
     $r->post('/users/delete', [StaffUserAdminController::class, 'delete'])->middleware([CsrfMiddleware::class]);
     $r->post('/users/bulk-delete', [StaffUserAdminController::class, 'bulkDelete'])->middleware([CsrfMiddleware::class]);
     $r->get('/trash', [StaffTrashController::class, 'index']);

@@ -14,6 +14,13 @@ class User extends Model
         return $stmt->fetch() ?: null;
     }
 
+    public function findByEmailIncludingDeleted(string $email): ?array
+    {
+        $stmt = $this->db->prepare("SELECT * FROM users WHERE email = :email LIMIT 1");
+        $stmt->execute(['email' => $email]);
+        return $stmt->fetch() ?: null;
+    }
+
     public function findById(int $id): ?array
     {
         $stmt = $this->db->prepare("SELECT * FROM users WHERE id = :id AND deleted_at IS NULL LIMIT 1");

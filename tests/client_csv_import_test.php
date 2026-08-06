@@ -13,9 +13,9 @@ $service=$reflection->newInstanceWithoutConstructor();
 
 $headers=$reflection->getMethod('findHeaders');
 $stream=fopen('php://temp','w+b');
-fputcsv($stream,[ClientCsv::TITLE]);
-fputcsv($stream,["\xEF\xBB\xBFCLIENT NAME",' Company No. ','Director(s) / Contact(s)','Email']);
-fputcsv($stream,['Example Ltd','00123456','Alex Example; Sam Example','company@example.com']);
+fputcsv($stream,[ClientCsv::TITLE],',','"','');
+fputcsv($stream,["\xEF\xBB\xBFCLIENT NAME",' Company No. ','Director(s) / Contact(s)','Email'],',','"','');
+fputcsv($stream,['Example Ltd','00123456','Alex Example; Sam Example','company@example.com'],',','"','');
 rewind($stream);
 [$detected,$line]=$headers->invoke($service,$stream);
 expect($line===2,'The title row was not skipped.');
@@ -40,6 +40,27 @@ expect((ClientCsv::defaultMapping(['END OF YEAR DATE','accounts dealine','QTR1']
 expect((ClientCsv::defaultMapping(['END OF YEAR DATE','accounts dealine','QTR1'])['filing_deadline']??null)===1,'Common accounts deadline header was not mapped.');
 expect((ClientCsv::defaultMapping(['END OF YEAR DATE','accounts dealine','QTR1'])['vat_quarter']??null)===2,'Common VAT-quarter header was not mapped.');
 
+// Regression coverage for the supplied business-client CSV layout, including
+// five repeated Director columns exported by spreadsheet software.
+$suppliedHeaders=['COMPANY NAME','Company Number ','UTR','VAT NUMBER','PAYE REF NUMBER','PAYE OFFICE NUMBER ','ADDRESS','EMAIL','PHONE','END OF YEAR DATE','accounts dealine','CONFIRMATION STATEMENT DATE','VAT RETURN qtr/monthly ','QTR1','Director','Director','Director','Director','Director'];
+$suppliedDirectorIndexes=$directorColumns->invoke($service,$suppliedHeaders);
+expect($suppliedDirectorIndexes===[14,15,16,17,18],'The supplied repeated Director columns were not detected.');
+$suppliedUnique=$uniqueHeaders->invoke($service,$suppliedHeaders);
+$suppliedMapping=ClientCsv::defaultMapping($suppliedUnique);
+expect(($suppliedMapping['client_name']??null)===0&&($suppliedMapping['company_number']??null)===1&&($suppliedMapping['directors']??null)===14,'The supplied company and director columns were not auto-mapped.');
+$suppliedRows=[
+    ['Trinova Accounting','16469351','1490724673','516859262','','','42 London rd, Stroud, GL5 2AJ','office@example.invalid','01453 702030','31/05/20026','22/02/2027','21/05/2027','Qtr','july/oct/jan/april','Jane Dean','Kirsty Allen','Emma Dean','',''],
+    ['Cotswold Garden Landscapes Limited','12303100','9138427415','381307996','','','113 Arrowsmith Drive, Stonehouse, GL10 2QS','landscapes@example.invalid','07833089296','30/11/2026','31/08/2026','6/11/26','Qtr','may/aug/nov/','Paul Tabb','','','',''],
+];
+$expectedDirectors=[['Jane Dean','Kirsty Allen','Emma Dean'],['Paul Tabb']];
+foreach($suppliedRows as $index=>$values){
+    $merged=$mergeDirectors->invoke($service,$values,$suppliedDirectorIndexes);
+    $data=[];foreach($suppliedMapping as $key=>$column)$data[$key]=$merged[$column]??'';
+    $planned=$reflection->getMethod('validateRow')->invoke($service,$index+2,$data,false,['company_number'=>[],'utr'=>[],'vat_number'=>[],'email_company'=>[],'contacts'=>[]]);
+    expect($planned['errors']===[],"Supplied CSV row {$index} was blocked instead of remaining importable.");
+    expect($planned['directors']===$expectedDirectors[$index],"Supplied CSV row {$index} linked directors to the wrong company plan.");
+}
+
 $canReclaim=$reflection->getMethod('canReclaimPending');
 expect($canReclaim->invoke($service,['status'=>'pending','created_by_user_id'=>9],9)===true,'The same staff member cannot recover an abandoned pending import.');
 expect($canReclaim->invoke($service,['status'=>'processing','created_by_user_id'=>9],9)===false,'A processing import could be reclaimed unsafely.');
@@ -52,7 +73,7 @@ $rowsB=[['_line'=>20,'values'=>[' second   ltd ','00876543','SECOND@example.com'
 expect($fingerprint->invoke($service,$fingerprintHeaders,$rowsA)===$fingerprint->invoke($service,$fingerprintHeaders,$rowsB),'Reordered or whitespace/case-only CSV changes bypassed normalized duplicate detection.');
 $tempA=tempnam(sys_get_temp_dir(),'csv-a');$tempB=tempnam(sys_get_temp_dir(),'csv-b');file_put_contents($tempA,"a,b\r\n1,2\r\n");file_put_contents($tempB,file_get_contents($tempA));expect(hash_file('sha256',$tempA)===hash_file('sha256',$tempB),'Renaming identical file content changed the raw fingerprint.');unlink($tempA);unlink($tempB);
 
-$invalid=fopen('php://temp','w+b');fputcsv($invalid,['Not','A','Header']);rewind($invalid);
+$invalid=fopen('php://temp','w+b');fputcsv($invalid,['Not','A','Header'],',','"','');rewind($invalid);
 try{$headers->invoke($service,$invalid);throw new RuntimeException('Invalid headers were accepted.');}catch(ReflectionException $e){throw $e;}catch(Throwable $e){$cause=$e instanceof ReflectionException?$e:$e->getPrevious();expect($e instanceof UserFacingException||$cause instanceof UserFacingException,'Invalid header did not produce a safe validation error.');}fclose($invalid);
 
 $validate=$reflection->getMethod('validateRow');

@@ -27,7 +27,7 @@ ok(str_contains($controller,'preg_match')&&str_contains($controller,"[=+\\-@]"),
 ok(str_contains($clientService,"'business_clients'"),'Existing company importer import type changed unexpectedly.');
 
 $reflection=new ReflectionClass(DirectorCsvImportService::class);$service=$reflection->newInstanceWithoutConstructor();
-$call=function(string $method,array $arguments=[])use($reflection,$service){$m=$reflection->getMethod($method);$m->setAccessible(true);return $m->invokeArgs($service,$arguments);};
+$call=function(string $method,array $arguments=[])use($reflection,$service){$m=$reflection->getMethod($method);return $m->invokeArgs($service,$arguments);};
 ok($call('normalizeCompany',['AB Design Ltd'])===$call('normalizeCompany',[' AB DESIGN Limited. ']),'Ltd/Limited normalization is unsafe.');
 ok($call('companyNames',["Company One Ltd; Company Two Ltd|Company Three Ltd\nCompany Four Ltd"])===['Company One Ltd','Company Two Ltd','Company Three Ltd','Company Four Ltd'],'Multiple-company separators are not handled.');
 ok($call('companyNames',['Smith, Jones & Co Ltd'])===['Smith, Jones & Co Ltd'],'Company names are incorrectly split on commas.');

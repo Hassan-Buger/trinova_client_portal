@@ -39,7 +39,7 @@ class Client extends Model
             SELECT c.*, u.name, u.email, u.status AS user_status
             FROM clients c
             JOIN users u ON u.id = c.user_id
-            WHERE c.deleted_at IS NULL
+            WHERE c.deleted_at IS NULL AND u.deleted_at IS NULL
             ORDER BY u.name ASC
         ");
         $stmt->execute();
@@ -50,7 +50,7 @@ class Client extends Model
     {
         $page = max(1, $page);
         $perPage = max(5, min($perPage, 50));
-        $where = 'WHERE c.deleted_at IS NULL';
+        $where = 'WHERE c.deleted_at IS NULL AND u.deleted_at IS NULL';
         $params = [];
 
         if ($search !== '') {
@@ -184,10 +184,12 @@ class Client extends Model
         $client = $this->findById($id);
         if (!$client) return false;
 
-        $stmt = $this->db->prepare("UPDATE clients SET deleted_at = NOW() WHERE id = :id");
-        $success = $stmt->execute(['id' => $id]);
-
-        if ($success) {
+        $ownsTransaction = !$this->db->inTransaction();
+        if ($ownsTransaction) $this->db->beginTransaction();
+        try {
+            $stmt = $this->db->prepare("UPDATE clients SET deleted_at = NOW() WHERE id = :id AND deleted_at IS NULL");
+            $stmt->execute(['id' => $id]);
+            if ($stmt->rowCount() !== 1) throw new \RuntimeException('The client record could not be moved to Trash.');
             if (!empty($client['user_id'])) {
                 $this->db->prepare("UPDATE users SET deleted_at = NOW() WHERE id = :user_id")->execute(['user_id' => $client['user_id']]);
             }
@@ -197,8 +199,12 @@ class Client extends Model
             $this->db->prepare("UPDATE messages SET deleted_at = NOW() WHERE client_id = :client_id")->execute(['client_id' => $id]);
             $this->db->prepare("UPDATE deadlines SET deleted_at = NOW() WHERE client_id = :client_id")->execute(['client_id' => $id]);
             $this->db->prepare("UPDATE meetings SET deleted_at = NOW() WHERE client_id = :client_id")->execute(['client_id' => $id]);
+            if ($ownsTransaction) $this->db->commit();
+            return true;
+        } catch (\Throwable $e) {
+            if ($ownsTransaction && $this->db->inTransaction()) $this->db->rollBack();
+            throw $e;
         }
-        return $success;
     }
 
     public function bulkSoftDelete(array $ids): int
@@ -219,10 +225,12 @@ class Client extends Model
         $client = $stmt->fetch();
         if (!$client) return false;
 
-        $stmt = $this->db->prepare("UPDATE clients SET deleted_at = NULL WHERE id = :id");
-        $success = $stmt->execute(['id' => $id]);
-
-        if ($success) {
+        $ownsTransaction = !$this->db->inTransaction();
+        if ($ownsTransaction) $this->db->beginTransaction();
+        try {
+            $stmt = $this->db->prepare("UPDATE clients SET deleted_at = NULL WHERE id = :id AND deleted_at IS NOT NULL");
+            $stmt->execute(['id' => $id]);
+            if ($stmt->rowCount() !== 1) throw new \RuntimeException('The client record could not be restored.');
             if (!empty($client['user_id'])) {
                 $this->db->prepare("UPDATE users SET deleted_at = NULL WHERE id = :user_id")->execute(['user_id' => $client['user_id']]);
             }
@@ -232,8 +240,12 @@ class Client extends Model
             $this->db->prepare("UPDATE messages SET deleted_at = NULL WHERE client_id = :client_id")->execute(['client_id' => $id]);
             $this->db->prepare("UPDATE deadlines SET deleted_at = NULL WHERE client_id = :client_id")->execute(['client_id' => $id]);
             $this->db->prepare("UPDATE meetings SET deleted_at = NULL WHERE client_id = :client_id")->execute(['client_id' => $id]);
+            if ($ownsTransaction) $this->db->commit();
+            return true;
+        } catch (\Throwable $e) {
+            if ($ownsTransaction && $this->db->inTransaction()) $this->db->rollBack();
+            throw $e;
         }
-        return $success;
     }
 
     public function bulkRestore(array $ids): int

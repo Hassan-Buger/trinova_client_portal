@@ -13,6 +13,7 @@ use Application\Models\User;
 use Application\Models\EntityAccess;
 use Application\Models\ClientEntity;
 use Application\Services\AuditService;
+use Application\Services\FileStorageService;
 
 class DocumentController extends Controller
 {
@@ -54,7 +55,6 @@ class DocumentController extends Controller
         }
 
         $file        = $_FILES['file'];
-        $filename    = basename($file['name']);
         $description = trim($request->getBody()['description'] ?? '');
         $requestId   = (int)($request->getBody()['request_id'] ?? 0);
         $entityId    = (int)($request->getBody()['entity_id'] ?? 0);
@@ -70,47 +70,33 @@ class DocumentController extends Controller
         $recordClientId = (int)$entity['client_id'];
         $scope = (string)$entity['entity_scope'];
 
-        // Validation: File size limit 25MB
-        if ($file['size'] > 25 * 1024 * 1024) {
-            Session::setFlash('error', 'File size exceeds maximum allowed limit (25MB).');
+        try {
+            $stored = FileStorageService::store($file);
+        } catch (\Throwable $e) {
+            $message = $e->getMessage();
+            if ($request->isAjax()) $response->json(['success' => false, 'message' => $message], 422);
+            Session::setFlash('error', $message);
             $response->redirect('/client/documents/upload');
             return;
         }
 
-        // Extension check
-        $ext = strtolower(pathinfo($filename, PATHINFO_EXTENSION));
-        $allowed = ['pdf', 'doc', 'docx', 'xls', 'xlsx', 'csv', 'png', 'jpg', 'jpeg', 'zip', 'txt'];
-        if (!in_array($ext, $allowed, true)) {
-            Session::setFlash('error', 'Disallowed file type. Allowed formats: PDF, DOC, XLS, CSV, Images, ZIP.');
-            $response->redirect('/client/documents/upload');
-            return;
+        $filename = $stored['original_filename'];
+        try {
+            $docId = $this->documentModel->create([
+                'client_id'           => $recordClientId,
+                'entity_id'           => $entityId,
+                'scope'               => $scope,
+                'uploaded_by_user_id' => $userId,
+                'direction'           => 'client_upload',
+                'filename'            => $filename,
+                'stored_path'         => $stored['stored_path'],
+                'description'         => $description,
+                'status'              => 'Uploaded',
+            ]);
+        } catch (\Throwable $e) {
+            FileStorageService::remove($stored['stored_path']);
+            throw $e;
         }
-
-        $targetDir = App::get('storage_dir') . '/uploads';
-        if (!is_dir($targetDir)) {
-            mkdir($targetDir, 0755, true);
-        }
-
-        $storedName = bin2hex(random_bytes(16)) . '.' . $ext;
-        $targetFile = $targetDir . '/' . $storedName;
-
-        if (!move_uploaded_file($file['tmp_name'], $targetFile)) {
-            Session::setFlash('error', 'Failed to store uploaded file. Please try again.');
-            $response->redirect('/client/documents/upload');
-            return;
-        }
-
-        $docId = $this->documentModel->create([
-            'client_id'           => $recordClientId,
-            'entity_id'           => $entityId,
-            'scope'               => $scope,
-            'uploaded_by_user_id' => $userId,
-            'direction'           => 'client_upload',
-            'filename'            => $filename,
-            'stored_path'         => $storedName,
-            'description'        => $description,
-            'status'              => 'Uploaded',
-        ]);
 
         AuditService::log('upload', 'documents', $docId);
         try {

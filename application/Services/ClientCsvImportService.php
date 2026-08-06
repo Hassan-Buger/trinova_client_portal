@@ -33,7 +33,7 @@ final class ClientCsvImportService
         $directorColumns=$this->directorColumns($headers);
         $headers=$this->uniqueHeaders($headers);
         $rows=[];$line=$headerLine;
-        while(($row=fgetcsv($handle))!==false){
+        while(($row=fgetcsv($handle, null, ',', '"', ''))!==false){
             $line++; if(count($rows)>=ClientCsv::MAX_ROWS){fclose($handle);throw new UserFacingException('The CSV exceeds the 5,000 row import limit.');}
             if(count(array_filter($row,fn($v)=>trim((string)$v)!==''))===0) continue;
             if(count($row)!==count($headers)){$rows[]=['_line'=>$line,'_malformed'=>true,'values'=>$row];continue;}
@@ -125,7 +125,7 @@ final class ClientCsvImportService
     /** @return array{0:array,1:int} */
     private function findHeaders($handle): array
     {
-        for($line=1;$line<=10 && ($candidate=fgetcsv($handle))!==false;$line++){
+        for($line=1;$line<=10 && ($candidate=fgetcsv($handle, null, ',', '"', ''))!==false;$line++){
             $candidate=array_map(fn($value)=>$this->cleanCsvValue((string)$value),$candidate);
             $mapping=ClientCsv::defaultMapping($candidate);
             if(isset($mapping['client_name'])&&count($mapping)>=2)return [$candidate,$line];
