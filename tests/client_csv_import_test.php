@@ -48,6 +48,13 @@ expect($suppliedDirectorIndexes===[14,15,16,17,18],'The supplied repeated Direct
 $suppliedUnique=$uniqueHeaders->invoke($service,$suppliedHeaders);
 $suppliedMapping=ClientCsv::defaultMapping($suppliedUnique);
 expect(($suppliedMapping['client_name']??null)===0&&($suppliedMapping['company_number']??null)===1&&($suppliedMapping['directors']??null)===14,'The supplied company and director columns were not auto-mapped.');
+expect(($suppliedMapping['paye_reference']??null)===4&&($suppliedMapping['paye_office_number']??null)===5,'The supplied PAYE columns were not auto-mapped.');
+expect(($suppliedMapping['confirmation_statement_date']??null)===11&&($suppliedMapping['vat_return_frequency']??null)===12,'Confirmation-statement or VAT-frequency columns were not auto-mapped.');
+$numberedDirectorMapping=ClientCsv::defaultMapping(['Company Name','Director 1','Director 2','Director 3','Director 4','Director 5']);
+expect(($numberedDirectorMapping['directors']??null)===1,'Unique Director 1-5 headers did not map to the first consolidated director column.');
+$canonicalHeaders=['COMPANY NAME','Company Number','UTR','VAT NUMBER','PAYE REF NUMBER','PAYE OFFICE NUMBER','ADDRESS','EMAIL','PHONE','END OF YEAR DATE','ACCOUNTS DEADLINE','CONFIRMATION STATEMENT DATE','VAT RETURN FREQUENCY','VAT QUARTER PATTERN','Director 1','Director 2','Director 3','Director 4','Director 5'];
+$canonicalMapping=ClientCsv::defaultMapping($canonicalHeaders);
+foreach(['client_name','company_number','utr','vat_number','paye_reference','paye_office_number','address','email','phone','year_end','filing_deadline','confirmation_statement_date','vat_return_frequency','vat_quarter','directors'] as $field)expect(array_key_exists($field,$canonicalMapping),"Canonical template header did not map {$field}.");
 $suppliedRows=[
     ['Trinova Accounting','16469351','1490724673','516859262','','','42 London rd, Stroud, GL5 2AJ','office@example.invalid','01453 702030','31/05/20026','22/02/2027','21/05/2027','Qtr','july/oct/jan/april','Jane Dean','Kirsty Allen','Emma Dean','',''],
     ['Cotswold Garden Landscapes Limited','12303100','9138427415','381307996','','','113 Arrowsmith Drive, Stonehouse, GL10 2QS','landscapes@example.invalid','07833089296','30/11/2026','31/08/2026','6/11/26','Qtr','may/aug/nov/','Paul Tabb','','','',''],
@@ -63,6 +70,8 @@ foreach($suppliedRows as $index=>$values){
     $attributes=$reflection->getMethod('businessAttributes')->invoke($service,$data);
     expect(($attributes['ct_utr']['value']??'')===$values[2],"Supplied CSV row {$index} lost its valid UTR.");
     expect(($attributes['vat_number']['value']??'')===$values[3],"Supplied CSV row {$index} lost its valid VAT number.");
+    expect(($attributes['confirmation_statement_date']['value']??'')!=='',"Supplied CSV row {$index} lost its confirmation statement date.");
+    expect(($attributes['vat_return_frequency']['value']??'')==='Quarterly',"Supplied CSV row {$index} did not normalize its VAT frequency.");
     expect(str_contains((string)($attributes['csv_source_data']['value']??''),$values[0]),"Supplied CSV row {$index} did not retain its original source values.");
     if($index===0)expect(($attributes['accounting_year_end']['value']??'')===''&&($attributes['filing_deadline_raw']['value']??'')==='2027-02-22','The invalid five-digit year was not skipped independently of the valid filing deadline.');
     if($index===1)expect(($attributes['accounting_year_end']['value']??'')==='2026-11-30'&&($attributes['vat_quarter']['value']??'')==='','The valid year end or invalid VAT quarter was handled incorrectly.');

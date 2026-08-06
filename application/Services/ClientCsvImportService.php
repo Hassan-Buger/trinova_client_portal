@@ -257,7 +257,8 @@ final class ClientCsvImportService
         if(($data['email']??'')!==''&&!$this->validEmail((string)$data['email']))$warnings[]='Email address format appears unusual and will be skipped; an internal pending account address will be used.';
         if(!$directors)$warnings[]='No director/contact names were supplied.';
         if($directors)$warnings[]='Director names will be linked as incomplete placeholders; full profiles will be imported later.';
-        foreach(['year_end'=>'Accounting year end','filing_deadline'=>'Filing deadline'] as $key=>$label){if(($data[$key]??'')!==''&&!$this->parseDate($data[$key]))$warnings[]="{$label} appears invalid or unsupported and will be skipped; the original remains in the import source data.";}
+        foreach(['year_end'=>'Accounting year end','filing_deadline'=>'Filing deadline','confirmation_statement_date'=>'Confirmation statement date'] as $key=>$label){if(($data[$key]??'')!==''&&!$this->parseDate($data[$key]))$warnings[]="{$label} appears invalid or unsupported and will be skipped; the original remains in the import source data.";}
+        if(($data['vat_return_frequency']??'')!==''&&!$this->validVatFrequency((string)$data['vat_return_frequency']))$warnings[]='VAT return frequency must be Quarterly or Monthly and will be skipped; the original remains in the import source data.';
         if(($data['vat_quarter']??'')!==''&&!$this->vatMonths($data['vat_quarter']))$warnings[]='VAT quarter format appears unusual and will be skipped; the original remains in the import source data.';
         $match=null;
         foreach(['company_number','utr','vat_number'] as $key){
@@ -337,6 +338,7 @@ final class ClientCsvImportService
         foreach($row['directors'] as $i=>$name){$normalized=$this->normalizeName($name);if(isset($knownContacts[$normalized])){$placeholderReused++;continue;}$stmt=$this->db->prepare('INSERT IGNORE INTO entity_contacts(entity_id,user_id,name,email,phone,is_primary,needs_contact_details) VALUES(:entity,NULL,:name,NULL,NULL,:primary,1)');$stmt->execute(['entity'=>$entityId,'name'=>$name,'primary'=>$i===0?1:0]);if($stmt->rowCount()>0){$placeholderCount++;$knownContacts[$normalized]=true;}else $placeholderReused++;}
         $this->commitStage='creating_deadlines';
         if(($date=$this->parseDate($d['filing_deadline']??''))!=='' && $this->ensureDeadline($clientId,$entityId,ClientCsv::FILING_DEADLINE_TYPE,$date))$deadlines++;
+        if(($date=$this->parseDate($d['confirmation_statement_date']??''))!=='' && $this->ensureDeadline($clientId,$entityId,ClientCsv::CONFIRMATION_STATEMENT_DEADLINE_TYPE,$date))$deadlines++;
         if(($d['vat_quarter']??'')!=='' && ($date=$this->nextVatDeadline($d['vat_quarter'])) && $this->ensureDeadline($clientId,$entityId,ClientCsv::VAT_DEADLINE_TYPE,$date))$deadlines++;
         $this->commitStage='completed';
         $row['result']=$created?'created':'updated';$row['entity_id']=$entityId;$row['failure_stage']='';$row['diagnostic_reference']='';$row['company_accounts_created']=$companyAccountCreated;$row['placeholder_directors_created']=$placeholderCount;$row['placeholder_directors_reused']=$placeholderReused;$row['director_links_created']=$placeholderCount;$row['duplicate_director_links_skipped']=$placeholderReused;$row['director_names_detected']=count($row['directors']);$row['directors_needing_details']=count($row['directors']);$row['deadlines_created']=$deadlines;return $row;
@@ -347,12 +349,18 @@ final class ClientCsvImportService
         $sourceFields=is_array($data['_source_fields']??null)?$data['_source_fields']:[];
         $yearEnd=$this->parseDate((string)($data['year_end']??''));
         $filingDeadline=$this->parseDate((string)($data['filing_deadline']??''));
+        $confirmationStatementDate=$this->parseDate((string)($data['confirmation_statement_date']??''));
         $vatQuarter=$this->vatMonths((string)($data['vat_quarter']??''))?(string)$data['vat_quarter']:'';
+        $vatFrequency=$this->normalizeVatFrequency((string)($data['vat_return_frequency']??''));
         return [
             'vat_number'=>['label'=>'VAT registration number','value'=>$this->validVatNumber((string)($data['vat_number']??''))?trim((string)$data['vat_number']):''],
             'ct_utr'=>['label'=>'Corporation Tax UTR','value'=>$this->validUtr((string)($data['utr']??''))?(string)preg_replace('/\s+/','',(string)$data['utr']):''],
+            'paye_reference'=>['label'=>'PAYE reference','value'=>trim((string)($data['paye_reference']??''))],
+            'paye_office_number'=>['label'=>'PAYE office number','value'=>trim((string)($data['paye_office_number']??''))],
             'accounting_year_end'=>['label'=>'Accounting year end','value'=>$yearEnd],
             'filing_deadline_raw'=>['label'=>'Filing deadline','value'=>$filingDeadline],
+            'confirmation_statement_date'=>['label'=>'Confirmation statement date','value'=>$confirmationStatementDate],
+            'vat_return_frequency'=>['label'=>'VAT return frequency','value'=>$vatFrequency],
             'vat_quarter'=>['label'=>'VAT quarter pattern','value'=>$vatQuarter],
             'source_email'=>['label'=>'Email as supplied','value'=>$this->validEmail((string)($data['email']??''))?strtolower(trim((string)$data['email'])):''],
             'csv_source_data'=>['label'=>'Original CSV data','value'=>$sourceFields?json_encode($sourceFields,JSON_UNESCAPED_UNICODE|JSON_UNESCAPED_SLASHES|JSON_THROW_ON_ERROR):''],
@@ -372,6 +380,8 @@ final class ClientCsvImportService
     private function validCompanyNumber(string $v):bool{$v=trim($v);return $v!==''&&preg_match('/^[A-Za-z0-9]{6,10}$/',$v)===1;}
     private function validUtr(string $v):bool{return preg_match('/^\d{10}$/',preg_replace('/\s+/','',$v)??'')===1;}
     private function validVatNumber(string $v):bool{$v=trim($v);return $v!==''&&preg_match('/^(GB)?[0-9A-Za-z ]{8,14}$/i',$v)===1;}
+    private function validVatFrequency(string $v):bool{return in_array(strtolower(trim($v)),['quarterly','quarter','qtr','monthly','month'],true);}
+    private function normalizeVatFrequency(string $v):string{if(!$this->validVatFrequency($v))return '';return in_array(strtolower(trim($v)),['quarterly','quarter','qtr'],true)?'Quarterly':'Monthly';}
     private function validEmail(string $v):bool{return trim($v)!==''&&filter_var(trim($v),FILTER_VALIDATE_EMAIL)!==false;}
     private function internalEmail(string $companyName):string{$slug=preg_replace('/[^a-z0-9]/','',strtolower($companyName))?:'company';return 'client.'.$slug.'.'.bin2hex(random_bytes(6)).'@trinova.invalid';}
     private function emailAvailableToUser(string $email,int $userId):bool{if($email==='')return false;$stmt=$this->db->prepare('SELECT id FROM users WHERE email=:email AND id<>:id LIMIT 1');$stmt->execute(['email'=>$email,'id'=>$userId]);return !$stmt->fetchColumn();}
