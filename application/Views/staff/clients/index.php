@@ -87,13 +87,19 @@
             <form action="/staff/clients/delete" method="POST" data-ajax-form>
                 <input type="hidden" name="csrf_token" value="<?= htmlspecialchars(\Application\Core\Session::csrfToken()) ?>">
                 <input type="hidden" name="client_id" id="deleteClientId">
+                <label for="deleteClientConfirmation" style="display:block;margin:0 0 20px;color:#334a43;font-size:14px;font-weight:700">
+                    Type <strong style="color:#b42318">DELETE</strong> to confirm
+                    <input id="deleteClientConfirmation" type="text" name="confirm_delete" required pattern="DELETE" autocomplete="off" spellcheck="false" placeholder="DELETE" oninput="document.getElementById('deleteClientSubmit').disabled=this.value!=='DELETE'" style="display:block;width:100%;box-sizing:border-box;margin-top:8px;padding:12px 14px;border:1.5px solid #fca5a5;border-radius:12px;background:#fffafa;color:#18332d;font:inherit;outline:none">
+                </label>
                 <div style="display:flex;justify-content:flex-end;gap:12px">
-                    <button type="button" onclick="document.getElementById('deleteClientModal').style.display='none'" style="background:#f0f5f3;color:#5f726c;border:none;padding:11px 20px;border-radius:12px;font-weight:700;cursor:pointer">Cancel</button>
-                    <button type="submit" style="background:#dc2626;color:#fff;border:none;padding:11px 22px;border-radius:12px;font-weight:700;cursor:pointer">Delete Client</button>
+                    <button type="button" onclick="tnCloseDeleteClient()" style="background:#f0f5f3;color:#5f726c;border:none;padding:11px 20px;border-radius:12px;font-weight:700;cursor:pointer">Cancel</button>
+                    <button id="deleteClientSubmit" type="submit" disabled data-loading-text="Moving to Trash..." style="background:#dc2626;color:#fff;border:none;padding:11px 22px;border-radius:12px;font-weight:700;cursor:pointer;transition:opacity .2s ease">Move to Trash</button>
                 </div>
             </form>
         </div>
     </div>
+
+    <style>#deleteClientSubmit:disabled{opacity:.45;cursor:not-allowed!important}</style>
 
     <!-- Clients Table -->
     <div class="tn-client-list" style="background:#fff;border-radius:24px;padding:12px;box-shadow:0 1px 2px rgba(16,54,45,.04),0 14px 34px -24px rgba(16,54,45,.4)">
@@ -169,7 +175,17 @@
 <script>
 function tnDeleteClient(id) {
     document.getElementById('deleteClientId').value = id;
+    const confirmation = document.getElementById('deleteClientConfirmation');
+    const submit = document.getElementById('deleteClientSubmit');
+    confirmation.value = '';
+    submit.disabled = true;
     document.getElementById('deleteClientModal').style.display = 'flex';
+    window.setTimeout(() => confirmation.focus(), 50);
+}
+function tnCloseDeleteClient() {
+    document.getElementById('deleteClientModal').style.display = 'none';
+    document.getElementById('deleteClientConfirmation').value = '';
+    document.getElementById('deleteClientSubmit').disabled = true;
 }
 function tnClientToggleAll(el) {
     document.querySelectorAll('.tn-client-check').forEach(c => { c.checked = el.checked; });

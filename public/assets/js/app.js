@@ -177,6 +177,8 @@
     }
 
     async function submitAjaxForm(form) {
+        if (form.dataset.submitting === 'true') return;
+
         const method = (form.method || 'GET').toUpperCase();
         if (method === 'GET') {
             const url = new URL(form.action || window.location.href, window.location.origin);
@@ -190,10 +192,16 @@
 
         const submitter = form.querySelector('[type="submit"]');
         const originalLabel = submitter?.textContent;
+        const importOverlay = form.matches('[data-import-commit-form]')
+            ? document.getElementById('csvCommitOverlay')
+            : null;
+        form.dataset.submitting = 'true';
         if (submitter) {
             submitter.disabled = true;
+            submitter.setAttribute('aria-busy', 'true');
             submitter.textContent = submitter.dataset.loadingText || 'Working…';
         }
+        if (importOverlay) importOverlay.hidden = false;
 
         try {
             const response = await fetch(form.action, {
@@ -239,8 +247,11 @@
         } catch (error) {
             showToast(error.message || 'The operation could not be completed.', 'error');
         } finally {
+            form.dataset.submitting = 'false';
+            if (importOverlay?.isConnected) importOverlay.hidden = true;
             if (submitter) {
                 submitter.disabled = false;
+                submitter.removeAttribute('aria-busy');
                 submitter.textContent = originalLabel;
             }
         }

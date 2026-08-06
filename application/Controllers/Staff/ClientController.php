@@ -270,10 +270,10 @@ class ClientController extends Controller
 
         if ($clientId <= 0 || $confirmation !== 'DELETE') {
             if ($request->isAjax()) {
-                $response->json(['success' => false, 'message' => 'Type DELETE to confirm permanent client removal.'], 422);
+                $response->json(['success' => false, 'message' => 'Type DELETE to confirm moving this client to Trash.'], 422);
                 return;
             }
-            \Application\Core\Session::setFlash('error', 'Type DELETE to confirm permanent client removal.');
+            \Application\Core\Session::setFlash('error', 'Type DELETE to confirm moving this client to Trash.');
             $response->redirect('/staff/clients');
             return;
         }
@@ -284,7 +284,7 @@ class ClientController extends Controller
             $this->clientModel->delete($clientId);
             \Application\Services\AuditService::log('client_deleted', 'clients', $clientId);
 
-            $msg = "Client account '{$name}' removed successfully.";
+            $msg = "Client account '{$name}' moved to Trash successfully.";
             if ($request->isAjax()) {
                 $response->json(['success' => true, 'message' => $msg, 'redirect' => '/staff/clients']);
                 return;
