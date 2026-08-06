@@ -8,7 +8,9 @@ use Application\Core\Request;
 use Application\Core\Response;
 use Application\Core\Session;
 use Application\Exceptions\UserFacingException;
+use Application\Exceptions\SystemSetupException;
 use Application\Services\ClientCsvImportService;
+use Application\Services\ErrorHandler;
 
 final class ClientCsvController extends Controller
 {
@@ -68,20 +70,29 @@ final class ClientCsvController extends Controller
     public function deleteBatch(Request $request, Response $response): void
     {
         $batchId = (int)($request->input('batch_id', 0) ?: $request->input('import_id', 0) ?: $request->input('id', 0));
+        if($batchId<1){$this->userFailure($request,$response,'The import batch identifier is missing or invalid.');return;}
         try {
-            if ($batchId > 0 && (new ClientCsvImportService())->deleteImportBatch($batchId)) {
-                $msg = 'Import batch deleted.';
-                if ($request->isAjax()) { $response->json(['success' => true, 'message' => $msg, 'redirect' => '/staff/clients']); return; }
+            if ((new ClientCsvImportService())->deleteImportBatch($batchId)) {
+                $msg = 'Import batch moved to Trash successfully.';
+                if ($request->isAjax()) { $response->json(['success' => true, 'message' => $msg, 'redirect' => '/staff/trash?tab=batches']); return; }
                 Session::setFlash('success', $msg);
-                $response->redirect('/staff/clients');
+                $response->redirect('/staff/trash?tab=batches');
                 return;
-            } else {
-                if ($request->isAjax()) { $response->json(['success' => false, 'message' => 'Failed to delete batch.'], 422); return; }
-                Session::setFlash('error', 'Failed to delete batch.');
             }
         } catch (UserFacingException $e) {
             $this->userFailure($request, $response, $e->getMessage());
             return;
+        } catch (SystemSetupException $e) {
+            ErrorHandler::report(new \RuntimeException('Delete import batch '.$batchId.' failed schema validation for user '.(int)Session::get('user_id'),0,$e),$request);
+            $message=ErrorHandler::SETUP_MESSAGE;
+            if($request->isAjax()){$response->json(['success'=>false,'message'=>$message,'error_code'=>'CSV_DELETE_SCHEMA'],503);return;}
+            Session::setFlash('error',$message);$response->redirect('/staff/clients/import');return;
+        } catch (\Throwable $e) {
+            $reference='CSV-DEL-'.date('YmdHis').'-'.$batchId;
+            ErrorHandler::report(new \RuntimeException($reference.' delete import batch failed for user '.(int)Session::get('user_id'),0,$e),$request);
+            $message='The import batch could not be deleted. Please try again or contact support with reference '.$reference.'.';
+            if($request->isAjax()){$response->json(['success'=>false,'message'=>$message,'error_code'=>$reference],500);return;}
+            Session::setFlash('error',$message);$response->redirect('/staff/clients/import');return;
         }
         $response->redirect('/staff/clients/import');
     }

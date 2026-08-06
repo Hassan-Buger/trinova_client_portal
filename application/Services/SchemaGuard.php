@@ -29,6 +29,14 @@ final class SchemaGuard
         if(array_diff($required,$available))throw new SystemSetupException('Directors Importer schema migration is incomplete.');
     }
 
+    public static function assertImportBatchDeletionReady(): void
+    {
+        $db=Database::getInstance();
+        $tables=['users','clients','client_entities','entity_directors','documents','document_requests','messages','deadlines','meetings','client_csv_imports'];
+        $stmt=$db->prepare("SELECT COUNT(*) FROM information_schema.columns WHERE table_schema=DATABASE() AND table_name=:table_name AND column_name='deleted_at'");
+        foreach($tables as $table){$stmt->execute(['table_name'=>$table]);if(!(int)$stmt->fetchColumn())throw new SystemSetupException('CSV batch deletion schema is incomplete: '.$table.'.deleted_at is missing.');}
+    }
+
     public static function assertDeleteSchemaReady(): void
     {
         $db = Database::getInstance();

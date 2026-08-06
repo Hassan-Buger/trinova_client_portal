@@ -91,10 +91,15 @@ expect(str_contains($source,"'accounting_year_end'=>['label'=>'Accounting year e
 expect(str_contains($source,'This row could not be saved because of a technical or database error.'),'Technical row failures are not reported safely.');
 expect(str_contains($source,'failed_count>=total_rows'),'A previously all-failed CSV cannot be retried under the warning-only validation policy.');
 expect(str_contains($source,"(\$row['result'] ?? '') !== 'created'"),'Batch cleanup is not restricted to companies created by that import.');
-expect(str_contains($source,"practice_key=:practice AND import_type='business_clients' AND deleted_at IS NULL FOR UPDATE"),'Batch deletion is not tenant-scoped and transactionally locked.');
+expect(str_contains($source,"practice_key=:practice AND import_type='business_clients' FOR UPDATE"),'Batch deletion is not tenant-scoped and transactionally locked.');
+expect(str_contains($source,"if (!empty(\$batch['deleted_at']))"),'Repeated batch deletion is not idempotent.');
 $controllerSource=file_get_contents(dirname(__DIR__).'/application/Controllers/Staff/ClientCsvController.php');
 $reportViewSource=file_get_contents(dirname(__DIR__).'/application/Views/staff/clients/import-report.php');
 expect(str_contains($controllerSource,"input('import_id', 0)"),'The batch endpoint does not accept legacy import_id submissions.');
 expect(str_contains($reportViewSource,'name="batch_id"'),'The import report does not submit the batch identifier expected by the endpoint.');
+expect(str_contains($controllerSource,"'/staff/trash?tab=batches'"),'Successful deletion does not redirect to the CSV batch history in Trash.');
+expect(!str_contains($controllerSource,"'Failed to delete batch.'"),'Batch deletion still hides every failure behind the old generic toast.');
+$databaseSql=file_get_contents(dirname(__DIR__).'/config/database.sql');
+expect(str_contains($databaseSql,'`deleted_at` DATETIME NULL'),'The canonical CSV import schema does not support soft deletion.');
 
 echo "Client CSV focused tests passed\n";

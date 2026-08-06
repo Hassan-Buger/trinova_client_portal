@@ -20,11 +20,13 @@ CREATE TABLE IF NOT EXISTS client_csv_imports (
   safe_error VARCHAR(255) NULL,
   started_at DATETIME NULL,
   completed_at DATETIME NULL,
+  deleted_at DATETIME NULL,
   created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
   updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   UNIQUE KEY uq_csv_import_file (practice_key, import_type, file_hash),
   UNIQUE KEY uq_csv_import_content (practice_key, import_type, content_hash),
   INDEX idx_csv_import_status (practice_key, import_type, status, completed_at),
   INDEX idx_csv_import_user (created_by_user_id),
+  INDEX idx_csv_deleted_at (deleted_at),
   CONSTRAINT fk_csv_import_user FOREIGN KEY (created_by_user_id) REFERENCES users(id) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

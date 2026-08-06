@@ -321,16 +321,21 @@ final class ClientCsvImportService
 
     public function deleteImportBatch(int $id): bool
     {
-        if ($id < 1) return false;
+        if ($id < 1) throw new UserFacingException('The import batch identifier is invalid.');
+        SchemaGuard::assertImportBatchDeletionReady();
 
         $this->db->beginTransaction();
         try {
-            $stmt = $this->db->prepare("SELECT * FROM client_csv_imports WHERE id=:id AND practice_key=:practice AND import_type='business_clients' AND deleted_at IS NULL FOR UPDATE");
+            $stmt = $this->db->prepare("SELECT * FROM client_csv_imports WHERE id=:id AND practice_key=:practice AND import_type='business_clients' FOR UPDATE");
             $stmt->execute(['id' => $id, 'practice' => $this->practiceKey()]);
             $batch = $stmt->fetch();
             if (!$batch) {
                 $this->db->rollBack();
-                return false;
+                throw new UserFacingException('The requested import batch was not found.');
+            }
+            if (!empty($batch['deleted_at'])) {
+                $this->db->rollBack();
+                return true;
             }
 
             $targets = $this->createdImportTargets($batch);
