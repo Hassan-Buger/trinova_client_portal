@@ -121,7 +121,7 @@
             </thead>
             <tbody>
                 <?php if (empty($clients)): ?>
-                    <tr class="tn-client-empty"><td colspan="6" style="padding:42px 16px;text-align:center;color:#7d8e88">No clients match the current search.</td></tr>
+                    <tr class="tn-client-empty"><td colspan="6" style="padding:42px 16px;text-align:center;color:#7d8e88"><?= ($search ?? '') !== '' ? 'No clients match the current search.' : 'No active client accounts were found. CSV upload and preview do not remove clients; check Trash if accounts were previously deleted.' ?></td></tr>
                 <?php endif; ?>
                 <?php foreach ($clients as $c): ?>
                     <tr class="client-row" id="client-row-<?= $c['id'] ?>" style="border-bottom:1px solid rgba(20,60,50,.06);transition:all .3s ease">

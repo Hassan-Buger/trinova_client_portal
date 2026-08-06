@@ -22,6 +22,21 @@ expect($line===2,'The title row was not skipped.');
 expect((ClientCsv::defaultMapping($detected)['client_name']??null)===0,'BOM/case-insensitive Client Name mapping failed.');
 fclose($stream);
 
+$uniqueHeaders=$reflection->getMethod('uniqueHeaders');
+$directorColumns=$reflection->getMethod('directorColumns');
+$mergeDirectors=$reflection->getMethod('mergeDirectorColumns');
+$repeated=['COMPANY NAME','Company Number','Director','Director','Director'];
+$unique=$uniqueHeaders->invoke($service,$repeated);
+expect($unique===['COMPANY NAME','Company Number','Director','Director (2)','Director (3)'],'Repeated spreadsheet headers were not made safe for column mapping.');
+$directorIndexes=$directorColumns->invoke($service,$repeated);
+expect($directorIndexes===[2,3,4],'Repeated Director columns were not detected.');
+$merged=$mergeDirectors->invoke($service,['Example Ltd','00123456','Alex Example','Sam Example','alex   example'],$directorIndexes);
+expect($merged[2]==='Alex Example; Sam Example' && $merged[3]==='' && $merged[4]==='','Repeated Director values were not consolidated without duplicates.');
+expect((ClientCsv::defaultMapping($unique)['directors']??null)===2,'The consolidated Director column was not auto-mapped.');
+expect((ClientCsv::defaultMapping(['END OF YEAR DATE','accounts dealine','QTR1'])['year_end']??null)===0,'Common year-end header was not mapped.');
+expect((ClientCsv::defaultMapping(['END OF YEAR DATE','accounts dealine','QTR1'])['filing_deadline']??null)===1,'Common accounts deadline header was not mapped.');
+expect((ClientCsv::defaultMapping(['END OF YEAR DATE','accounts dealine','QTR1'])['vat_quarter']??null)===2,'Common VAT-quarter header was not mapped.');
+
 $fingerprint=$reflection->getMethod('contentHash');
 $fingerprintHeaders=['Client Name','Company No.','Email'];
 $rowsA=[['_line'=>2,'values'=>['Example Ltd','00123456','company@example.com']],['_line'=>3,'values'=>['Second Ltd','00876543','second@example.com']]];

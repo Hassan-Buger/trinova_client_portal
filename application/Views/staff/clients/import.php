@@ -6,6 +6,7 @@
 <?php if(empty($upload)): ?>
     <h3 style="margin-top:0">1. Upload CSV</h3>
     <p style="color:#61756e;font-size:14px">Business clients only. Maximum 5 MB and 5,000 rows. No invitations or emails are sent.</p>
+    <p style="margin:0 0 16px;color:#61756e;font-size:13px"><strong>Safe preview:</strong> uploading and mapping a CSV does not delete or replace existing clients. Database changes happen only after you review the preview and confirm the import.</p>
     <form action="/staff/clients/import/upload" method="POST" enctype="multipart/form-data">
         <input type="hidden" name="csrf_token" value="<?= htmlspecialchars(\Application\Core\Session::csrfToken()) ?>">
         <input type="file" name="csv_file" accept=".csv,text/csv" required style="display:block;width:100%;padding:18px;border:2px dashed #b9d5ce;border-radius:16px;margin:18px 0">

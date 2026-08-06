@@ -21,12 +21,12 @@ final class ClientCsv
             'utr'=>['header'=>'UTR','required'=>false,'aliases'=>['utr','corporation tax utr','ct utr']],
             'vat_number'=>['header'=>'VAT No.','required'=>false,'aliases'=>['vat no.','vat no','vat number']],
             'address'=>['header'=>'Registered Address','required'=>false,'aliases'=>['registered address','address']],
-            'directors'=>['header'=>'Director(s) / Contact(s)','required'=>false,'aliases'=>['director(s) / contact(s)','directors','contacts']],
+            'directors'=>['header'=>'Director(s) / Contact(s)','required'=>false,'aliases'=>['director(s) / contact(s)','director','directors','contact','contacts']],
             'email'=>['header'=>'Email','required'=>false,'aliases'=>['email','email address']],
             'phone'=>['header'=>'Phone','required'=>false,'aliases'=>['phone','telephone','mobile']],
-            'year_end'=>['header'=>'EOY (Year End)','required'=>false,'aliases'=>['eoy (year end)','year end','accounting year end']],
-            'filing_deadline'=>['header'=>'Filing Deadline','required'=>false,'aliases'=>['filing deadline']],
-            'vat_quarter'=>['header'=>'VAT Quarter','required'=>false,'aliases'=>['vat quarter','vat quarters']],
+            'year_end'=>['header'=>'EOY (Year End)','required'=>false,'aliases'=>['eoy (year end)','year end','accounting year end','end of year date']],
+            'filing_deadline'=>['header'=>'Filing Deadline','required'=>false,'aliases'=>['filing deadline','accounts deadline','accounts dealine']],
+            'vat_quarter'=>['header'=>'VAT Quarter','required'=>false,'aliases'=>['vat quarter','vat quarters','qtr1']],
         ];
     }
 

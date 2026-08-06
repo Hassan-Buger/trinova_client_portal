@@ -27,13 +27,16 @@ final class ClientCsvImportService
         $handle=fopen((string)$file['tmp_name'],'rb');
         if(!$handle) throw new UserFacingException('The uploaded CSV could not be read.');
         [$headers,$headerLine]=$this->findHeaders($handle);
-        if(count($headers)<2 || count(array_filter($headers))!==count(array_unique(array_filter($headers)))){fclose($handle);throw new UserFacingException('The CSV headers are missing or duplicated.');}
+        if(count($headers)<2){fclose($handle);throw new UserFacingException('The CSV headers are missing.');}
+        $directorColumns=$this->directorColumns($headers);
+        $headers=$this->uniqueHeaders($headers);
         $rows=[];$line=$headerLine;
         while(($row=fgetcsv($handle))!==false){
             $line++; if(count($rows)>=ClientCsv::MAX_ROWS){fclose($handle);throw new UserFacingException('The CSV exceeds the 5,000 row import limit.');}
             if(count(array_filter($row,fn($v)=>trim((string)$v)!==''))===0) continue;
             if(count($row)!==count($headers)){$rows[]=['_line'=>$line,'_malformed'=>true,'values'=>$row];continue;}
-            $rows[]=['_line'=>$line,'values'=>array_map(fn($v)=>trim((string)$v),$row)];
+            $row=array_map(fn($v)=>$this->cleanCsvValue((string)$v),$row);
+            $rows[]=['_line'=>$line,'values'=>$this->mergeDirectorColumns($row,$directorColumns)];
         }
         fclose($handle);
         if(!$rows) throw new UserFacingException('The CSV contains no data rows.');
@@ -121,6 +124,51 @@ final class ClientCsvImportService
             if(isset($mapping['client_name'])&&count($mapping)>=2)return [$candidate,$line];
         }
         throw new UserFacingException('The CSV header could not be recognized. Ensure the Client Name and expected business columns are present.');
+    }
+
+    private function uniqueHeaders(array $headers): array
+    {
+        $seen=[];$result=[];
+        foreach($headers as $index=>$header){
+            $label=$this->cleanCsvValue((string)$header);
+            if($label==='')$label='Unmapped column '.($index+1);
+            $key=strtolower(preg_replace('/\s+/u',' ',$label)??$label);
+            $seen[$key]=($seen[$key]??0)+1;
+            $result[]=$seen[$key]===1?$label:$label.' ('.$seen[$key].')';
+        }
+        return $result;
+    }
+
+    private function directorColumns(array $headers): array
+    {
+        $indexes=[];
+        foreach($headers as $index=>$header){
+            $normalized=strtolower(trim(preg_replace('/\s+/u',' ',$this->cleanCsvValue((string)$header))??''));
+            if(preg_match('/^(director|contact)(?:\s*\d+|\(s\)|s)?(?:\s*\/\s*contact\(s\))?$/',$normalized))$indexes[]=(int)$index;
+        }
+        return $indexes;
+    }
+
+    private function mergeDirectorColumns(array $row,array $indexes): array
+    {
+        if(count($indexes)<2)return $row;
+        $names=[];$seen=[];
+        foreach($indexes as $index){
+            foreach(preg_split('/[;,\r\n]+/u',(string)($row[$index]??''))?:[] as $name){
+                $name=$this->cleanCsvValue($name);if($name==='')continue;
+                $key=strtolower(preg_replace('/\s+/u',' ',$name)??$name);
+                if(isset($seen[$key]))continue;$seen[$key]=true;$names[]=$name;
+            }
+        }
+        $row[$indexes[0]]=implode('; ',$names);
+        foreach(array_slice($indexes,1) as $index)$row[$index]='';
+        return $row;
+    }
+
+    private function cleanCsvValue(string $value): string
+    {
+        $value=str_replace(["\xC2\xA0","\xEF\xBB\xBF"],[' ',''],$value);
+        return trim($value);
     }
 
     private function contentHash(array $headers,array $rows): string
