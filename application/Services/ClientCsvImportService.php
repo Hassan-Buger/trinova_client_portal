@@ -7,6 +7,8 @@ use Application\Config\ClientCsv;
 use Application\Core\Database;
 use Application\Core\Session;
 use Application\Exceptions\UserFacingException;
+use Application\Models\Client;
+use Application\Models\ClientEntity;
 use PDO;
 use PDOException;
 
@@ -291,22 +293,97 @@ final class ClientCsvImportService
 
     public function deleteImportBatch(int $id): bool
     {
-        $stmt = $this->db->prepare("UPDATE client_csv_imports SET deleted_at = NOW() WHERE id = :id");
-        $success = $stmt->execute(['id' => $id]);
-        if ($success) {
-            \Application\Services\AuditService::log('csv_import_batch_deleted', 'client_csv_imports', $id);
+        if ($id < 1) return false;
+
+        $this->db->beginTransaction();
+        try {
+            $stmt = $this->db->prepare("SELECT * FROM client_csv_imports WHERE id=:id AND practice_key=:practice AND import_type='business_clients' AND deleted_at IS NULL FOR UPDATE");
+            $stmt->execute(['id' => $id, 'practice' => $this->practiceKey()]);
+            $batch = $stmt->fetch();
+            if (!$batch) {
+                $this->db->rollBack();
+                return false;
+            }
+
+            $targets = $this->createdImportTargets($batch);
+            $clientModel = new Client();
+            $entityModel = new ClientEntity();
+            foreach ($targets['client_ids'] as $clientId) $clientModel->softDelete($clientId);
+            foreach ($targets['entity_ids'] as $entityId) $entityModel->softDelete($entityId);
+
+            $update = $this->db->prepare("UPDATE client_csv_imports SET deleted_at=NOW() WHERE id=:id AND practice_key=:practice AND deleted_at IS NULL");
+            $update->execute(['id' => $id, 'practice' => $this->practiceKey()]);
+            if ($update->rowCount() !== 1) throw new \RuntimeException('Import batch could not be moved to Trash.');
+            $this->db->commit();
+        } catch (\Throwable $e) {
+            if ($this->db->inTransaction()) $this->db->rollBack();
+            throw $e;
         }
-        return $success;
+
+        try {
+            AuditService::log('csv_import_batch_deleted', 'client_csv_imports', $id, null, [
+                'clients_moved_to_trash' => count($targets['client_ids']),
+                'entities_moved_to_trash' => count($targets['entity_ids']),
+            ]);
+        } catch (\Throwable $auditError) {
+            error_log('CSV batch deletion audit failed: '.$auditError->getMessage());
+        }
+        return true;
     }
 
     public function restoreImportBatch(int $id): bool
     {
-        $stmt = $this->db->prepare("UPDATE client_csv_imports SET deleted_at = NULL WHERE id = :id");
-        $success = $stmt->execute(['id' => $id]);
-        if ($success) {
-            \Application\Services\AuditService::log('csv_import_batch_restored', 'client_csv_imports', $id);
+        if ($id < 1) return false;
+
+        $this->db->beginTransaction();
+        try {
+            $stmt = $this->db->prepare("SELECT * FROM client_csv_imports WHERE id=:id AND practice_key=:practice AND import_type='business_clients' AND deleted_at IS NOT NULL FOR UPDATE");
+            $stmt->execute(['id' => $id, 'practice' => $this->practiceKey()]);
+            $batch = $stmt->fetch();
+            if (!$batch) {
+                $this->db->rollBack();
+                return false;
+            }
+
+            $targets = $this->createdImportTargets($batch);
+            $clientModel = new Client();
+            $entityModel = new ClientEntity();
+            foreach ($targets['client_ids'] as $clientId) $clientModel->restore($clientId);
+            foreach ($targets['entity_ids'] as $entityId) $entityModel->restore($entityId);
+
+            $update = $this->db->prepare("UPDATE client_csv_imports SET deleted_at=NULL WHERE id=:id AND practice_key=:practice AND deleted_at IS NOT NULL");
+            $update->execute(['id' => $id, 'practice' => $this->practiceKey()]);
+            if ($update->rowCount() !== 1) throw new \RuntimeException('Import batch could not be restored.');
+            $this->db->commit();
+        } catch (\Throwable $e) {
+            if ($this->db->inTransaction()) $this->db->rollBack();
+            throw $e;
         }
-        return $success;
+
+        try {
+            AuditService::log('csv_import_batch_restored', 'client_csv_imports', $id);
+        } catch (\Throwable $auditError) {
+            error_log('CSV batch restore audit failed: '.$auditError->getMessage());
+        }
+        return true;
+    }
+
+    private function createdImportTargets(array $batch): array
+    {
+        $report = $this->decodeReport($batch);
+        $clientIds = [];
+        $entityIds = [];
+        foreach (($report['rows'] ?? []) as $row) {
+            if (($row['result'] ?? '') !== 'created' || (int)($row['entity_id'] ?? 0) < 1) continue;
+            $entityId = (int)$row['entity_id'];
+            $stmt = $this->db->prepare('SELECT client_id FROM client_entities WHERE id=:id LIMIT 1');
+            $stmt->execute(['id' => $entityId]);
+            $clientId = (int)($stmt->fetchColumn() ?: 0);
+            if ($clientId < 1) continue;
+            if ((int)($row['company_accounts_created'] ?? 0) > 0) $clientIds[$clientId] = $clientId;
+            else $entityIds[$entityId] = $entityId;
+        }
+        return ['client_ids' => array_values($clientIds), 'entity_ids' => array_values($entityIds)];
     }
 
     public function getAllBatches(): array

@@ -17,9 +17,9 @@ $secondary=['placeholder_directors_created'=>'Directors created','placeholder_di
       <a class="ir-btn ir-btn-secondary" href="/staff/clients">View clients</a>
       <form action="/staff/clients/import/batch/delete" method="POST" data-ajax-form style="margin:0;display:inline-block">
         <input type="hidden" name="csrf_token" value="<?= htmlspecialchars(\Application\Core\Session::csrfToken()) ?>">
-        <input type="hidden" name="import_id" value="<?= (int)($result['import_id'] ?? 0) ?>">
+        <input type="hidden" name="batch_id" value="<?= (int)($result['import_id'] ?? 0) ?>">
         <input type="hidden" name="token" value="<?= htmlspecialchars((string)($result['token'] ?? '')) ?>">
-        <button type="submit" onclick="return confirm('Delete all client companies imported in this batch? They can be restored from Trash.')" class="ir-btn" style="background:#fef2f2;color:#dc2626;border:1px solid #fecaca;cursor:pointer">Delete Import Batch</button>
+        <button type="submit" data-loading-text="Moving batch to Trash..." onclick="return confirm('Move only the client companies created by this import batch to Trash? Matched existing clients will not be changed.')" class="ir-btn" style="background:#fef2f2;color:#dc2626;border:1px solid #fecaca;cursor:pointer">Delete Import Batch</button>
       </form>
     </div>
   </section>

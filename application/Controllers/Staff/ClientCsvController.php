@@ -61,12 +61,14 @@ final class ClientCsvController extends Controller
 
     public function deleteBatch(Request $request, Response $response): void
     {
-        $batchId = (int)($request->input('batch_id', 0) ?: $request->input('id', 0));
+        $batchId = (int)($request->input('batch_id', 0) ?: $request->input('import_id', 0) ?: $request->input('id', 0));
         try {
             if ($batchId > 0 && (new ClientCsvImportService())->deleteImportBatch($batchId)) {
                 $msg = 'Import batch deleted.';
-                if ($request->isAjax()) { $response->json(['success' => true, 'message' => $msg]); return; }
+                if ($request->isAjax()) { $response->json(['success' => true, 'message' => $msg, 'redirect' => '/staff/clients']); return; }
                 Session::setFlash('success', $msg);
+                $response->redirect('/staff/clients');
+                return;
             } else {
                 if ($request->isAjax()) { $response->json(['success' => false, 'message' => 'Failed to delete batch.'], 422); return; }
                 Session::setFlash('error', 'Failed to delete batch.');

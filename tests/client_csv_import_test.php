@@ -78,5 +78,11 @@ expect(str_contains($migration,'UNIQUE KEY uq_csv_import_content (practice_key, 
 expect(str_contains($source,"status='completed'"),'Completed import state is not persisted.');
 expect(str_contains($source,'practice_key=:practice'),'Import/report queries are not tenant scoped.');
 expect(str_contains($source,'FOR UPDATE'),'Concurrent commit locking is missing.');
+expect(str_contains($source,"(\$row['result'] ?? '') !== 'created'"),'Batch cleanup is not restricted to companies created by that import.');
+expect(str_contains($source,"practice_key=:practice AND import_type='business_clients' AND deleted_at IS NULL FOR UPDATE"),'Batch deletion is not tenant-scoped and transactionally locked.');
+$controllerSource=file_get_contents(dirname(__DIR__).'/application/Controllers/Staff/ClientCsvController.php');
+$reportViewSource=file_get_contents(dirname(__DIR__).'/application/Views/staff/clients/import-report.php');
+expect(str_contains($controllerSource,"input('import_id', 0)"),'The batch endpoint does not accept legacy import_id submissions.');
+expect(str_contains($reportViewSource,'name="batch_id"'),'The import report does not submit the batch identifier expected by the endpoint.');
 
 echo "Client CSV focused tests passed\n";
