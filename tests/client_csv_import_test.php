@@ -67,7 +67,13 @@ expect(($row['match']['entity_id']??0)===77,'Email plus company-name fallback di
 
 $bad=$base;$bad['client_name']='';$bad['filing_deadline']='not-a-date';
 $row=$validate->invoke($service,5,$bad,false,$existing);
-expect(count($row['errors'])>=2,'Missing company name and invalid date were not rejected.');
+expect($row['errors']===[],'Business validation still blocks a structurally valid company row.');
+expect(count($row['warnings'])>=2,'Business validation warnings were lost.');
+$malformed=$validate->invoke($service,6,$base,true,$existing);
+expect(count($malformed['errors'])===1,'A malformed CSV row is no longer a blocking technical error.');
+$attributes=$reflection->getMethod('businessAttributes')->invoke($service,$base+['_source_fields'=>['PAYE REF NUMBER'=>'123/AB456']]);
+expect(($attributes['accounting_year_end']['value']??'')==='Thu 31 Jul 2025','Accounting year-end input was normalized instead of retained.');
+expect(str_contains((string)($attributes['csv_source_data']['value']??''),'PAYE REF NUMBER'),'Unmapped source fields are not retained.');
 
 $source=file_get_contents(dirname(__DIR__).'/application/Services/ClientCsvImportService.php');
 expect(str_contains($source,'VALUES(:entity,NULL,:name,NULL,NULL,:primary,1)'),'Director placeholders are not name-only records.');
@@ -78,6 +84,12 @@ expect(str_contains($migration,'UNIQUE KEY uq_csv_import_content (practice_key, 
 expect(str_contains($source,"status='completed'"),'Completed import state is not persisted.');
 expect(str_contains($source,'practice_key=:practice'),'Import/report queries are not tenant scoped.');
 expect(str_contains($source,'FOR UPDATE'),'Concurrent commit locking is missing.');
+expect(str_contains($source,'Email address format appears unusual; the supplied value will still be stored.'),'Invalid email values are not retained as warnings.');
+expect(str_contains($source,'VAT quarter format appears unusual; the supplied value will still be stored.'),'VAT format validation is not preserved as a warning.');
+expect(str_contains($source,'Duplicates CSV row {$seen[$key][$id]} by {$key}; database matching will determine whether this company is created or updated.'),'Duplicate business identifiers still block otherwise importable rows.');
+expect(str_contains($source,"'accounting_year_end'=>['label'=>'Accounting year end','value'=>(string)(\$data['year_end']??'')]"),'The raw accounting year value is not retained.');
+expect(str_contains($source,'This row could not be saved because of a technical or database error.'),'Technical row failures are not reported safely.');
+expect(str_contains($source,'failed_count>=total_rows'),'A previously all-failed CSV cannot be retried under the warning-only validation policy.');
 expect(str_contains($source,"(\$row['result'] ?? '') !== 'created'"),'Batch cleanup is not restricted to companies created by that import.');
 expect(str_contains($source,"practice_key=:practice AND import_type='business_clients' AND deleted_at IS NULL FOR UPDATE"),'Batch deletion is not tenant-scoped and transactionally locked.');
 $controllerSource=file_get_contents(dirname(__DIR__).'/application/Controllers/Staff/ClientCsvController.php');

@@ -65,8 +65,9 @@ final class ClientCsvImportService
         $identifiers=$this->existingIdentifiers();$preview=[];$seen=[];
         foreach($draft['rows'] as $raw){
             $data=[];foreach($clean as $key=>$index)$data[$key]=trim((string)($raw['values'][$index]??''));
+            $data['_source_fields']=[];foreach($draft['headers'] as $index=>$header)$data['_source_fields'][(string)$header]=(string)($raw['values'][$index]??'');
             $planned=$this->validateRow((int)$raw['_line'],$data,!empty($raw['_malformed']),$identifiers);
-            foreach(['company_number','utr','vat_number'] as $key){$id=$this->identifier($data[$key]??'');if($id==='')continue;if(isset($seen[$key][$id])){$planned['errors'][]="Duplicates CSV row {$seen[$key][$id]} by {$key}.";break;}$seen[$key][$id]=(int)$raw['_line'];}
+            foreach(['company_number','utr','vat_number'] as $key){$id=$this->identifier($data[$key]??'');if($id==='')continue;if(isset($seen[$key][$id])){$planned['warnings'][]="Duplicates CSV row {$seen[$key][$id]} by {$key}; database matching will determine whether this company is created or updated.";break;}$seen[$key][$id]=(int)$raw['_line'];}
             $preview[]=$planned;
         }
         $draft['mapping']=$clean;$draft['preview']=$preview;$this->writeDraft($token,$draft);
@@ -77,24 +78,28 @@ final class ClientCsvImportService
     {
         SchemaGuard::assertClientCsvReady();
         $draft=$this->readDraft($token); if(empty($draft['preview'])) throw new UserFacingException('Preview this import before confirming it.');
-        $report=[];$currentLine=0;$importId=(int)($draft['import_id']??0);if($importId<1)throw new UserFacingException('This import draft predates duplicate protection. Upload the CSV again.');$this->db->beginTransaction();
+        $report=[];$importId=(int)($draft['import_id']??0);if($importId<1)throw new UserFacingException('This import draft predates duplicate protection. Upload the CSV again.');$this->db->beginTransaction();
         try{
             $tracked=$this->lockImport($importId);
             if(!$tracked)throw new UserFacingException('The tracked import could not be found. Upload the CSV again.');
             if($tracked['status']==='completed'){$this->db->rollBack();$saved=$this->decodeReport($tracked);return $saved+['import_id'=>$importId,'duplicate'=>true];}
             if($tracked['status']!=='pending')throw new UserFacingException('This CSV import is already being processed.');
             $this->db->prepare("UPDATE client_csv_imports SET status='processing',started_at=NOW(),safe_error=NULL WHERE id=:id")->execute(['id'=>$importId]);
-            foreach($draft['preview'] as $row){
-                $currentLine=(int)($row['line']??0);
-                if($row['errors']){$row['result']='failed';$report[]=$row;continue;}
-                $report[]=$this->commitRow($row);
-            }
-            $summary=$this->summarize($report);
-            $result=['filename'=>$draft['filename'],'rows'=>$report,'summary'=>$summary,'completed_at'=>date('c'),'vat_rule_confirmed'=>ClientCsv::VAT_RULE_CONFIRMED,'vat_offset_days'=>ClientCsv::VAT_DEADLINE_OFFSET_DAYS,'import_id'=>$importId];
-            $this->completeImport($importId,$summary,$result);
             $this->db->commit();
-        }catch(\Throwable $e){if($this->db->inTransaction())$this->db->rollBack();$this->failImport($importId,'The import could not be completed. Please review the file and try again.');throw new \RuntimeException('Client CSV commit failed at row '.$currentLine.'; all changes were rolled back. Cause: '.$e->getMessage(),0,$e);}
-        AuditService::log('client_csv_import','clients',null,null,[
+        }catch(\Throwable $e){if($this->db->inTransaction())$this->db->rollBack();$this->failImport($importId,'The import could not be started. Please review the file and try again.');throw new \RuntimeException('Client CSV import '.$importId.' could not be claimed. Cause: '.$e->getMessage(),0,$e);}
+
+        foreach($draft['preview'] as $row){
+            if($row['errors']){$row['result']='failed';$report[]=$row;continue;}
+            $this->db->beginTransaction();
+            try{$processed=$this->commitRow($row);$this->db->commit();$report[]=$processed;}
+            catch(\Throwable $e){if($this->db->inTransaction())$this->db->rollBack();ErrorHandler::report(new \RuntimeException('Client import row '.(int)($row['line']??0).' failed; import '.$importId,0,$e));$row['result']='failed';$row['errors'][]='This row could not be saved because of a technical or database error.';$report[]=$row;}
+        }
+
+        $summary=$this->summarize($report);
+        $result=['filename'=>$draft['filename'],'rows'=>$report,'summary'=>$summary,'completed_at'=>date('c'),'vat_rule_confirmed'=>ClientCsv::VAT_RULE_CONFIRMED,'vat_offset_days'=>ClientCsv::VAT_DEADLINE_OFFSET_DAYS,'import_id'=>$importId];
+        try{$this->db->beginTransaction();$this->completeImport($importId,$summary,$result);$this->db->commit();}
+        catch(\Throwable $e){if($this->db->inTransaction())$this->db->rollBack();$this->failImport($importId,'The import report could not be completed.');throw new \RuntimeException('Client CSV import '.$importId.' could not save its report. Cause: '.$e->getMessage(),0,$e);}
+        try{AuditService::log('client_csv_import','clients',null,null,[
             'filename'=>$draft['filename'],'total_rows'=>$summary['total'],'created'=>$summary['created'],
             'updated'=>$summary['updated'],'skipped'=>$summary['skipped'],'flagged'=>$summary['flagged'],
             'failed'=>$summary['failed'],'status'=>$summary['failed']>0?'completed_with_errors':'completed',
@@ -102,7 +107,7 @@ final class ClientCsvImportService
             'placeholder_directors_created'=>$summary['placeholder_directors_created'],
             'placeholder_directors_reused'=>$summary['placeholder_directors_reused'],
             'director_links_created'=>$summary['director_links_created'],
-        ]);
+        ]);}catch(\Throwable $auditError){ErrorHandler::report($auditError);}
         $draft['report']=$result;$this->writeDraft($token,$draft);
         return $result+['token'=>$token];
     }
@@ -175,8 +180,8 @@ final class ClientCsvImportService
 
     private function contentHash(array $headers,array $rows): string
     {
-        $mapping=ClientCsv::defaultMapping($headers);$normalized=[];
-        foreach($rows as $row){$values=$row['values']??[];$record=[];foreach(ClientCsv::fields() as $key=>$definition){if(!isset($mapping[$key]))continue;$value=trim((string)($values[$mapping[$key]]??''));$record[$key]=strtolower(preg_replace('/\s+/u',' ',$value)??$value);}if(!empty($row['_malformed']))$record['_malformed']=array_map(fn($value)=>strtolower(trim((string)$value)),$values);$normalized[]=json_encode($record,JSON_UNESCAPED_UNICODE|JSON_UNESCAPED_SLASHES|JSON_THROW_ON_ERROR);}
+        $normalized=[];
+        foreach($rows as $row){$values=$row['values']??[];$record=[];foreach($headers as $index=>$header){$value=trim((string)($values[$index]??''));$record[strtolower(trim((string)$header))]=strtolower(preg_replace('/\s+/u',' ',$value)??$value);}if(!empty($row['_malformed']))$record['_malformed']=array_map(fn($value)=>strtolower(trim((string)$value)),$values);$normalized[]=json_encode($record,JSON_UNESCAPED_UNICODE|JSON_UNESCAPED_SLASHES|JSON_THROW_ON_ERROR);}
         sort($normalized,SORT_STRING);
         return hash('sha256',json_encode($normalized,JSON_UNESCAPED_UNICODE|JSON_UNESCAPED_SLASHES|JSON_THROW_ON_ERROR));
     }
@@ -185,7 +190,13 @@ final class ClientCsvImportService
     {
         $practice=$this->practiceKey();$existing=$this->findTrackedImport($fileHash,$contentHash);
         if($existing){
-            if($existing['status']==='failed'){$retry=$this->db->prepare("UPDATE client_csv_imports SET file_hash=:file_hash,content_hash=:content_hash,original_filename=:filename,created_by_user_id=:user,draft_token=:token,status='pending',total_rows=:rows,safe_error=NULL,started_at=NULL,completed_at=NULL,report_json=NULL WHERE id=:id AND status='failed'");try{$retry->execute(['file_hash'=>$fileHash,'content_hash'=>$contentHash,'filename'=>$filename,'user'=>$userId?:null,'token'=>$token,'rows'=>$rows,'id'=>$existing['id']]);}catch(PDOException $e){if($e->getCode()!=='23000')throw $e;}if($retry->rowCount()>0)return ['duplicate'=>false,'record'=>['id'=>(int)$existing['id']]];$existing=$this->findTrackedImport($fileHash,$contentHash);}
+            if($existing['status']==='completed'&&(int)($existing['total_rows']??0)>0&&(int)($existing['failed_count']??0)>=(int)$existing['total_rows']){
+                $retry=$this->db->prepare("UPDATE client_csv_imports SET file_hash=:file_hash,content_hash=:content_hash,original_filename=:filename,created_by_user_id=:user,draft_token=:token,status='pending',total_rows=:rows,created_count=0,updated_count=0,skipped_count=0,flagged_count=0,failed_count=0,safe_error=NULL,started_at=NULL,completed_at=NULL,report_json=NULL,deleted_at=NULL WHERE id=:id AND practice_key=:practice AND import_type='business_clients' AND status='completed' AND total_rows>0 AND failed_count>=total_rows");
+                $retry->execute(['file_hash'=>$fileHash,'content_hash'=>$contentHash,'filename'=>$filename,'user'=>$userId?:null,'token'=>$token,'rows'=>$rows,'id'=>$existing['id'],'practice'=>$practice]);
+                if($retry->rowCount()>0)return ['duplicate'=>false,'record'=>['id'=>(int)$existing['id']]];
+                $existing=$this->findTrackedImport($fileHash,$contentHash);
+            }
+            if($existing&&$existing['status']==='failed'){$retry=$this->db->prepare("UPDATE client_csv_imports SET file_hash=:file_hash,content_hash=:content_hash,original_filename=:filename,created_by_user_id=:user,draft_token=:token,status='pending',total_rows=:rows,safe_error=NULL,started_at=NULL,completed_at=NULL,report_json=NULL WHERE id=:id AND status='failed'");try{$retry->execute(['file_hash'=>$fileHash,'content_hash'=>$contentHash,'filename'=>$filename,'user'=>$userId?:null,'token'=>$token,'rows'=>$rows,'id'=>$existing['id']]);}catch(PDOException $e){if($e->getCode()!=='23000')throw $e;}if($retry->rowCount()>0)return ['duplicate'=>false,'record'=>['id'=>(int)$existing['id']]];$existing=$this->findTrackedImport($fileHash,$contentHash);}
             if($existing&&$this->canReclaimPending($existing,$userId)){
                 $retry=$this->db->prepare("UPDATE client_csv_imports SET file_hash=:file_hash,content_hash=:content_hash,original_filename=:filename,draft_token=:token,total_rows=:rows,safe_error=NULL,started_at=NULL,completed_at=NULL,report_json=NULL WHERE id=:id AND practice_key=:practice AND import_type='business_clients' AND status='pending' AND created_by_user_id=:user");
                 $retry->execute(['file_hash'=>$fileHash,'content_hash'=>$contentHash,'filename'=>$filename,'token'=>$token,'rows'=>$rows,'id'=>$existing['id'],'practice'=>$practice,'user'=>$userId]);
@@ -226,15 +237,15 @@ final class ClientCsvImportService
         $errors=[];$warnings=[];$directors=[];$seenNames=[];
         foreach(preg_split('/[;,\r\n]+/u',(string)($data['directors']??''))?:[] as $name){$name=trim($name);if($name==='')continue;$normalized=$this->normalizeName($name);if(isset($seenNames[$normalized]))continue;$seenNames[$normalized]=true;$directors[]=$name;}
         if($malformed)$errors[]='Malformed row: column count does not match the header.';
-        if(($data['client_name']??'')==='')$errors[]='Company name is required.';
+        if(($data['client_name']??'')==='')$warnings[]='Company name is blank.';
         if(($data['company_number']??'')!==''&&!preg_match('/^[A-Za-z0-9]{6,10}$/',$data['company_number']))$warnings[]='Company Number has an unusual format.';
         if(($data['utr']??'')!==''&&!preg_match('/^\d{10}$/',preg_replace('/\s+/','',$data['utr'])))$warnings[]='UTR should normally contain 10 digits.';
         if(($data['vat_number']??'')!==''&&!preg_match('/^(GB)?[0-9A-Za-z ]{8,14}$/i',$data['vat_number']))$warnings[]='VAT number has an unusual format.';
-        if(($data['email']??'')!==''&&!filter_var($data['email'],FILTER_VALIDATE_EMAIL)){$warnings[]='Email address is invalid and will be auto-generated.';$data['email']='';}
+        if(($data['email']??'')!==''&&!filter_var($data['email'],FILTER_VALIDATE_EMAIL))$warnings[]='Email address format appears unusual; the supplied value will still be stored.';
         if(!$directors)$warnings[]='No director/contact names were supplied.';
         if($directors)$warnings[]='Director names will be linked as incomplete placeholders; full profiles will be imported later.';
-        foreach(['year_end'=>'Accounting year end','filing_deadline'=>'Filing deadline'] as $key=>$label){if(($data[$key]??'')!==''&&!$this->parseDate($data[$key]))$errors[]="{$label} is invalid or unsupported.";}
-        if(($data['vat_quarter']??'')!==''&&!$this->vatMonths($data['vat_quarter']))$errors[]='VAT quarter must contain four recurring months, such as Jan/Apr/Jul/Oct.';
+        foreach(['year_end'=>'Accounting year end','filing_deadline'=>'Filing deadline'] as $key=>$label){if(($data[$key]??'')!==''&&!$this->parseDate($data[$key]))$warnings[]="{$label} appears invalid or unsupported; the supplied value will still be stored.";}
+        if(($data['vat_quarter']??'')!==''&&!$this->vatMonths($data['vat_quarter']))$warnings[]='VAT quarter format appears unusual; the supplied value will still be stored.';
         $match=null;
         foreach(['company_number','utr','vat_number'] as $key){$v=$this->identifier($data[$key]??'');if($v!==''&&isset($existing[$key][$v])){$match=['entity_id'=>$existing[$key][$v],'field'=>$key,'value'=>$data[$key]];break;}}
         if(!$match&&($data['email']??'')!==''&&($data['client_name']??'')!==''){$emailCompany=strtolower(trim($data['email'])).'|'.$this->normalizeName($data['client_name']);if(isset($existing['email_company'][$emailCompany]))$match=['entity_id'=>$existing['email_company'][$emailCompany],'field'=>'email + company name','value'=>$data['email']];}
@@ -248,21 +259,24 @@ final class ClientCsvImportService
     private function commitRow(array $row): array
     {
         $d=$row['data'];$entityId=(int)($row['match']['entity_id']??0);$created=false;$companyAccountCreated=0;$placeholderCount=0;$placeholderReused=0;$deadlines=0;
-        $primaryEmail=!empty($d['email'])&&filter_var($d['email'],FILTER_VALIDATE_EMAIL)?$d['email']:'client.'.preg_replace('/[^a-z0-9]/','',strtolower($d['client_name']??'company')).'.'.bin2hex(random_bytes(4)).'@trinova.invalid';
+        $primaryEmail=trim((string)($d['email']??''))!==''?$d['email']:'client.'.preg_replace('/[^a-z0-9]/','',strtolower($d['client_name']??'company')).'.'.bin2hex(random_bytes(4)).'@trinova.invalid';
         if($entityId){
-            $stmt=$this->db->prepare('SELECT e.*,c.user_id,c.id AS client_id FROM client_entities e JOIN clients c ON c.id=e.client_id WHERE e.id=:id FOR UPDATE');$stmt->execute(['id'=>$entityId]);$entity=$stmt->fetch();
+            $stmt=$this->db->prepare('SELECT e.*,e.deleted_at AS entity_deleted_at,c.user_id,c.id AS client_id,c.deleted_at AS client_deleted_at,u.deleted_at AS user_deleted_at FROM client_entities e JOIN clients c ON c.id=e.client_id JOIN users u ON u.id=c.user_id WHERE e.id=:id FOR UPDATE');$stmt->execute(['id'=>$entityId]);$entity=$stmt->fetch();
             if(!$entity){throw new UserFacingException('A matched company no longer exists.');}
             $clientId=(int)$entity['client_id'];$userId=(int)$entity['user_id'];
+            if(!empty($entity['client_deleted_at'])||!empty($entity['user_deleted_at']))(new Client())->restore($clientId);
+            elseif(!empty($entity['entity_deleted_at']))(new ClientEntity())->restore($entityId);
             $attrs=json_decode((string)($entity['attributes']??'{}'),true)?:[];
-            foreach(['vat_number'=>$d['vat_number']??'','ct_utr'=>$d['utr']??'','accounting_year_end'=>$this->parseDate($d['year_end']??''),'vat_quarter'=>$d['vat_quarter']??''] as $k=>$v)if($v!==''&&empty($attrs[$k]))$attrs[$k]=['label'=>$k,'value'=>$v];
-            $this->db->prepare('UPDATE client_entities SET company_name=COALESCE(NULLIF(company_name,\'\'),:name),company_number=COALESCE(NULLIF(company_number,\'\'),:number),tax_reference=COALESCE(NULLIF(tax_reference,\'\'),:utr),attributes=:attrs WHERE id=:id')->execute(['name'=>$d['client_name'],'number'=>$d['company_number']?:null,'utr'=>$d['utr']?:null,'attrs'=>json_encode($attrs,JSON_UNESCAPED_UNICODE),'id'=>$entityId]);
-            $this->db->prepare('UPDATE clients SET phone=COALESCE(NULLIF(phone,\'\'),:phone),address=COALESCE(NULLIF(address,\'\'),:address),notes=COALESCE(NULLIF(notes,\'\'),:notes) WHERE id=:id')->execute(['phone'=>$d['phone']?:null,'address'=>$d['address']?:null,'notes'=>$d['status_notes']?:null,'id'=>$clientId]);
+            foreach($this->businessAttributes($d) as $k=>$v)if($v['value']!=='')$attrs[$k]=$v;
+            $this->db->prepare('UPDATE client_entities SET company_name=CASE WHEN :name<>\'\' THEN :name2 ELSE company_name END,company_number=CASE WHEN :number<>\'\' THEN :number2 ELSE company_number END,tax_reference=CASE WHEN :utr<>\'\' THEN :utr2 ELSE tax_reference END,attributes=:attrs WHERE id=:id')->execute(['name'=>$d['client_name'],'name2'=>$d['client_name'],'number'=>$d['company_number']??'','number2'=>$d['company_number']??'','utr'=>$d['utr']??'','utr2'=>$d['utr']??'','attrs'=>json_encode($attrs,JSON_UNESCAPED_UNICODE),'id'=>$entityId]);
+            $this->db->prepare('UPDATE clients SET phone=CASE WHEN :phone<>\'\' THEN :phone2 ELSE phone END,address=CASE WHEN :address<>\'\' THEN :address2 ELSE address END,notes=CASE WHEN :notes<>\'\' THEN :notes2 ELSE notes END WHERE id=:id')->execute(['phone'=>$d['phone']??'','phone2'=>$d['phone']??'','address'=>$d['address']??'','address2'=>$d['address']??'','notes'=>$d['status_notes']??'','notes2'=>$d['status_notes']??'','id'=>$clientId]);
+            $this->db->prepare('UPDATE users SET name=CASE WHEN :name<>\'\' THEN :name2 ELSE name END,email=CASE WHEN :email<>\'\' THEN :email2 ELSE email END WHERE id=:id')->execute(['name'=>$d['client_name']??'','name2'=>$d['client_name']??'','email'=>$d['email']??'','email2'=>$d['email']??'','id'=>$userId]);
         }else{
-            $user=$this->db->prepare('SELECT id FROM users WHERE email=:email LIMIT 1');$user->execute(['email'=>$primaryEmail]);$userId=(int)($user->fetchColumn()?:0);
-            if($userId){$c=$this->db->prepare('SELECT id FROM clients WHERE user_id=:id');$c->execute(['id'=>$userId]);$clientId=(int)($c->fetchColumn()?:0);if(!$clientId)throw new UserFacingException('The primary email belongs to a non-client account.');}
-            else{$this->db->prepare("INSERT INTO users(name,email,password_hash,role,status) VALUES(:name,:email,:hash,'client','pending_activation')")->execute(['name'=>$d['client_name'],'email'=>$primaryEmail,'hash'=>password_hash(bin2hex(random_bytes(24)),PASSWORD_BCRYPT)]);$userId=(int)$this->db->lastInsertId();$this->db->prepare("INSERT INTO clients(user_id,phone,address,aml_status,notes) VALUES(:user,:phone,:address,'Action Required',:notes)")->execute(['user'=>$userId,'phone'=>$d['phone']?:null,'address'=>$d['address']?:null,'notes'=>$d['status_notes']?:null]);$clientId=(int)$this->db->lastInsertId();$companyAccountCreated=1;}
-            $attrs=['vat_number'=>['label'=>'VAT registration number','value'=>$d['vat_number']??''],'ct_utr'=>['label'=>'Corporation Tax UTR','value'=>$d['utr']??''],'accounting_year_end'=>['label'=>'Accounting year end','value'=>$this->parseDate($d['year_end']??'')],'vat_quarter'=>['label'=>'VAT quarter pattern','value'=>$d['vat_quarter']??'']];$attrs=array_filter($attrs,fn($v)=>$v['value']!=='');
-            $this->db->prepare("INSERT INTO client_entities(client_id,company_name,entity_type,entity_scope,company_number,tax_reference,attributes) VALUES(:client,:name,'Limited Company','company',:number,:utr,:attrs)")->execute(['client'=>$clientId,'name'=>$d['client_name'],'number'=>$d['company_number']?:null,'utr'=>$d['utr']?:null,'attrs'=>json_encode($attrs,JSON_UNESCAPED_UNICODE)]);$entityId=(int)$this->db->lastInsertId();$created=true;
+            $user=$this->db->prepare('SELECT u.id,u.deleted_at,c.id AS client_id,c.deleted_at AS client_deleted_at FROM users u LEFT JOIN clients c ON c.user_id=u.id WHERE u.email=:email LIMIT 1');$user->execute(['email'=>$primaryEmail]);$existingUser=$user->fetch();$userId=(int)($existingUser['id']??0);
+            if($userId){$clientId=(int)($existingUser['client_id']??0);if(!$clientId)throw new UserFacingException('The primary email belongs to a non-client account.');if(!empty($existingUser['deleted_at'])||!empty($existingUser['client_deleted_at']))(new Client())->restore($clientId);}
+            else{$this->db->prepare("INSERT INTO users(name,email,password_hash,role,status) VALUES(:name,:email,:hash,'client','pending_activation')")->execute(['name'=>(string)($d['client_name']??''),'email'=>$primaryEmail,'hash'=>password_hash(bin2hex(random_bytes(24)),PASSWORD_BCRYPT)]);$userId=(int)$this->db->lastInsertId();$this->db->prepare("INSERT INTO clients(user_id,phone,address,aml_status,notes) VALUES(:user,:phone,:address,'Action Required',:notes)")->execute(['user'=>$userId,'phone'=>($d['phone']??'')!==''?$d['phone']:null,'address'=>($d['address']??'')!==''?$d['address']:null,'notes'=>($d['status_notes']??'')!==''?$d['status_notes']:null]);$clientId=(int)$this->db->lastInsertId();$companyAccountCreated=1;}
+            $attrs=array_filter($this->businessAttributes($d),fn($v)=>$v['value']!=='');
+            $this->db->prepare("INSERT INTO client_entities(client_id,company_name,entity_type,entity_scope,company_number,tax_reference,attributes) VALUES(:client,:name,'Limited Company','company',:number,:utr,:attrs)")->execute(['client'=>$clientId,'name'=>(string)($d['client_name']??''),'number'=>($d['company_number']??'')!==''?$d['company_number']:null,'utr'=>($d['utr']??'')!==''?$d['utr']:null,'attrs'=>json_encode($attrs,JSON_UNESCAPED_UNICODE)]);$entityId=(int)$this->db->lastInsertId();$created=true;
             $this->db->prepare('INSERT IGNORE INTO entity_directors(entity_id,user_id,created_by_user_id) VALUES(:entity,:user,:creator)')->execute(['entity'=>$entityId,'user'=>$userId,'creator'=>(int)\Application\Core\Session::get('user_id')]);
         }
         $knownContacts=[];$known=$this->db->prepare('SELECT name FROM entity_contacts WHERE entity_id=:entity');$known->execute(['entity'=>$entityId]);foreach($known->fetchAll() as $contact)$knownContacts[$this->normalizeName((string)$contact['name'])]=true;
@@ -270,6 +284,20 @@ final class ClientCsvImportService
         if(($date=$this->parseDate($d['filing_deadline']??''))!=='' && $this->ensureDeadline($clientId,$entityId,ClientCsv::FILING_DEADLINE_TYPE,$date))$deadlines++;
         if(($d['vat_quarter']??'')!=='' && ($date=$this->nextVatDeadline($d['vat_quarter'])) && $this->ensureDeadline($clientId,$entityId,ClientCsv::VAT_DEADLINE_TYPE,$date))$deadlines++;
         $row['result']=$created?'created':'updated';$row['entity_id']=$entityId;$row['company_accounts_created']=$companyAccountCreated;$row['placeholder_directors_created']=$placeholderCount;$row['placeholder_directors_reused']=$placeholderReused;$row['director_links_created']=$placeholderCount;$row['duplicate_director_links_skipped']=$placeholderReused;$row['director_names_detected']=count($row['directors']);$row['directors_needing_details']=count($row['directors']);$row['deadlines_created']=$deadlines;return $row;
+    }
+
+    private function businessAttributes(array $data): array
+    {
+        $sourceFields=is_array($data['_source_fields']??null)?$data['_source_fields']:[];
+        return [
+            'vat_number'=>['label'=>'VAT registration number','value'=>(string)($data['vat_number']??'')],
+            'ct_utr'=>['label'=>'Corporation Tax UTR','value'=>(string)($data['utr']??'')],
+            'accounting_year_end'=>['label'=>'Accounting year end','value'=>(string)($data['year_end']??'')],
+            'filing_deadline_raw'=>['label'=>'Filing deadline as supplied','value'=>(string)($data['filing_deadline']??'')],
+            'vat_quarter'=>['label'=>'VAT quarter pattern','value'=>(string)($data['vat_quarter']??'')],
+            'source_email'=>['label'=>'Email as supplied','value'=>(string)($data['email']??'')],
+            'csv_source_data'=>['label'=>'Original CSV data','value'=>$sourceFields?json_encode($sourceFields,JSON_UNESCAPED_UNICODE|JSON_UNESCAPED_SLASHES|JSON_THROW_ON_ERROR):''],
+        ];
     }
 
     private function existingIdentifiers(): array
