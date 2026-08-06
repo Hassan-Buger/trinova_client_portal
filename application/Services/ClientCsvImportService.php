@@ -184,6 +184,12 @@ final class ClientCsvImportService
         $practice=$this->practiceKey();$existing=$this->findTrackedImport($fileHash,$contentHash);
         if($existing){
             if($existing['status']==='failed'){$retry=$this->db->prepare("UPDATE client_csv_imports SET file_hash=:file_hash,content_hash=:content_hash,original_filename=:filename,created_by_user_id=:user,draft_token=:token,status='pending',total_rows=:rows,safe_error=NULL,started_at=NULL,completed_at=NULL,report_json=NULL WHERE id=:id AND status='failed'");try{$retry->execute(['file_hash'=>$fileHash,'content_hash'=>$contentHash,'filename'=>$filename,'user'=>$userId?:null,'token'=>$token,'rows'=>$rows,'id'=>$existing['id']]);}catch(PDOException $e){if($e->getCode()!=='23000')throw $e;}if($retry->rowCount()>0)return ['duplicate'=>false,'record'=>['id'=>(int)$existing['id']]];$existing=$this->findTrackedImport($fileHash,$contentHash);}
+            if($existing&&$this->canReclaimPending($existing,$userId)){
+                $retry=$this->db->prepare("UPDATE client_csv_imports SET file_hash=:file_hash,content_hash=:content_hash,original_filename=:filename,draft_token=:token,total_rows=:rows,safe_error=NULL,started_at=NULL,completed_at=NULL,report_json=NULL WHERE id=:id AND practice_key=:practice AND import_type='business_clients' AND status='pending' AND created_by_user_id=:user");
+                $retry->execute(['file_hash'=>$fileHash,'content_hash'=>$contentHash,'filename'=>$filename,'token'=>$token,'rows'=>$rows,'id'=>$existing['id'],'practice'=>$practice,'user'=>$userId]);
+                if($retry->rowCount()>0)return ['duplicate'=>false,'record'=>['id'=>(int)$existing['id']]];
+                $existing=$this->findTrackedImport($fileHash,$contentHash);
+            }
             if($existing&&in_array($existing['status'],['pending','processing'],true)&&strtotime((string)$existing['updated_at'])<time()-900){$retry=$this->db->prepare("UPDATE client_csv_imports SET file_hash=:file_hash,content_hash=:content_hash,original_filename=:filename,created_by_user_id=:user,draft_token=:token,status='pending',total_rows=:rows,safe_error=NULL,started_at=NULL,completed_at=NULL,report_json=NULL WHERE id=:id AND status IN('pending','processing') AND updated_at<DATE_SUB(NOW(),INTERVAL 15 MINUTE)");$retry->execute(['file_hash'=>$fileHash,'content_hash'=>$contentHash,'filename'=>$filename,'user'=>$userId?:null,'token'=>$token,'rows'=>$rows,'id'=>$existing['id']]);if($retry->rowCount()>0)return ['duplicate'=>false,'record'=>['id'=>(int)$existing['id']]];$existing=$this->findTrackedImport($fileHash,$contentHash);}
             if($existing)return ['duplicate'=>true,'record'=>$existing];
         }
@@ -193,6 +199,13 @@ final class ClientCsvImportService
     private function findTrackedImport(string $fileHash,string $contentHash): ?array
     {
         $stmt=$this->db->prepare("SELECT i.*,u.name AS imported_by FROM client_csv_imports i LEFT JOIN users u ON u.id=i.created_by_user_id WHERE i.practice_key=:practice AND i.import_type='business_clients' AND (i.file_hash=:file_hash OR i.content_hash=:content_hash) ORDER BY (i.status='completed') DESC,i.id DESC LIMIT 1");$stmt->execute(['practice'=>$this->practiceKey(),'file_hash'=>$fileHash,'content_hash'=>$contentHash]);return $stmt->fetch()?:null;
+    }
+
+    private function canReclaimPending(array $record,int $userId): bool
+    {
+        return $userId>0
+            && ($record['status']??'')==='pending'
+            && (int)($record['created_by_user_id']??0)===$userId;
     }
 
     private function duplicateDetails(array $record): array

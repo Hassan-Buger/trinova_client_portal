@@ -37,6 +37,11 @@ expect((ClientCsv::defaultMapping(['END OF YEAR DATE','accounts dealine','QTR1']
 expect((ClientCsv::defaultMapping(['END OF YEAR DATE','accounts dealine','QTR1'])['filing_deadline']??null)===1,'Common accounts deadline header was not mapped.');
 expect((ClientCsv::defaultMapping(['END OF YEAR DATE','accounts dealine','QTR1'])['vat_quarter']??null)===2,'Common VAT-quarter header was not mapped.');
 
+$canReclaim=$reflection->getMethod('canReclaimPending');
+expect($canReclaim->invoke($service,['status'=>'pending','created_by_user_id'=>9],9)===true,'The same staff member cannot recover an abandoned pending import.');
+expect($canReclaim->invoke($service,['status'=>'processing','created_by_user_id'=>9],9)===false,'A processing import could be reclaimed unsafely.');
+expect($canReclaim->invoke($service,['status'=>'pending','created_by_user_id'=>8],9)===false,'One staff member could reclaim another staff member\'s pending import.');
+
 $fingerprint=$reflection->getMethod('contentHash');
 $fingerprintHeaders=['Client Name','Company No.','Email'];
 $rowsA=[['_line'=>2,'values'=>['Example Ltd','00123456','company@example.com']],['_line'=>3,'values'=>['Second Ltd','00876543','second@example.com']]];
