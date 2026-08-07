@@ -123,7 +123,7 @@
                         <th style="padding:14px 16px;min-width:220px">Email</th>
                         <th style="padding:14px 16px;min-width:130px">Phone</th>
                         <th style="padding:14px 16px;min-width:130px">AML Status</th>
-                        <th style="padding:14px 16px;text-align:right;white-space:nowrap;min-width:190px">Action</th>
+                        <th style="padding:14px 16px;text-align:right;white-space:nowrap;min-width:90px">Action</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -159,14 +159,12 @@
                                 </span>
                             </td>
                             <td data-label="Action" style="padding:16px;text-align:right;white-space:nowrap">
-                                <div style="display:inline-flex;align-items:center;gap:10px">
-                                    <a href="/staff/clients/<?= $c['id'] ?>" style="display:inline-flex;align-items:center;gap:6px;font-weight:700;font-size:13px;color:#0d9488;background:#eef4f1;padding:7px 13px;border-radius:10px">
-                                        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg>
-                                        View Profile &rarr;
+                                <div style="display:inline-flex;align-items:center;gap:8px">
+                                    <a href="/staff/clients/<?= $c['id'] ?>" title="View Profile" aria-label="View Profile" style="display:inline-flex;align-items:center;justify-content:center;width:36px;height:36px;color:#0d9488;background:#eef4f1;border-radius:10px;transition:all .15s ease">
+                                        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg>
                                     </a>
-                                    <button type="button" onclick="tnDeleteClient(<?= (int)$c['id'] ?>)" style="display:inline-flex;align-items:center;gap:6px;background:#fef2f2;color:#dc2626;border:1px solid #fecaca;padding:7px 12px;border-radius:10px;font-weight:700;font-size:13px;cursor:pointer">
-                                        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path><line x1="10" y1="11" x2="10" y2="17"></line><line x1="14" y1="11" x2="14" y2="17"></line></svg>
-                                        Delete
+                                    <button type="button" onclick="tnDeleteClient(<?= (int)$c['id'] ?>)" title="Delete Client" aria-label="Delete Client" style="display:inline-flex;align-items:center;justify-content:center;width:36px;height:36px;background:#fef2f2;color:#dc2626;border:1px solid #fecaca;border-radius:10px;cursor:pointer;transition:all .15s ease">
+                                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path><line x1="10" y1="11" x2="10" y2="17"></line><line x1="14" y1="11" x2="14" y2="17"></line></svg>
                                     </button>
                                 </div>
                             </td>
