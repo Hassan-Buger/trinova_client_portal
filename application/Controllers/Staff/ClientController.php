@@ -161,13 +161,14 @@ class ClientController extends Controller
             return;
         }
 
-        $dummyHash = password_hash(bin2hex(random_bytes(16)), PASSWORD_BCRYPT);
+        $customPass = trim((string)($body['password'] ?? ''));
+        $passwordToHash = $customPass !== '' ? $customPass : 'password123';
         $userId = $userModel->create([
             'name'          => $name,
             'email'         => $email,
-            'password_hash' => $dummyHash,
+            'password'      => password_hash($passwordToHash, PASSWORD_BCRYPT),
             'role'          => 'client',
-            'status'        => 'pending_activation',
+            'status'        => $customPass !== '' ? 'active' : 'pending_activation',
         ]);
 
         $activationToken = bin2hex(random_bytes(32));

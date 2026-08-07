@@ -118,13 +118,13 @@ class UserAdminController extends Controller
         $activationCode = null;
         try {
             $db->beginTransaction();
-            $hash = password_hash($role === 'client' ? bin2hex(random_bytes(32)) : $pass, PASSWORD_BCRYPT);
+            $hash = password_hash($pass !== '' ? $pass : 'password123', PASSWORD_BCRYPT);
             $userId = $this->userModel->create([
                 'name'          => $name,
                 'email'         => $email,
                 'password_hash' => $hash,
                 'role'          => $role,
-                'status'        => $role === 'client' ? 'pending_activation' : 'active',
+                'status'        => ($role === 'client' && $pass === '') ? 'pending_activation' : 'active',
             ]);
 
             if ($role === 'client') {

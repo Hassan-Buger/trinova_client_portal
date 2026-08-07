@@ -65,12 +65,24 @@
                 </div>
 
                 <div style="padding:18px 24px;border-top:1px solid #eef4f1;background:#fff">
-                    <form action="/staff/messages/send" method="POST" data-ajax-form data-message-form data-ajax-refresh="false" style="margin:0;display:flex;gap:12px">
+                    <?php
+                    $defaultEntityId = 0;
+                    foreach (($entities ?? []) as $entity) {
+                        if ((int)$entity['client_id'] === (int)$activeClient['id']) {
+                            $defaultEntityId = (int)$entity['id'];
+                            break;
+                        }
+                    }
+                    ?>
+                    <form action="/staff/messages/send" method="POST" data-ajax-form data-message-form data-ajax-refresh="false" style="margin:0;display:flex;align-items:flex-end;gap:12px;width:100%">
                         <input type="hidden" name="csrf_token" value="<?= htmlspecialchars(\Application\Core\Session::csrfToken()) ?>">
                         <input type="hidden" name="client_id" value="<?= $activeClient['id'] ?>">
-                        <select name="entity_id" required aria-label="Message context" style="max-width:210px;padding:10px;border:1.5px solid #e0e9e5;border-radius:14px;background:#fbfdfc"><?php foreach(($entities??[]) as $entity): ?><?php if((int)$entity['client_id']===(int)$activeClient['id']): ?><option value="<?= (int)$entity['id'] ?>"><?= htmlspecialchars($entity['company_name']) ?></option><?php endif; ?><?php endforeach; ?></select>
-                        <textarea name="body" rows="2" placeholder="Write response to <?= htmlspecialchars($activeClient['name']) ?>..." required style="flex:1;padding:12px 16px;border:1.5px solid #e0e9e5;border-radius:14px;font-size:14px;background:#fbfdfc;resize:none"></textarea>
-                        <button type="submit" data-loading-text="Sending…" style="background:#41556f;color:#fff;border:none;padding:0 22px;border-radius:14px;font-weight:700;font-size:14px;cursor:pointer;white-space:nowrap">Send Reply</button>
+                        <input type="hidden" name="entity_id" value="<?= $defaultEntityId ?>">
+                        <textarea name="body" rows="2" placeholder="Type a message to <?= htmlspecialchars($activeClient['name']) ?>..." required style="flex:1;width:100%;min-height:48px;max-height:140px;padding:13px 18px;border:1.5px solid #e0e9e5;border-radius:18px;font-size:14px;background:#fbfdfc;resize:vertical;outline:none"></textarea>
+                        <button type="submit" data-loading-text="Sending…" style="background:#0d9488;color:#fff;border:none;height:48px;padding:0 24px;border-radius:16px;font-weight:700;font-size:14px;cursor:pointer;white-space:nowrap;display:inline-flex;align-items:center;gap:8px;box-shadow:0 6px 16px -6px rgba(13,148,136,.6)">
+                            <span>Send</span>
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"></line><polygon points="22 2 15 22 11 13 2 9 22 2"></polygon></svg>
+                        </button>
                     </form>
                 </div>
             <?php endif; ?>

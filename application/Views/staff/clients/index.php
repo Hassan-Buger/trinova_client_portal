@@ -52,6 +52,11 @@
                     <input type="text" name="address" placeholder="10 Station Road, Leeds LS2 8AB" style="width:100%;padding:13px 16px;border:1.5px solid #e0e9e5;border-radius:14px;font-size:14px;background:#fbfdfc">
                 </div>
 
+                <div style="margin-bottom:16px">
+                    <label style="display:block;font-size:13px;font-weight:700;color:#3a4d47;margin-bottom:6px">Initial Password (Manual)</label>
+                    <input type="text" name="password" placeholder="Set custom password (or leave default password123)" style="width:100%;padding:13px 16px;border:1.5px solid #e0e9e5;border-radius:14px;font-size:14px;background:#fbfdfc">
+                </div>
+
                 <div style="margin-bottom:24px">
                     <label style="display:block;font-size:13px;font-weight:700;color:#3a4d47;margin-bottom:6px">Initial AML Status</label>
                     <select name="aml_status" style="width:100%;padding:13px 16px;border:1.5px solid #e0e9e5;border-radius:14px;font-size:14px;background:#fbfdfc">
@@ -119,21 +124,31 @@
                 <thead>
                     <tr style="border-bottom:1px solid rgba(20,60,50,.08);color:#8a9a94;font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.05em">
                         <th style="padding:14px 10px;width:36px"><input type="checkbox" id="clientCheckAll" aria-label="Select all clients" onchange="tnClientToggleAll(this)" style="width:16px;height:16px;cursor:pointer"></th>
+                        <th style="padding:14px 10px;width:42px;color:#8a9a94">#</th>
                         <th style="padding:14px 16px;min-width:160px">Client Name</th>
                         <th style="padding:14px 16px;min-width:220px">Email</th>
                         <th style="padding:14px 16px;min-width:130px">Phone</th>
                         <th style="padding:14px 16px;min-width:130px">AML Status</th>
-                        <th style="padding:14px 16px;text-align:right;white-space:nowrap;min-width:90px">Action</th>
+                        <th style="padding:14px 16px;text-align:right;white-space:nowrap;min-width:130px">Action</th>
                     </tr>
                 </thead>
                 <tbody>
                     <?php if (empty($clients)): ?>
-                        <tr class="tn-client-empty"><td colspan="6" style="padding:42px 16px;text-align:center;color:#7d8e88"><?= ($search ?? '') !== '' ? 'No clients match the current search.' : 'No active client accounts were found. CSV upload and preview do not remove clients; check Trash if accounts were previously deleted.' ?></td></tr>
+                        <tr class="tn-client-empty"><td colspan="7" style="padding:42px 16px;text-align:center;color:#7d8e88"><?= ($search ?? '') !== '' ? 'No clients match the current search.' : 'No active client accounts were found. CSV upload and preview do not remove clients; check Trash if accounts were previously deleted.' ?></td></tr>
                     <?php endif; ?>
+                    <?php
+                    $currentPage = (int)($pagination['page'] ?? 1);
+                    $perPage = (int)($pagination['per_page'] ?? 10);
+                    $rowIndex = 0;
+                    ?>
                     <?php foreach ($clients as $c): ?>
+                        <?php $rowIndex++; $seqNumber = (($currentPage - 1) * $perPage) + $rowIndex; ?>
                         <tr class="client-row" id="client-row-<?= $c['id'] ?>" style="border-bottom:1px solid rgba(20,60,50,.06);transition:all .3s ease">
                             <td style="padding:14px 10px"><input type="checkbox" class="tn-client-check" value="<?= (int)$c['id'] ?>" aria-label="Select client" onchange="tnClientUpdateBar()" style="width:16px;height:16px;cursor:pointer"></td>
-                            <td data-label="Client" style="padding:16px;font-weight:700;font-size:15px;word-break:break-word;overflow-wrap:anywhere" class="client-name"><?= htmlspecialchars($c['name']) ?></td>
+                            <td style="padding:16px 10px;color:#8a9a94;font-size:13px;font-weight:700"><?= $seqNumber ?></td>
+                            <td data-label="Client" style="padding:16px;font-weight:700;font-size:15px;word-break:break-word;overflow-wrap:anywhere" class="client-name">
+                                <a href="/staff/clients/<?= $c['id'] ?>" style="color:#213330;text-decoration:none;" onmouseover="this.style.color='#0d9488'" onmouseout="this.style.color='#213330'"><?= htmlspecialchars($c['name']) ?></a>
+                            </td>
                             <td data-label="Email" style="padding:16px;color:#61756e;font-size:14px;word-break:break-all;overflow-wrap:anywhere;max-width:280px" class="client-email"><?= htmlspecialchars($c['email']) ?></td>
                             <td data-label="Phone" style="padding:16px;color:#61756e;font-size:14px;line-height:1.4">
                                 <?php
@@ -160,11 +175,12 @@
                             </td>
                             <td data-label="Action" style="padding:16px;text-align:right;white-space:nowrap">
                                 <div style="display:inline-flex;align-items:center;gap:8px">
-                                    <a href="/staff/clients/<?= $c['id'] ?>" title="View Profile" aria-label="View Profile" style="display:inline-flex;align-items:center;justify-content:center;width:36px;height:36px;color:#0d9488;background:#eef4f1;border-radius:10px;transition:all .15s ease">
-                                        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg>
+                                    <a href="/staff/clients/<?= $c['id'] ?>" title="View Profile" aria-label="View Profile" style="display:inline-flex;align-items:center;gap:5px;font-weight:700;font-size:13px;color:#0d9488;background:#eef4f1;padding:7px 12px;border-radius:10px;text-decoration:none;transition:all .15s ease">
+                                        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg>
+                                        View
                                     </a>
-                                    <button type="button" onclick="tnDeleteClient(<?= (int)$c['id'] ?>)" title="Delete Client" aria-label="Delete Client" style="display:inline-flex;align-items:center;justify-content:center;width:36px;height:36px;background:#fef2f2;color:#dc2626;border:1px solid #fecaca;border-radius:10px;cursor:pointer;transition:all .15s ease">
-                                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path><line x1="10" y1="11" x2="10" y2="17"></line><line x1="14" y1="11" x2="14" y2="17"></line></svg>
+                                    <button type="button" onclick="tnDeleteClient(<?= (int)$c['id'] ?>)" title="Delete Client" aria-label="Delete Client" style="display:inline-flex;align-items:center;justify-content:center;width:34px;height:34px;background:#fef2f2;color:#dc2626;border:1px solid #fecaca;border-radius:10px;cursor:pointer;transition:all .15s ease">
+                                        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path><line x1="10" y1="11" x2="10" y2="17"></line><line x1="14" y1="11" x2="14" y2="17"></line></svg>
                                     </button>
                                 </div>
                             </td>
