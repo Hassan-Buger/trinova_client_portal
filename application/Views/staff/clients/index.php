@@ -135,7 +135,24 @@
                             <td style="padding:14px 10px"><input type="checkbox" class="tn-client-check" value="<?= (int)$c['id'] ?>" aria-label="Select client" onchange="tnClientUpdateBar()" style="width:16px;height:16px;cursor:pointer"></td>
                             <td data-label="Client" style="padding:16px;font-weight:700;font-size:15px;word-break:break-word;overflow-wrap:anywhere" class="client-name"><?= htmlspecialchars($c['name']) ?></td>
                             <td data-label="Email" style="padding:16px;color:#61756e;font-size:14px;word-break:break-all;overflow-wrap:anywhere;max-width:280px" class="client-email"><?= htmlspecialchars($c['email']) ?></td>
-                            <td data-label="Phone" style="padding:16px;color:#61756e;font-size:14px;white-space:nowrap"><?= htmlspecialchars($c['phone'] ?? '—') ?></td>
+                            <td data-label="Phone" style="padding:16px;color:#61756e;font-size:14px;line-height:1.4">
+                                <?php
+                                $phoneRaw = trim((string)($c['phone'] ?? ''));
+                                if ($phoneRaw === '' || $phoneRaw === '—') {
+                                    echo '—';
+                                } else {
+                                    $phoneNumbers = preg_split('/;\s*|,\s*|\r\n|\n|\s+\/\s+/', $phoneRaw);
+                                    $phoneNumbers = array_filter(array_map('trim', $phoneNumbers));
+                                    if (empty($phoneNumbers)) {
+                                        echo '—';
+                                    } else {
+                                        foreach ($phoneNumbers as $p) {
+                                            echo '<div style="white-space:nowrap;">' . htmlspecialchars($p) . '</div>';
+                                        }
+                                    }
+                                }
+                                ?>
+                            </td>
                             <td data-label="AML Status" style="padding:16px;white-space:nowrap">
                                 <span style="font-size:11.5px;font-weight:700;padding:5px 12px;border-radius:999px;white-space:nowrap;display:inline-block;<?= $c['aml_status'] === 'Complete' ? 'background:#e2f3ea;color:#3f9d6d;' : 'background:#fdecdc;color:#e07d24;' ?>">
                                     <?= htmlspecialchars($c['aml_status']) ?>
@@ -143,8 +160,14 @@
                             </td>
                             <td data-label="Action" style="padding:16px;text-align:right;white-space:nowrap">
                                 <div style="display:inline-flex;align-items:center;gap:10px">
-                                    <a href="/staff/clients/<?= $c['id'] ?>" style="font-weight:700;font-size:13px;color:#0d9488;background:#eef4f1;padding:7px 13px;border-radius:10px">View Profile &rarr;</a>
-                                    <button type="button" onclick="tnDeleteClient(<?= (int)$c['id'] ?>)" style="background:#fef2f2;color:#dc2626;border:1px solid #fecaca;padding:7px 12px;border-radius:10px;font-weight:700;font-size:13px;cursor:pointer">Delete</button>
+                                    <a href="/staff/clients/<?= $c['id'] ?>" style="display:inline-flex;align-items:center;gap:6px;font-weight:700;font-size:13px;color:#0d9488;background:#eef4f1;padding:7px 13px;border-radius:10px">
+                                        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg>
+                                        View Profile &rarr;
+                                    </a>
+                                    <button type="button" onclick="tnDeleteClient(<?= (int)$c['id'] ?>)" style="display:inline-flex;align-items:center;gap:6px;background:#fef2f2;color:#dc2626;border:1px solid #fecaca;padding:7px 12px;border-radius:10px;font-weight:700;font-size:13px;cursor:pointer">
+                                        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path><line x1="10" y1="11" x2="10" y2="17"></line><line x1="14" y1="11" x2="14" y2="17"></line></svg>
+                                        Delete
+                                    </button>
                                 </div>
                             </td>
                         </tr>
