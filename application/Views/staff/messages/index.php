@@ -3,30 +3,35 @@
         <p style="margin:0;color:#61756e;font-size:14.5px">Select a client thread to read conversation history and send responses.</p>
     </div>
 
-    <div style="display:flex;gap:20px;min-height:560px;flex-wrap:wrap">
+    <div style="display:flex;gap:20px;height:calc(100vh - 165px);min-height:520px;max-height:720px;align-items:stretch">
         <!-- Client Threads Sidebar -->
-        <div style="width:300px;flex-shrink:0;background:#fff;border-radius:24px;padding:20px;box-shadow:0 1px 2px rgba(16,54,45,.04),0 14px 34px -24px rgba(16,54,45,.4);display:flex;flex-direction:column;gap:8px">
-            <h3 style="margin:0 0 12px;font-size:16px;font-weight:800;color:#213330;padding:0 6px">Client Accounts</h3>
-            <?php foreach ($clients as $c): ?>
-                <?php
-                $isSelected = ((int)$c['id'] === (int)$selectedClientId);
-                $itemBg = $isSelected ? 'background:#e6ecf5;border-color:transparent;' : 'background:#fbfdfc;border-color:rgba(20,60,50,.08);';
-                ?>
-                <a href="/staff/messages?client_id=<?= $c['id'] ?>" data-ajax-link style="display:block;padding:14px;border-radius:16px;border:1px solid;<?= $itemBg ?>text-decoration:none;transition:all .15s">
-                    <div style="font-weight:700;font-size:14.5px;color:#213330"><?= htmlspecialchars($c['name']) ?></div>
-                    <div style="font-size:12.5px;color:#7d8e88;margin-top:2px"><?= htmlspecialchars($c['email']) ?></div>
-                </a>
-            <?php endforeach; ?>
+        <div style="width:300px;flex-shrink:0;background:#fff;border-radius:24px;padding:20px;box-shadow:0 1px 2px rgba(16,54,45,.04),0 14px 34px -24px rgba(16,54,45,.4);display:flex;flex-direction:column;overflow:hidden">
+            <div style="margin-bottom:12px;padding:0 4px;display:flex;align-items:center;justify-content:space-between;flex-shrink:0">
+                <h3 style="margin:0;font-size:16px;font-weight:800;color:#213330">Client Accounts</h3>
+                <span style="font-size:11.5px;font-weight:700;color:#7d8e88;background:#f0f5f3;padding:2px 8px;border-radius:999px"><?= count($clients) ?></span>
+            </div>
+            <div style="flex:1;overflow-y:auto;display:flex;flex-direction:column;gap:8px;padding-right:4px">
+                <?php foreach ($clients as $c): ?>
+                    <?php
+                    $isSelected = ((int)$c['id'] === (int)$selectedClientId);
+                    $itemBg = $isSelected ? 'background:#e6ecf5;border-color:transparent;' : 'background:#fbfdfc;border-color:rgba(20,60,50,.08);';
+                    ?>
+                    <a href="/staff/messages?client_id=<?= $c['id'] ?>" data-ajax-link style="display:block;padding:12px 14px;border-radius:16px;border:1px solid;<?= $itemBg ?>text-decoration:none;transition:all .15s">
+                        <div style="font-weight:700;font-size:14px;color:#213330;white-space:nowrap;overflow:hidden;text-overflow:ellipsis"><?= htmlspecialchars($c['name']) ?></div>
+                        <div style="font-size:12px;color:#7d8e88;margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis"><?= htmlspecialchars($c['email']) ?></div>
+                    </a>
+                <?php endforeach; ?>
+            </div>
         </div>
 
         <!-- Selected Thread Panel -->
-        <div style="flex:1;min-width:340px;background:#fff;border-radius:24px;box-shadow:0 1px 2px rgba(16,54,45,.04),0 14px 34px -24px rgba(16,54,45,.4);display:flex;flex-direction:column;overflow:hidden">
+        <div style="flex:1;min-width:340px;background:#fff;border-radius:24px;box-shadow:0 1px 2px rgba(16,54,45,.04),0 14px 34px -24px rgba(16,54,45,.4);display:flex;flex-direction:column;overflow:hidden;height:100%">
             <?php if (!$activeClient): ?>
                 <div style="flex:1;display:flex;align-items:center;justify-content:center;color:#8a9a94">Select a client thread to start messaging.</div>
             <?php else: ?>
-                <div style="padding:18px 24px;border-bottom:1px solid #eef4f1;background:#fbfdfc;display:flex;align-items:center;justify-content:space-between">
+                <div style="padding:16px 24px;border-bottom:1px solid #eef4f1;background:#fbfdfc;display:flex;align-items:center;justify-content:space-between;flex-shrink:0">
                     <div>
-                        <h3 style="margin:0;font-size:17px;font-weight:800;color:#213330"><?= htmlspecialchars($activeClient['name']) ?></h3>
+                        <h3 style="margin:0;font-size:16.5px;font-weight:800;color:#213330"><?= htmlspecialchars($activeClient['name']) ?></h3>
                         <div style="font-size:12.5px;color:#7d8e88"><?= htmlspecialchars($activeClient['email']) ?> &middot; Phone: <?= htmlspecialchars($activeClient['phone'] ?? 'N/A') ?></div>
                     </div>
                     <div style="display:flex;align-items:center;gap:10px">
@@ -39,7 +44,7 @@
                     </div>
                 </div>
 
-                <div data-message-thread data-current-role="staff" data-feed-url="/staff/messages/feed?client_id=<?= (int) $activeClient['id'] ?>" style="flex:1;padding:24px;overflow-y:auto;display:flex;flex-direction:column;gap:14px;background:#fcfdfe;max-height:560px">
+                <div data-message-thread data-current-role="staff" data-feed-url="/staff/messages/feed?client_id=<?= (int) $activeClient['id'] ?>" style="flex:1;padding:24px;overflow-y:auto;display:flex;flex-direction:column;gap:14px;background:#fcfdfe">
                     <?php if (empty($messages)): ?>
                         <div data-empty-thread style="padding:48px 0;text-align:center;color:#8a9a94;font-size:14px">No messages in this client thread yet.</div>
                     <?php else: ?>
@@ -64,7 +69,7 @@
                     <?php endif; ?>
                 </div>
 
-                <div style="padding:18px 24px;border-top:1px solid #eef4f1;background:#fff">
+                <div style="padding:16px 24px;border-top:1px solid #eef4f1;background:#fff;flex-shrink:0">
                     <?php
                     $defaultEntityId = 0;
                     foreach (($entities ?? []) as $entity) {
@@ -78,7 +83,7 @@
                         <input type="hidden" name="csrf_token" value="<?= htmlspecialchars(\Application\Core\Session::csrfToken()) ?>">
                         <input type="hidden" name="client_id" value="<?= $activeClient['id'] ?>">
                         <input type="hidden" name="entity_id" value="<?= $defaultEntityId ?>">
-                        <textarea name="body" rows="2" placeholder="Type a message to <?= htmlspecialchars($activeClient['name']) ?>..." required style="flex:1;width:100%;min-height:48px;max-height:140px;padding:13px 18px;border:1.5px solid #e0e9e5;border-radius:18px;font-size:14px;background:#fbfdfc;resize:vertical;outline:none"></textarea>
+                        <textarea name="body" rows="2" placeholder="Type a message to <?= htmlspecialchars($activeClient['name']) ?>..." required style="flex:1;width:100%;min-height:48px;max-height:120px;padding:12px 16px;border:1.5px solid #e0e9e5;border-radius:16px;font-size:14px;background:#fbfdfc;resize:none;outline:none"></textarea>
                         <button type="submit" data-loading-text="Sending…" style="background:#0d9488;color:#fff;border:none;height:48px;padding:0 24px;border-radius:16px;font-weight:700;font-size:14px;cursor:pointer;white-space:nowrap;display:inline-flex;align-items:center;gap:8px;box-shadow:0 6px 16px -6px rgba(13,148,136,.6)">
                             <span>Send</span>
                             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"></line><polygon points="22 2 15 22 11 13 2 9 22 2"></polygon></svg>

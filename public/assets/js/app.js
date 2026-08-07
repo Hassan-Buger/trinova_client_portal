@@ -335,7 +335,7 @@
         const existing = stream.querySelectorAll('[data-message-day]');
         if (existing.length) stream.dataset.lastDay = existing[existing.length - 1].dataset.messageDay;
         stream.scrollTop = stream.scrollHeight;
-        state.messageTimer = window.setInterval(() => pollMessages(false), 7000);
+        state.messageTimer = window.setInterval(() => pollMessages(false), 3000);
     }
 
     function notificationTime(value) {
