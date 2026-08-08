@@ -40,7 +40,6 @@
                             <input type="hidden" name="client_id" value="<?= (int)$activeClient['id'] ?>">
                             <button type="submit" onclick="return confirm('Delete entire message thread for this client? All messages will be soft-deleted.')" style="background:#fef2f2;color:#dc2626;border:1px solid #fecaca;padding:6px 12px;border-radius:10px;font-weight:700;font-size:12.5px;cursor:pointer">Delete Thread</button>
                         </form>
-                        <span style="font-size:12px;font-weight:700;color:#41556f;background:#e6ecf5;padding:4px 10px;border-radius:999px">Shared Access</span>
                     </div>
                 </div>
 
