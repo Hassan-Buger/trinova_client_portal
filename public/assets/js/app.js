@@ -51,12 +51,17 @@
     function updateNavigation(url) {
         const currentPath = new URL(url, window.location.origin).pathname.replace(/\/$/, '');
         document.querySelectorAll('.tn-side .tn-navitem').forEach((link) => {
-            if (link.getAttribute('href') === '/logout') return;
+            if (!(link instanceof HTMLAnchorElement)) return;
             const linkPath = new URL(link.href, window.location.origin).pathname.replace(/\/$/, '');
             const active = currentPath === linkPath || (linkPath !== '' && currentPath.startsWith(`${linkPath}/`));
-            link.setAttribute('aria-current', active ? 'page' : 'false');
-            link.style.background = active ? '#ffffff' : 'transparent';
-            link.style.color = active ? '#0d9488' : '#61756e';
+            if (link.closest('.staff-sidebar')) {
+                link.classList.toggle('is-active', active);
+            } else {
+                link.style.background = active ? '#ffffff' : 'transparent';
+                link.style.color = active ? '#0d9488' : '#61756e';
+            }
+            if (active) link.setAttribute('aria-current', 'page');
+            else link.removeAttribute('aria-current');
         });
     }
 
