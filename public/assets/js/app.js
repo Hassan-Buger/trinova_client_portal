@@ -534,6 +534,36 @@
 
     function initialisePage() {
         initialiseMessages();
+        initialiseLogin();
+    }
+
+    function initialiseLogin() {
+        const form = document.querySelector('[data-login-form]');
+        if (!form) return;
+
+        const password = form.querySelector('#loginPassword');
+        const toggle = form.querySelector('[data-password-toggle]');
+        const submit = form.querySelector('[data-login-submit]');
+
+        toggle?.addEventListener('click', () => {
+            if (!(password instanceof HTMLInputElement)) return;
+            const shouldShow = password.type === 'password';
+            password.type = shouldShow ? 'text' : 'password';
+            toggle.setAttribute('aria-pressed', shouldShow ? 'true' : 'false');
+            toggle.setAttribute('aria-label', shouldShow ? 'Hide password' : 'Show password');
+            password.focus({ preventScroll: true });
+        });
+
+        form.addEventListener('submit', (event) => {
+            if (!form.checkValidity() || !(submit instanceof HTMLButtonElement)) return;
+            if (submit.disabled) {
+                event.preventDefault();
+                return;
+            }
+            submit.disabled = true;
+            submit.classList.add('is-loading');
+            submit.querySelector('.auth-submit__label').textContent = 'Signing in securely…';
+        });
     }
 
     document.addEventListener('click', (event) => {
