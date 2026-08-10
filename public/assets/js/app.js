@@ -51,12 +51,17 @@
     function updateNavigation(url) {
         const currentPath = new URL(url, window.location.origin).pathname.replace(/\/$/, '');
         document.querySelectorAll('.tn-side .tn-navitem').forEach((link) => {
-            if (link.getAttribute('href') === '/logout') return;
+            if (!(link instanceof HTMLAnchorElement)) return;
             const linkPath = new URL(link.href, window.location.origin).pathname.replace(/\/$/, '');
             const active = currentPath === linkPath || (linkPath !== '' && currentPath.startsWith(`${linkPath}/`));
-            link.setAttribute('aria-current', active ? 'page' : 'false');
-            link.style.background = active ? '#ffffff' : 'transparent';
-            link.style.color = active ? '#0d9488' : '#61756e';
+            if (link.closest('.staff-sidebar')) {
+                link.classList.toggle('is-active', active);
+            } else {
+                link.style.background = active ? '#ffffff' : 'transparent';
+                link.style.color = active ? '#0d9488' : '#61756e';
+            }
+            if (active) link.setAttribute('aria-current', 'page');
+            else link.removeAttribute('aria-current');
         });
     }
 
@@ -335,7 +340,7 @@
         const existing = stream.querySelectorAll('[data-message-day]');
         if (existing.length) stream.dataset.lastDay = existing[existing.length - 1].dataset.messageDay;
         stream.scrollTop = stream.scrollHeight;
-        state.messageTimer = window.setInterval(() => pollMessages(false), 7000);
+        state.messageTimer = window.setInterval(() => pollMessages(false), 3000);
     }
 
     function notificationTime(value) {
@@ -360,10 +365,18 @@
             return;
         }
         items.forEach((item) => {
+            const wrapper = document.createElement('div');
+            wrapper.style.position = 'relative';
+            wrapper.style.display = 'flex';
+            wrapper.style.alignItems = 'center';
+
             const link = document.createElement('a');
             link.className = `tn-notification-item${item.is_read ? '' : ' is-unread'}`;
             link.href = item.url;
             link.dataset.notificationId = String(item.id);
+            link.style.flex = '1';
+            link.style.paddingRight = '32px';
+
             const title = document.createElement('strong');
             title.className = 'tn-notification-title';
             title.textContent = item.title || 'Portal update';
@@ -375,8 +388,40 @@
             time.dateTime = item.created_at;
             time.textContent = notificationTime(item.created_at);
             time.title = new Intl.DateTimeFormat(undefined, { dateStyle: 'full', timeStyle: 'short' }).format(new Date(item.created_at));
+
+            const dismissBtn = document.createElement('button');
+            dismissBtn.type = 'button';
+            dismissBtn.className = 'tn-notification-dismiss';
+            dismissBtn.title = 'Remove notification';
+            dismissBtn.setAttribute('aria-label', 'Remove notification');
+            dismissBtn.innerHTML = '&times;';
+            dismissBtn.style.cssText = 'position:absolute;right:10px;top:10px;background:none;border:none;font-size:18px;font-weight:700;color:#8a9a94;cursor:pointer;line-height:1;padding:2px 6px;border-radius:6px;transition:all .15s;z-index:2';
+            dismissBtn.addEventListener('mouseover', () => { dismissBtn.style.color = '#dc2626'; dismissBtn.style.background = '#fef2f2'; });
+            dismissBtn.addEventListener('mouseout', () => { dismissBtn.style.color = '#8a9a94'; dismissBtn.style.background = 'none'; });
+
+            dismissBtn.addEventListener('click', async (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                wrapper.style.opacity = '0';
+                wrapper.style.transform = 'scale(0.95)';
+                wrapper.style.transition = 'all 0.2s ease';
+                window.setTimeout(() => {
+                    wrapper.remove();
+                    if (!list.children.length) {
+                        const empty = document.createElement('div');
+                        empty.className = 'tn-notification-empty';
+                        empty.textContent = 'No new notifications';
+                        list.appendChild(empty);
+                    }
+                }, 200);
+                try {
+                    await markNotificationRead(item.id);
+                } catch (_) {}
+            });
+
             link.append(title, message, time);
-            list.appendChild(link);
+            wrapper.append(link, dismissBtn);
+            list.appendChild(wrapper);
         });
     }
 
@@ -494,6 +539,36 @@
 
     function initialisePage() {
         initialiseMessages();
+        initialiseLogin();
+    }
+
+    function initialiseLogin() {
+        const form = document.querySelector('[data-login-form]');
+        if (!form) return;
+
+        const password = form.querySelector('#loginPassword');
+        const toggle = form.querySelector('[data-password-toggle]');
+        const submit = form.querySelector('[data-login-submit]');
+
+        toggle?.addEventListener('click', () => {
+            if (!(password instanceof HTMLInputElement)) return;
+            const shouldShow = password.type === 'password';
+            password.type = shouldShow ? 'text' : 'password';
+            toggle.setAttribute('aria-pressed', shouldShow ? 'true' : 'false');
+            toggle.setAttribute('aria-label', shouldShow ? 'Hide password' : 'Show password');
+            password.focus({ preventScroll: true });
+        });
+
+        form.addEventListener('submit', (event) => {
+            if (!form.checkValidity() || !(submit instanceof HTMLButtonElement)) return;
+            if (submit.disabled) {
+                event.preventDefault();
+                return;
+            }
+            submit.disabled = true;
+            submit.classList.add('is-loading');
+            submit.querySelector('.auth-submit__label').textContent = 'Signing in securely…';
+        });
     }
 
     document.addEventListener('click', (event) => {
