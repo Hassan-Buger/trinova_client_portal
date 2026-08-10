@@ -320,9 +320,16 @@ final class ClientCsvImportService
             if(!$entity){throw new UserFacingException('A matched company no longer exists.');}
             $clientId=(int)$entity['client_id'];$userId=(int)$entity['user_id'];
             $this->commitStage='restoring_matched_company';
-            if(!empty($entity['client_deleted_at']))(new Client())->restore($clientId);
-            elseif(!empty($entity['user_deleted_at']))$this->db->prepare('UPDATE users SET deleted_at=NULL WHERE id=:id')->execute(['id'=>$userId]);
-            if(!empty($entity['entity_deleted_at'])&&empty($entity['client_deleted_at']))(new ClientEntity())->restore($entityId);
+            if(!empty($entity['client_deleted_at'])){
+                // A CSV row restores only the company it matched. Calling the
+                // broad Client::restore() here would also revive every stale
+                // entity previously attached to the client account.
+                $this->db->prepare('UPDATE clients SET deleted_at=NULL WHERE id=:id')->execute(['id'=>$clientId]);
+                $this->db->prepare('UPDATE users SET deleted_at=NULL WHERE id=:id')->execute(['id'=>$userId]);
+            }elseif(!empty($entity['user_deleted_at'])){
+                $this->db->prepare('UPDATE users SET deleted_at=NULL WHERE id=:id')->execute(['id'=>$userId]);
+            }
+            if(!empty($entity['entity_deleted_at']))(new ClientEntity())->restore($entityId);
             $this->commitStage='encoding_company_attributes';
             $attrs=json_decode((string)($entity['attributes']??'{}'),true)?:[];
             foreach($this->businessAttributes($d) as $k=>$v)if($v['value']!=='')$attrs[$k]=$v;

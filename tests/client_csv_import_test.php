@@ -129,6 +129,8 @@ expect(str_contains($source,'VAT quarter format appears unusual and will be skip
 expect(str_contains($source,'Duplicates CSV row {$seen[$key][$id]} by {$key}; database matching will determine whether this company is created or updated.'),'Duplicate business identifiers still block otherwise importable rows.');
 expect(str_contains($source,"'accounting_year_end'=>['label'=>'Accounting year end','value'=>\$yearEnd]"),'Invalid accounting-year values are not skipped from canonical attributes.');
 expect(str_contains($source,"\$this->commitStage='repairing_client_profile'"),'An orphaned client login cannot be repaired during import.');
+expect(!str_contains($source,"if(!empty(\$entity['client_deleted_at']))(new Client())->restore(\$clientId)"),'Matched-company import still revives every stale entity on a deleted client account.');
+expect(str_contains($source,"UPDATE clients SET deleted_at=NULL WHERE id=:id")&&str_contains($source,"if(!empty(\$entity['entity_deleted_at']))(new ClientEntity())->restore(\$entityId)"),'Matched-company import does not restore only the selected client and entity records.');
 expect(str_contains($source,"\$row['diagnostic_reference']=\$reference"),'Technical row failures do not include a support reference.');
 expect(str_contains($source,"\$this->commitStage='updating_company_record'"),'Matched-company updates are not diagnosed at the company-record operation.');
 expect(str_contains($source,"\$row['database_state']=(string)\$e->getCode()"),'Database failures do not expose a safe SQLSTATE diagnostic.');
