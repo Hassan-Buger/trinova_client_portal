@@ -16,6 +16,10 @@ final class ClientCsvController extends Controller
 {
     public function index(Request $request,Response $response):void
     {
+        if ($request->input('template') || $request->input('action') === 'template') {
+            $this->template($request, $response);
+            return;
+        }
         $this->render('staff/clients/import',['pageTitle'=>'Import Business Clients','fields'=>ClientCsv::fields()],'main');
     }
 

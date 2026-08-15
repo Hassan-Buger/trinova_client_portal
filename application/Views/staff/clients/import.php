@@ -20,7 +20,7 @@
                 </label>
                 <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:18px">
                     <button class="dx-btn dx-primary">Upload and map columns</button>
-                    <a class="dx-btn dx-secondary" data-no-ajax href="/staff/clients/import/template">Download template</a>
+                    <a class="dx-btn dx-secondary" data-no-ajax href="/staff/clients/import?template=1">Download template</a>
                     <a class="dx-btn dx-secondary" href="/staff/clients">Back to clients</a>
                 </div>
             </form>
