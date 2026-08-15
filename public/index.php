@@ -128,6 +128,7 @@ $app->router->group([
     $r->get('/clients/export', [StaffClientController::class, 'exportCsv']);
     $r->get('/clients/import', [StaffClientCsvController::class, 'index']);
     $r->get('/clients/import/template', [StaffClientCsvController::class, 'template']);
+    $r->get('/clients/import-template', [StaffClientCsvController::class, 'template']);
     $r->post('/clients/import/upload', [StaffClientCsvController::class, 'upload'])->middleware([CsrfMiddleware::class]);
     $r->post('/clients/import/preview', [StaffClientCsvController::class, 'preview'])->middleware([CsrfMiddleware::class]);
     $r->post('/clients/import/commit', [StaffClientCsvController::class, 'commit'])->middleware([CsrfMiddleware::class]);
