@@ -34,8 +34,69 @@ final class ClientCsvController extends Controller
         header('X-Content-Type-Options: nosniff');
         $out = fopen('php://output', 'wb');
         fwrite($out, "\xEF\xBB\xBF");
-        fputcsv($out, [ClientCsv::TITLE], ',', '"', '');
-        fputcsv($out, ClientCsv::headers(), ',', '"', '');
+        fputcsv($out, [
+            'COMPANY NAME',
+            'Company Number',
+            'UTR',
+            'VAT NUMBER',
+            'PAYE REF NUMBER',
+            'PAYE OFFICE NUMBER',
+            'ADDRESS',
+            'EMAIL',
+            'PHONE',
+            'END OF YEAR DATE',
+            'ACCOUNTS DEADLINE',
+            'CONFIRMATION STATEMENT DATE',
+            'VAT RETURN FREQUENCY',
+            'VAT QUARTER PATTERN',
+            'Director 1',
+            'Director 2',
+            'Director 3',
+            'Director 4',
+            'Director 5'
+        ], ',', '"', '');
+        fputcsv($out, [
+            'Trinova Accounting',
+            '16469351',
+            '1490724673',
+            '516859262',
+            '',
+            '',
+            '42 London rd, Stroud, GL5 2AJ',
+            'office@trinovaaccounting.co.uk',
+            '01453 702030',
+            '2026-05-31',
+            '2027-02-22',
+            '2027-05-21',
+            'Quarterly',
+            'Jan/Apr/Jul/Oct',
+            'Jane Dean',
+            'Kirsty Allen',
+            'Emma Dean',
+            '',
+            ''
+        ], ',', '"', '');
+        fputcsv($out, [
+            'Cotswold Garden Landscapes Limited',
+            '12303100',
+            '9138427415',
+            '381307996',
+            '',
+            '',
+            '113 Arrowsmith Drive, Stonehouse, GL10 2QS',
+            'cotswoldgardenlandscapes@yahoo.co.uk',
+            '07833089296',
+            '2026-11-30',
+            '2026-08-31',
+            '2026-11-06',
+            'Quarterly',
+            'Feb/May/Aug/Nov',
+            'Paul Tabb',
+            '',
+            '',
+            '',
+            ''
+        ], ',', '"', '');
         fclose($out);
         exit;
     }
