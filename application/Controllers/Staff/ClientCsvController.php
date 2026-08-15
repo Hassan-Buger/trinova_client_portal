@@ -25,6 +25,21 @@ final class ClientCsvController extends Controller
         catch(UserFacingException $e){$this->userFailure($request,$response,$e->getMessage());}
     }
 
+    public function template(Request $request, Response $response): void
+    {
+        while (ob_get_level() > 0) ob_end_clean();
+        header('Content-Type: text/csv; charset=UTF-8');
+        header('Content-Disposition: attachment; filename="trinova-client-import-template.csv"');
+        header('Cache-Control: private, no-store');
+        header('X-Content-Type-Options: nosniff');
+        $out = fopen('php://output', 'wb');
+        fwrite($out, "\xEF\xBB\xBF");
+        fputcsv($out, [ClientCsv::TITLE], ',', '"', '');
+        fputcsv($out, ClientCsv::headers(), ',', '"', '');
+        fclose($out);
+        exit;
+    }
+
     public function preview(Request $request,Response $response):void
     {
         try{$body=$request->getBody();$mapping=is_array($_POST['mapping']??null)?$_POST['mapping']:[];$preview=(new ClientCsvImportService())->preview((string)($body['token']??''),$mapping);$this->render('staff/clients/import-preview',['pageTitle'=>'Confirm Client Import','preview'=>$preview,'fields'=>ClientCsv::fields()],'main');}
