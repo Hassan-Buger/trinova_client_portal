@@ -29,7 +29,7 @@ function renderNavIcon(string $ic): string {
 }
 ?>
 
-<aside class="tn-side client-sidebar" aria-label="Client portal navigation">
+<aside id="tnClientSidebar" class="tn-side client-sidebar" aria-label="Client portal navigation">
     <div class="tn-sidebar-brand-row">
         <div class="tn-sidebar-brand" style="display:flex;align-items:center;padding:4px 8px 22px">
             <img class="tn-brand-logo" src="/assets/images/trinova-accounting-logo.png" alt="TriNova Accounting">

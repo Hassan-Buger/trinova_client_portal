@@ -539,33 +539,51 @@
 
     function toggleMobileMenu(open) {
         const body = document.body;
-        const toggle = document.getElementById('tnMobileMenuToggle');
-        const overlay = document.getElementById('tnMobileOverlay');
+        const toggle = document.getElementById('tnMobileMenuToggle') || document.querySelector('.mobile-menu-toggle');
+        const overlay = document.getElementById('tnMobileOverlay') || document.getElementById('sidebarOverlay');
+        const sidebars = document.querySelectorAll('.staff-sidebar, .client-sidebar, .tn-side');
         const shouldOpen = typeof open === 'boolean' ? open : !body.classList.contains('tn-mobile-menu-open');
+
         body.classList.toggle('tn-mobile-menu-open', shouldOpen);
-        if (toggle) toggle.setAttribute('aria-expanded', shouldOpen ? 'true' : 'false');
-        if (overlay) overlay.setAttribute('aria-hidden', shouldOpen ? 'false' : 'true');
+        body.classList.toggle('sidebar-open', shouldOpen);
+
+        if (toggle) {
+            toggle.classList.toggle('is-active', shouldOpen);
+            toggle.setAttribute('aria-expanded', shouldOpen ? 'true' : 'false');
+        }
+        if (overlay) {
+            overlay.classList.toggle('is-visible', shouldOpen);
+            overlay.setAttribute('aria-hidden', shouldOpen ? 'false' : 'true');
+        }
+        sidebars.forEach(s => s.classList.toggle('is-open', shouldOpen));
     }
 
     function initialiseMobileMenu() {
-        const toggle = document.getElementById('tnMobileMenuToggle');
-        const overlay = document.getElementById('tnMobileOverlay');
-        const closeStaff = document.getElementById('tnMobileMenuCloseStaff');
-        const closeClient = document.getElementById('tnMobileMenuCloseClient');
+        if (state.mobileMenuInitialised) return;
+        state.mobileMenuInitialised = true;
 
-        toggle?.addEventListener('click', (e) => { e.stopPropagation(); toggleMobileMenu(); });
-        overlay?.addEventListener('click', () => toggleMobileMenu(false));
-        closeStaff?.addEventListener('click', () => toggleMobileMenu(false));
-        closeClient?.addEventListener('click', () => toggleMobileMenu(false));
+        document.addEventListener('click', (e) => {
+            const toggle = e.target.closest('#tnMobileMenuToggle, #mobileMenuToggle, .mobile-menu-toggle');
+            if (toggle) {
+                e.preventDefault();
+                e.stopPropagation();
+                toggleMobileMenu();
+                return;
+            }
+            if (e.target.closest('#tnMobileOverlay, #sidebarOverlay, .sidebar-overlay, #tnMobileMenuCloseStaff, #tnMobileMenuCloseClient, .tn-mobile-close')) {
+                e.preventDefault();
+                toggleMobileMenu(false);
+            }
+        });
 
         document.addEventListener('keydown', (e) => {
-            if (e.key === 'Escape' && document.body.classList.contains('tn-mobile-menu-open')) {
+            if (e.key === 'Escape' && (document.body.classList.contains('tn-mobile-menu-open') || document.body.classList.contains('sidebar-open'))) {
                 toggleMobileMenu(false);
             }
         });
 
         window.addEventListener('resize', () => {
-            if (window.innerWidth > 768 && document.body.classList.contains('tn-mobile-menu-open')) {
+            if (window.innerWidth > 768 && (document.body.classList.contains('tn-mobile-menu-open') || document.body.classList.contains('sidebar-open'))) {
                 toggleMobileMenu(false);
             }
         });

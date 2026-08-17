@@ -12,7 +12,7 @@ $nav = [
 ];
 ?>
 
-<aside class="tn-side staff-sidebar" aria-label="Staff portal navigation">
+<aside id="tnStaffSidebar" class="tn-side staff-sidebar" aria-label="Staff portal navigation">
     <div class="staff-sidebar__brand-row">
         <a class="staff-sidebar__brand tn-sidebar-brand" href="/staff/dashboard" aria-label="TriNova Staff Portal dashboard">
             <img class="tn-brand-logo" src="/assets/images/trinova-staff-portal-logo.png" alt="TriNova Staff Portal">

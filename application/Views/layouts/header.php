@@ -6,12 +6,14 @@ $currentPath = parse_url($_SERVER['REQUEST_URI'] ?? '', PHP_URL_PATH);
 $isDashboard = in_array($currentPath, ['/staff/dashboard', '/client/dashboard'], true);
 ?>
 <header class="tn-topbar<?= $role === 'staff' ? ' tn-topbar--staff' : '' ?>">
-    <button id="tnMobileMenuToggle" class="tn-mobile-toggle" type="button" aria-label="Toggle Navigation Menu" aria-expanded="false">
-        <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="3" y1="6" x2="21" y2="6"></line><line x1="3" y1="12" x2="21" y2="12"></line><line x1="3" y1="18" x2="21" y2="18"></line></svg>
+    <button id="tnMobileMenuToggle" class="tn-mobile-toggle mobile-menu-toggle" type="button" aria-label="Open navigation" aria-expanded="false" aria-controls="tnStaffSidebar tnClientSidebar">
+        <span></span>
+        <span></span>
+        <span></span>
     </button>
     <div class="tn-topbar__title">
         <h1 id="portal-page-title" class="tn-pagetitle"><?= htmlspecialchars($pageTitle ?? 'Dashboard') ?></h1>
-        <div id="portalWelcomeText" class="tn-welcome-text" <?= $isDashboard ? '' : 'hidden' ?>>Welcome back, <?= htmlspecialchars($userName) ?><span aria-hidden="true"> · </span><?= $role === 'staff' ? 'Staff portal' : 'Client portal' ?></div>
+        <div id="portalWelcomeText" class="tn-welcome-text" <?= $isDashboard ? '' : 'hidden' ?>>Welcome back, <?= htmlspecialchars($userName) ?><span class="tn-welcome-suffix" aria-hidden="true"> · </span><span class="tn-welcome-role"><?= $role === 'staff' ? 'Staff portal' : 'Client portal' ?></span></div>
     </div>
     <div class="tn-topbar__actions">
         <div class="tn-notification-wrap">
@@ -30,3 +32,4 @@ $isDashboard = in_array($currentPath, ['/staff/dashboard', '/client/dashboard'],
         </div>
     </div>
 </header>
+
