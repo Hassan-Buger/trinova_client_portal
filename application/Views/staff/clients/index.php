@@ -6,8 +6,8 @@
             <p style="margin:0;color:#61756e;font-size:14px">Manage practice client accounts, AML status, and entity profiles.</p>
         </div>
         <div class="tn-client-toolbar-actions" style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">
-            <form action="/staff/clients" method="GET" data-ajax-form style="display:flex;align-items:center;gap:8px;margin:0">
-                <input type="search" name="q" value="<?= htmlspecialchars($search ?? '') ?>" data-ajax-search placeholder="Search clients…" aria-label="Search clients" style="padding:11px 16px;border:1.5px solid #e0e9e5;border-radius:14px;font-size:14px;background:#fff;min-width:240px">
+            <form action="/staff/clients" method="GET" data-ajax-form style="display:flex;align-items:center;gap:8px;margin:0;flex-wrap:wrap;flex:1">
+                <input type="search" name="q" value="<?= htmlspecialchars($search ?? '') ?>" data-ajax-search placeholder="Search clients…" aria-label="Search clients" style="padding:11px 16px;border:1.5px solid #e0e9e5;border-radius:14px;font-size:14px;background:#fff;flex:1;min-width:140px">
                 <select name="per_page" onchange="this.form.requestSubmit()" aria-label="Results per page" style="padding:11px 12px;border:1.5px solid #e0e9e5;border-radius:14px;background:#fff;color:#61756e">
                     <?php foreach ([10, 20, 50] as $size): ?>
                         <option value="<?= $size ?>" <?= (int)($pagination['per_page'] ?? 10) === $size ? 'selected' : '' ?>><?= $size ?> / page</option>
@@ -22,8 +22,8 @@
     </div>
 
     <!-- Create Client Modal -->
-    <div id="newClientModal" style="display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(20,40,35,.45);backdrop-filter:blur(6px);z-index:99;align-items:center;justify-content:center;padding:20px">
-        <div style="background:#fff;border-radius:24px;width:100%;max-width:620px;max-height:92vh;overflow:auto;padding:32px;box-shadow:0 24px 60px -28px rgba(0,0,0,.4);animation:tnpop .25s ease">
+    <div id="newClientModal" style="display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(20,40,35,.45);backdrop-filter:blur(6px);z-index:99;align-items:center;justify-content:center;padding:16px">
+        <div style="background:#fff;border-radius:24px;width:100%;max-width:620px;max-height:92vh;overflow:auto;padding:clamp(16px,4vw,32px);box-shadow:0 24px 60px -28px rgba(0,0,0,.4);animation:tnpop .25s ease">
             <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px">
                 <h3 style="margin:0;font-size:20px;font-weight:800">Create Client Account</h3>
                 <button onclick="document.getElementById('newClientModal').style.display='none'" style="background:none;border:none;font-size:24px;cursor:pointer;color:#8a9a94">&times;</button>

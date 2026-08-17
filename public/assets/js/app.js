@@ -537,9 +537,44 @@
         state.notificationTimer = window.setInterval(loadNotifications, 5000);
     }
 
+    function toggleMobileMenu(open) {
+        const body = document.body;
+        const toggle = document.getElementById('tnMobileMenuToggle');
+        const overlay = document.getElementById('tnMobileOverlay');
+        const shouldOpen = typeof open === 'boolean' ? open : !body.classList.contains('tn-mobile-menu-open');
+        body.classList.toggle('tn-mobile-menu-open', shouldOpen);
+        if (toggle) toggle.setAttribute('aria-expanded', shouldOpen ? 'true' : 'false');
+        if (overlay) overlay.setAttribute('aria-hidden', shouldOpen ? 'false' : 'true');
+    }
+
+    function initialiseMobileMenu() {
+        const toggle = document.getElementById('tnMobileMenuToggle');
+        const overlay = document.getElementById('tnMobileOverlay');
+        const closeStaff = document.getElementById('tnMobileMenuCloseStaff');
+        const closeClient = document.getElementById('tnMobileMenuCloseClient');
+
+        toggle?.addEventListener('click', (e) => { e.stopPropagation(); toggleMobileMenu(); });
+        overlay?.addEventListener('click', () => toggleMobileMenu(false));
+        closeStaff?.addEventListener('click', () => toggleMobileMenu(false));
+        closeClient?.addEventListener('click', () => toggleMobileMenu(false));
+
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape' && document.body.classList.contains('tn-mobile-menu-open')) {
+                toggleMobileMenu(false);
+            }
+        });
+
+        window.addEventListener('resize', () => {
+            if (window.innerWidth > 768 && document.body.classList.contains('tn-mobile-menu-open')) {
+                toggleMobileMenu(false);
+            }
+        });
+    }
+
     function initialisePage() {
         initialiseMessages();
         initialiseLogin();
+        initialiseMobileMenu();
     }
 
     function initialiseLogin() {
@@ -573,6 +608,9 @@
 
     document.addEventListener('click', (event) => {
         const link = event.target.closest('a[href]');
+        if (link?.closest('.tn-side')) {
+            toggleMobileMenu(false);
+        }
         if (link?.matches('[data-document-preview]')) {
             event.preventDefault();
             openDocumentPreview(link);

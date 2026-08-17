@@ -13,9 +13,12 @@ $nav = [
 ?>
 
 <aside class="tn-side staff-sidebar" aria-label="Staff portal navigation">
-    <a class="staff-sidebar__brand tn-sidebar-brand" href="/staff/dashboard" aria-label="TriNova Staff Portal dashboard">
-        <img class="tn-brand-logo" src="/assets/images/trinova-staff-portal-logo.png" alt="TriNova Staff Portal">
-    </a>
+    <div class="staff-sidebar__brand-row">
+        <a class="staff-sidebar__brand tn-sidebar-brand" href="/staff/dashboard" aria-label="TriNova Staff Portal dashboard">
+            <img class="tn-brand-logo" src="/assets/images/trinova-staff-portal-logo.png" alt="TriNova Staff Portal">
+        </a>
+        <button id="tnMobileMenuCloseStaff" class="tn-mobile-close" type="button" aria-label="Close navigation menu">&times;</button>
+    </div>
 
     <nav aria-label="Primary navigation">
         <?php foreach ($nav as $index => $item): ?>
