@@ -34,7 +34,7 @@ function renderNavIcon(string $ic): string {
         <div class="tn-sidebar-brand" style="display:flex;align-items:center;padding:4px 8px 22px">
             <img class="tn-brand-logo" src="/assets/images/trinova-accounting-logo.png" alt="TriNova Accounting">
         </div>
-        <button id="tnMobileMenuCloseClient" class="tn-mobile-close" type="button" aria-label="Close navigation menu">&times;</button>
+        <button id="tnMobileMenuCloseClient" class="tn-mobile-close" type="button" aria-label="Close navigation menu" onclick="window.tnToggleMobileMenu ? window.tnToggleMobileMenu(event, false) : null">&times;</button>
     </div>
     <nav style="display:flex;flex-direction:column;gap:3px;flex:1">
         <?php foreach ($nav as $item): ?>

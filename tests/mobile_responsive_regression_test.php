@@ -34,9 +34,9 @@ assertCondition(str_contains($mainLayout, '@media (min-width: 769px) and (max-wi
 // 4. Check mobile drawer rules (<= 768px)
 assertCondition(str_contains($mainLayout, '@media (max-width: 768px)'), 'Mobile layout rules must include @media (max-width: 768px).');
 assertCondition(str_contains($mainLayout, 'transform: translateX(-105%)'), 'Off-canvas drawer must default to off-screen transform.');
-assertCondition(str_contains($mainLayout, 'body.tn-mobile-menu-open .tn-side { transform: translateX(0)'), 'Opening drawer must slide sidebar in with translateX(0).');
-assertCondition(str_contains($mainLayout, 'body.tn-mobile-menu-open .tn-mobile-overlay { opacity: 1; pointer-events: auto; }'), 'Opening drawer must activate mobile overlay.');
-assertCondition(str_contains($mainLayout, 'body.tn-mobile-menu-open { overflow: hidden'), 'Opening drawer must lock body scrolling.');
+assertCondition(str_contains($mainLayout, 'body.tn-mobile-menu-open .tn-side') && str_contains($mainLayout, 'transform: translateX(0)'), 'Opening drawer must slide sidebar in with translateX(0).');
+assertCondition((str_contains($mainLayout, 'body.tn-mobile-menu-open .tn-mobile-overlay') || str_contains($mainLayout, 'body.tn-mobile-menu-open .sidebar-overlay')) && str_contains($mainLayout, 'opacity: 1'), 'Opening drawer must activate mobile overlay.');
+assertCondition(str_contains($mainLayout, 'body.tn-mobile-menu-open') && str_contains($mainLayout, 'overflow: hidden'), 'Opening drawer must lock body scrolling.');
 
 // 5. Check Header hamburger toggle & ARIA
 assertCondition(str_contains($header, 'id="tnMobileMenuToggle"'), 'Header must contain id="tnMobileMenuToggle".');

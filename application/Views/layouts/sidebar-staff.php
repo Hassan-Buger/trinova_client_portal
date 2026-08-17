@@ -17,7 +17,7 @@ $nav = [
         <a class="staff-sidebar__brand tn-sidebar-brand" href="/staff/dashboard" aria-label="TriNova Staff Portal dashboard">
             <img class="tn-brand-logo" src="/assets/images/trinova-staff-portal-logo.png" alt="TriNova Staff Portal">
         </a>
-        <button id="tnMobileMenuCloseStaff" class="tn-mobile-close" type="button" aria-label="Close navigation menu">&times;</button>
+        <button id="tnMobileMenuCloseStaff" class="tn-mobile-close" type="button" aria-label="Close navigation menu" onclick="window.tnToggleMobileMenu ? window.tnToggleMobileMenu(event, false) : null">&times;</button>
     </div>
 
     <nav aria-label="Primary navigation">

@@ -476,8 +476,8 @@
                 height: 100vh !important;
                 height: 100dvh !important;
                 z-index: 50 !important;
-                transform: translateX(-105%);
-                transition: transform .28s cubic-bezier(.22,1,.36,1);
+                transform: translateX(-105%) !important;
+                transition: transform .28s cubic-bezier(.22,1,.36,1) !important;
                 box-shadow: 0 0 40px rgba(0,0,0,.25);
                 background: #fff !important;
                 padding: max(20px, env(safe-area-inset-top)) 16px max(20px, env(safe-area-inset-bottom)) !important;
@@ -487,9 +487,28 @@
                 overflow-y: auto !important;
                 -webkit-overflow-scrolling: touch;
             }
-            body.tn-mobile-menu-open { overflow: hidden !important; touch-action: none; }
-            body.tn-mobile-menu-open .tn-side { transform: translateX(0) !important; }
-            body.tn-mobile-menu-open .tn-mobile-overlay { opacity: 1; pointer-events: auto; }
+            body.tn-mobile-menu-open, body.sidebar-open { overflow: hidden !important; touch-action: none; }
+            body.tn-mobile-menu-open .tn-side,
+            body.tn-mobile-menu-open .staff-sidebar,
+            body.tn-mobile-menu-open .client-sidebar,
+            body.sidebar-open .tn-side,
+            body.sidebar-open .staff-sidebar,
+            body.sidebar-open .client-sidebar,
+            .staff-sidebar.is-open,
+            .client-sidebar.is-open,
+            .tn-side.is-open {
+                transform: translateX(0) !important;
+            }
+            body.tn-mobile-menu-open .tn-mobile-overlay,
+            body.tn-mobile-menu-open .sidebar-overlay,
+            body.sidebar-open .tn-mobile-overlay,
+            body.sidebar-open .sidebar-overlay,
+            .tn-mobile-overlay.is-visible,
+            .sidebar-overlay.is-visible {
+                opacity: 1 !important;
+                pointer-events: auto !important;
+                visibility: visible !important;
+            }
             .staff-sidebar__brand-row, .tn-sidebar-brand-row {
                 display: flex !important;
                 align-items: center !important;
@@ -760,7 +779,7 @@
 
 <div id="tnPageProgress" class="tn-page-progress" aria-hidden="true"></div>
 <div id="tnToastStack" class="tn-toast-stack" aria-live="polite" aria-atomic="true"></div>
-<div id="tnMobileOverlay" class="tn-mobile-overlay sidebar-overlay" aria-hidden="true"></div>
+<div id="tnMobileOverlay" class="tn-mobile-overlay sidebar-overlay" aria-hidden="true" onclick="window.tnToggleMobileMenu ? window.tnToggleMobileMenu(event, false) : null"></div>
 
 <?php
 $userId = \Application\Core\Session::get('user_id');
@@ -798,6 +817,61 @@ $role = \Application\Core\Session::get('role');
     </div>
 <?php endif; ?>
 
-<script src="/assets/js/app.js?v=<?= (int)@filemtime(dirname(__DIR__, 3) . '/public/assets/js/app.js') ?>" defer></script>
+<script>
+(function() {
+    window.tnToggleMobileMenu = function(e, force) {
+        if (e && e.preventDefault) e.preventDefault();
+        if (e && e.stopPropagation) e.stopPropagation();
+        var b = document.body;
+        var open = typeof force === 'boolean' ? force : !b.classList.contains('tn-mobile-menu-open');
+        b.classList.toggle('tn-mobile-menu-open', open);
+        b.classList.toggle('sidebar-open', open);
+        
+        var toggles = document.querySelectorAll('#tnMobileMenuToggle, #mobileMenuToggle, .mobile-menu-toggle, .tn-mobile-toggle');
+        toggles.forEach(function(t) {
+            t.classList.toggle('is-active', open);
+            t.setAttribute('aria-expanded', open ? 'true' : 'false');
+        });
+        
+        var overlays = document.querySelectorAll('#tnMobileOverlay, #sidebarOverlay, .tn-mobile-overlay, .sidebar-overlay');
+        overlays.forEach(function(o) {
+            o.classList.toggle('is-visible', open);
+            o.setAttribute('aria-hidden', open ? 'false' : 'true');
+        });
+
+        var sidebars = document.querySelectorAll('.staff-sidebar, .client-sidebar, .tn-side');
+        sidebars.forEach(function(s) {
+            s.classList.toggle('is-open', open);
+        });
+    };
+
+    document.addEventListener('click', function(e) {
+        if (e.target.closest('#tnMobileMenuToggle, #mobileMenuToggle, .mobile-menu-toggle, .tn-mobile-toggle')) {
+            window.tnToggleMobileMenu(e);
+            return;
+        }
+        if (e.target.closest('#tnMobileOverlay, #sidebarOverlay, .sidebar-overlay, #tnMobileMenuCloseStaff, #tnMobileMenuCloseClient, .tn-mobile-close')) {
+            window.tnToggleMobileMenu(e, false);
+            return;
+        }
+        if (e.target.closest('.tn-side a, .staff-sidebar a, .client-sidebar a')) {
+            window.tnToggleMobileMenu(null, false);
+        }
+    });
+
+    document.addEventListener('keydown', function(e) {
+        if (e.key === 'Escape') {
+            window.tnToggleMobileMenu(null, false);
+        }
+    });
+
+    window.addEventListener('resize', function() {
+        if (window.innerWidth > 768) {
+            window.tnToggleMobileMenu(null, false);
+        }
+    });
+})();
+</script>
+<script src="/assets/js/app.js?v=<?= (int)(@filemtime(dirname(__DIR__, 3) . '/public/assets/js/app.js') ?: 2026081703) ?>" defer></script>
 </body>
 </html>

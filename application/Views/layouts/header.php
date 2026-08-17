@@ -6,7 +6,7 @@ $currentPath = parse_url($_SERVER['REQUEST_URI'] ?? '', PHP_URL_PATH);
 $isDashboard = in_array($currentPath, ['/staff/dashboard', '/client/dashboard'], true);
 ?>
 <header class="tn-topbar<?= $role === 'staff' ? ' tn-topbar--staff' : '' ?>">
-    <button id="tnMobileMenuToggle" class="tn-mobile-toggle mobile-menu-toggle" type="button" aria-label="Open navigation" aria-expanded="false" aria-controls="tnStaffSidebar tnClientSidebar">
+    <button id="tnMobileMenuToggle" class="tn-mobile-toggle mobile-menu-toggle" type="button" aria-label="Open navigation" aria-expanded="false" aria-controls="tnStaffSidebar tnClientSidebar" onclick="window.tnToggleMobileMenu ? window.tnToggleMobileMenu(event) : null">
         <span></span>
         <span></span>
         <span></span>
