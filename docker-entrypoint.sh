@@ -1,13 +1,14 @@
 #!/bin/bash
 set -e
 
-# Suppress ServerName warning
+# Suppress ServerName warning globally
 echo "ServerName localhost" > /etc/apache2/conf-available/servername.conf
-a2enconf servername 2>/dev/null || true
+a2enconf servername >/dev/null 2>&1 || true
+grep -q "ServerName localhost" /etc/apache2/apache2.conf || echo "ServerName localhost" >> /etc/apache2/apache2.conf
 
-# Disable conflicting Apache MPM modules and ensure only prefork is active
-a2dismod mpm_event mpm_worker 2>/dev/null || true
-a2enmod mpm_prefork 2>/dev/null || true
+# Ensure only prefork MPM is enabled
+a2dismod mpm_event mpm_worker >/dev/null 2>&1 || true
+a2enmod mpm_prefork >/dev/null 2>&1 || true
 rm -f /etc/apache2/mods-enabled/mpm_event.load /etc/apache2/mods-enabled/mpm_worker.load /etc/apache2/mods-enabled/mpm_event.conf /etc/apache2/mods-enabled/mpm_worker.conf 2>/dev/null || true
 
 # Configure ports: listen on standard web ports (80, 8080, 8000) and dynamic Railway PORT

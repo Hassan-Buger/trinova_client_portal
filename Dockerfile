@@ -6,10 +6,14 @@ RUN docker-php-ext-install pdo pdo_mysql mysqli
 # Configure PHP environment variable parsing
 RUN echo 'variables_order = "EGPCS"' > /usr/local/etc/php/conf.d/docker-php-vars.ini
 
+# Install Composer from official image
+COPY --from=composer:2 /usr/bin/composer /usr/bin/composer
+
 # Enable Apache mod_rewrite and enforce mpm_prefork
 RUN a2enmod rewrite \
     && a2dismod mpm_event mpm_worker 2>/dev/null || true \
-    && a2enmod mpm_prefork 2>/dev/null || true
+    && a2enmod mpm_prefork 2>/dev/null || true \
+    && echo "ServerName localhost" >> /etc/apache2/apache2.conf
 
 # Configure Apache DocumentRoot to point to /public
 ENV APACHE_DOCUMENT_ROOT=/var/www/html/public
@@ -28,8 +32,11 @@ RUN echo '<Directory /var/www/html/public>\n\
 # Copy application source code
 COPY . /var/www/html
 
+# Generate Composer autoloader inside container
+RUN cd /var/www/html && composer dump-autoload --optimize --no-dev 2>/dev/null || true
+
 # Ensure storage directories exist and are writable
-RUN mkdir -p /var/www/html/storage/uploads \
+RUN mkdir -p /var/www/html/storage/uploads /var/www/html/storage/logs \
     && chown -R www-data:www-data /var/www/html/storage \
     && chmod -R 775 /var/www/html/storage
 
