@@ -3,6 +3,9 @@ FROM php:8.2-apache
 # Install required PHP extensions
 RUN docker-php-ext-install pdo pdo_mysql mysqli
 
+# Configure PHP environment variable parsing
+RUN echo 'variables_order = "EGPCS"' > /usr/local/etc/php/conf.d/docker-php-vars.ini
+
 # Enable Apache mod_rewrite and enforce mpm_prefork
 RUN a2enmod rewrite \
     && a2dismod mpm_event mpm_worker 2>/dev/null || true \
@@ -35,7 +38,8 @@ COPY docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
 RUN chmod +x /usr/local/bin/docker-entrypoint.sh \
     && sed -i 's/\r$//' /usr/local/bin/docker-entrypoint.sh
 
-EXPOSE 80
+EXPOSE 80 8080 8000
 
 ENTRYPOINT ["/usr/local/bin/docker-entrypoint.sh"]
+
 
