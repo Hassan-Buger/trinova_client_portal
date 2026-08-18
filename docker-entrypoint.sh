@@ -48,5 +48,9 @@ mkdir -p /var/www/html/storage/uploads
 chown -R www-data:www-data /var/www/html/storage
 chmod -R 775 /var/www/html/storage
 
+# Run automated database migration & seed check
+php /var/www/html/scripts/auto_migrate.php || true
+
 # Start Apache in the foreground
 exec apache2-foreground
+
