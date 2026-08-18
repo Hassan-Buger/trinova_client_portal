@@ -3,8 +3,10 @@ FROM php:8.2-apache
 # Install required PHP extensions
 RUN docker-php-ext-install pdo pdo_mysql mysqli
 
-# Enable Apache mod_rewrite for front-controller routing
-RUN a2enmod rewrite
+# Enable Apache mod_rewrite and enforce mpm_prefork
+RUN a2enmod rewrite \
+    && a2dismod mpm_event mpm_worker 2>/dev/null || true \
+    && a2enmod mpm_prefork 2>/dev/null || true
 
 # Configure Apache DocumentRoot to point to /public
 ENV APACHE_DOCUMENT_ROOT=/var/www/html/public
@@ -28,10 +30,12 @@ RUN mkdir -p /var/www/html/storage/uploads \
     && chown -R www-data:www-data /var/www/html/storage \
     && chmod -R 775 /var/www/html/storage
 
-# Configure Apache port binding for Railway (uses $PORT, default 80)
-RUN sed -i 's/Listen 80/Listen ${PORT:-80}/' /etc/apache2/ports.conf \
-    && sed -i 's/:80/:${PORT:-80}/' /etc/apache2/sites-available/*.conf
+# Copy and prepare entrypoint script (stripping Windows CRLF if present)
+COPY docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
+RUN chmod +x /usr/local/bin/docker-entrypoint.sh \
+    && sed -i 's/\r$//' /usr/local/bin/docker-entrypoint.sh
 
 EXPOSE 80
 
-CMD ["apache2-foreground"]
+ENTRYPOINT ["/usr/local/bin/docker-entrypoint.sh"]
+
