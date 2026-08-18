@@ -6,8 +6,8 @@
             <p style="margin:0;color:#61756e;font-size:14px">Manage practice client accounts, AML status, and entity profiles.</p>
         </div>
         <div class="tn-client-toolbar-actions" style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">
-            <form action="/staff/clients" method="GET" data-ajax-form style="display:flex;align-items:center;gap:8px;margin:0">
-                <input type="search" name="q" value="<?= htmlspecialchars($search ?? '') ?>" data-ajax-search placeholder="Search clients…" aria-label="Search clients" style="padding:11px 16px;border:1.5px solid #e0e9e5;border-radius:14px;font-size:14px;background:#fff;min-width:240px">
+            <form action="/staff/clients" method="GET" data-ajax-form style="display:flex;align-items:center;gap:8px;margin:0;flex-wrap:wrap;flex:1">
+                <input type="search" name="q" value="<?= htmlspecialchars($search ?? '') ?>" data-ajax-search placeholder="Search clients…" aria-label="Search clients" style="padding:11px 16px;border:1.5px solid #e0e9e5;border-radius:14px;font-size:14px;background:#fff;flex:1;min-width:140px">
                 <select name="per_page" onchange="this.form.requestSubmit()" aria-label="Results per page" style="padding:11px 12px;border:1.5px solid #e0e9e5;border-radius:14px;background:#fff;color:#61756e">
                     <?php foreach ([10, 20, 50] as $size): ?>
                         <option value="<?= $size ?>" <?= (int)($pagination['per_page'] ?? 10) === $size ? 'selected' : '' ?>><?= $size ?> / page</option>
@@ -22,8 +22,8 @@
     </div>
 
     <!-- Create Client Modal -->
-    <div id="newClientModal" style="display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(20,40,35,.45);backdrop-filter:blur(6px);z-index:99;align-items:center;justify-content:center;padding:20px">
-        <div style="background:#fff;border-radius:24px;width:100%;max-width:620px;max-height:92vh;overflow:auto;padding:32px;box-shadow:0 24px 60px -28px rgba(0,0,0,.4);animation:tnpop .25s ease">
+    <div id="newClientModal" style="display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(20,40,35,.45);backdrop-filter:blur(6px);z-index:99;align-items:center;justify-content:center;padding:16px">
+        <div style="background:#fff;border-radius:24px;width:100%;max-width:620px;max-height:92vh;overflow:auto;padding:clamp(16px,4vw,32px);box-shadow:0 24px 60px -28px rgba(0,0,0,.4);animation:tnpop .25s ease">
             <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px">
                 <h3 style="margin:0;font-size:20px;font-weight:800">Create Client Account</h3>
                 <button onclick="document.getElementById('newClientModal').style.display='none'" style="background:none;border:none;font-size:24px;cursor:pointer;color:#8a9a94">&times;</button>
@@ -50,6 +50,11 @@
                 <div style="margin-bottom:16px">
                     <label style="display:block;font-size:13px;font-weight:700;color:#3a4d47;margin-bottom:6px">Registered Address</label>
                     <input type="text" name="address" placeholder="10 Station Road, Leeds LS2 8AB" style="width:100%;padding:13px 16px;border:1.5px solid #e0e9e5;border-radius:14px;font-size:14px;background:#fbfdfc">
+                </div>
+
+                <div style="margin-bottom:16px">
+                    <label style="display:block;font-size:13px;font-weight:700;color:#3a4d47;margin-bottom:6px">Initial Password (Manual)</label>
+                    <input type="text" name="password" placeholder="Set custom password (or leave default password123)" style="width:100%;padding:13px 16px;border:1.5px solid #e0e9e5;border-radius:14px;font-size:14px;background:#fbfdfc">
                 </div>
 
                 <div style="margin-bottom:24px">
@@ -114,42 +119,76 @@
             <button type="button" onclick="tnClientSelectNone()" style="background:#f0f5f3;color:#5f726c;border:none;padding:8px 14px;border-radius:10px;font-weight:700;font-size:13px;cursor:pointer">Clear</button>
         </div>
 
-        <table id="clientsTable" style="width:100%;border-collapse:collapse;text-align:left">
-            <thead>
-                <tr style="border-bottom:1px solid rgba(20,60,50,.08);color:#8a9a94;font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.05em">
-                    <th style="padding:14px 10px;width:36px"><input type="checkbox" id="clientCheckAll" aria-label="Select all clients" onchange="tnClientToggleAll(this)" style="width:16px;height:16px;cursor:pointer"></th>
-                    <th style="padding:14px 16px">Client Name</th>
-                    <th style="padding:14px 16px">Email</th>
-                    <th style="padding:14px 16px">Phone</th>
-                    <th style="padding:14px 16px">AML Status</th>
-                    <th style="padding:14px 16px;text-align:right">Action</th>
-                </tr>
-            </thead>
-            <tbody>
-                <?php if (empty($clients)): ?>
-                    <tr class="tn-client-empty"><td colspan="6" style="padding:42px 16px;text-align:center;color:#7d8e88"><?= ($search ?? '') !== '' ? 'No clients match the current search.' : 'No active client accounts were found. CSV upload and preview do not remove clients; check Trash if accounts were previously deleted.' ?></td></tr>
-                <?php endif; ?>
-                <?php foreach ($clients as $c): ?>
-                    <tr class="client-row" id="client-row-<?= $c['id'] ?>" style="border-bottom:1px solid rgba(20,60,50,.06);transition:all .3s ease">
-                        <td style="padding:14px 10px"><input type="checkbox" class="tn-client-check" value="<?= (int)$c['id'] ?>" aria-label="Select client" onchange="tnClientUpdateBar()" style="width:16px;height:16px;cursor:pointer"></td>
-                        <td data-label="Client" style="padding:16px;font-weight:700;font-size:15px" class="client-name"><?= htmlspecialchars($c['name']) ?></td>
-                        <td data-label="Email" style="padding:16px;color:#61756e;font-size:14px" class="client-email"><?= htmlspecialchars($c['email']) ?></td>
-                        <td data-label="Phone" style="padding:16px;color:#61756e;font-size:14px"><?= htmlspecialchars($c['phone'] ?? '—') ?></td>
-                        <td data-label="AML Status" style="padding:16px">
-                            <span style="font-size:11.5px;font-weight:700;padding:5px 12px;border-radius:999px;white-space:nowrap;display:inline-block;<?= $c['aml_status'] === 'Complete' ? 'background:#e2f3ea;color:#3f9d6d;' : 'background:#fdecdc;color:#e07d24;' ?>">
-                                <?= htmlspecialchars($c['aml_status']) ?>
-                            </span>
-                        </td>
-                        <td data-label="Action" style="padding:16px;text-align:right">
-                            <div style="display:inline-flex;align-items:center;gap:10px">
-                                <a href="/staff/clients/<?= $c['id'] ?>" style="font-weight:700;font-size:13px;color:#0d9488;background:#eef4f1;padding:7px 13px;border-radius:10px">View Profile &rarr;</a>
-                                <button type="button" onclick="tnDeleteClient(<?= (int)$c['id'] ?>)" style="background:#fef2f2;color:#dc2626;border:1px solid #fecaca;padding:7px 12px;border-radius:10px;font-weight:700;font-size:13px;cursor:pointer">Delete</button>
-                            </div>
-                        </td>
+        <div style="overflow-x:auto;width:100%">
+            <table id="clientsTable" style="width:100%;border-collapse:collapse;text-align:left">
+                <thead>
+                    <tr style="border-bottom:1px solid rgba(20,60,50,.08);color:#8a9a94;font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.05em">
+                        <th style="padding:14px 10px;width:36px"><input type="checkbox" id="clientCheckAll" aria-label="Select all clients" onchange="tnClientToggleAll(this)" style="width:16px;height:16px;cursor:pointer"></th>
+                        <th style="padding:14px 10px;width:42px;color:#8a9a94">#</th>
+                        <th style="padding:14px 16px;min-width:160px">Client Name</th>
+                        <th style="padding:14px 16px;min-width:220px">Email</th>
+                        <th style="padding:14px 16px;min-width:130px">Phone</th>
+                        <th style="padding:14px 16px;min-width:130px">AML Status</th>
+                        <th style="padding:14px 16px;text-align:right;white-space:nowrap;min-width:130px">Action</th>
                     </tr>
-                <?php endforeach; ?>
-            </tbody>
-        </table>
+                </thead>
+                <tbody>
+                    <?php if (empty($clients)): ?>
+                        <tr class="tn-client-empty"><td colspan="7" style="padding:42px 16px;text-align:center;color:#7d8e88"><?= ($search ?? '') !== '' ? 'No clients match the current search.' : 'No active client accounts were found. CSV upload and preview do not remove clients; check Trash if accounts were previously deleted.' ?></td></tr>
+                    <?php endif; ?>
+                    <?php
+                    $currentPage = (int)($pagination['page'] ?? 1);
+                    $perPage = (int)($pagination['per_page'] ?? 10);
+                    $rowIndex = 0;
+                    ?>
+                    <?php foreach ($clients as $c): ?>
+                        <?php $rowIndex++; $seqNumber = (($currentPage - 1) * $perPage) + $rowIndex; ?>
+                        <tr class="client-row" id="client-row-<?= $c['id'] ?>" style="border-bottom:1px solid rgba(20,60,50,.06);transition:all .3s ease">
+                            <td style="padding:14px 10px"><input type="checkbox" class="tn-client-check" value="<?= (int)$c['id'] ?>" aria-label="Select client" onchange="tnClientUpdateBar()" style="width:16px;height:16px;cursor:pointer"></td>
+                            <td style="padding:16px 10px;color:#8a9a94;font-size:13px;font-weight:700"><?= $seqNumber ?></td>
+                            <td data-label="Client" style="padding:16px;font-weight:700;font-size:15px;word-break:break-word;overflow-wrap:anywhere" class="client-name">
+                                <a href="/staff/clients/<?= $c['id'] ?>" style="color:#213330;text-decoration:none;" onmouseover="this.style.color='#0d9488'" onmouseout="this.style.color='#213330'"><?= htmlspecialchars($c['name']) ?></a>
+                            </td>
+                            <td data-label="Email" style="padding:16px;color:#61756e;font-size:14px;word-break:break-all;overflow-wrap:anywhere;max-width:280px" class="client-email"><?= htmlspecialchars($c['email']) ?></td>
+                            <td data-label="Phone" style="padding:16px;color:#61756e;font-size:14px;line-height:1.4">
+                                <?php
+                                $phoneRaw = trim((string)($c['phone'] ?? ''));
+                                if ($phoneRaw === '' || $phoneRaw === '—') {
+                                    echo '—';
+                                } else {
+                                    $phoneNumbers = preg_split('/;\s*|,\s*|\r\n|\n|\s+\/\s+/', $phoneRaw);
+                                    $phoneNumbers = array_filter(array_map('trim', $phoneNumbers));
+                                    if (empty($phoneNumbers)) {
+                                        echo '—';
+                                    } else {
+                                        foreach ($phoneNumbers as $p) {
+                                            echo '<div style="white-space:nowrap;">' . htmlspecialchars($p) . '</div>';
+                                        }
+                                    }
+                                }
+                                ?>
+                            </td>
+                            <td data-label="AML Status" style="padding:16px;white-space:nowrap">
+                                <span style="font-size:11.5px;font-weight:700;padding:5px 12px;border-radius:999px;white-space:nowrap;display:inline-block;<?= $c['aml_status'] === 'Complete' ? 'background:#e2f3ea;color:#3f9d6d;' : 'background:#fdecdc;color:#e07d24;' ?>">
+                                    <?= htmlspecialchars($c['aml_status']) ?>
+                                </span>
+                            </td>
+                            <td data-label="Action" style="padding:16px;text-align:right;white-space:nowrap">
+                                <div style="display:inline-flex;align-items:center;gap:8px">
+                                    <a href="/staff/clients/<?= $c['id'] ?>" title="View Profile" aria-label="View Profile" style="display:inline-flex;align-items:center;gap:5px;font-weight:700;font-size:13px;color:#0d9488;background:#eef4f1;padding:7px 12px;border-radius:10px;text-decoration:none;transition:all .15s ease">
+                                        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg>
+                                        View
+                                    </a>
+                                    <button type="button" onclick="tnDeleteClient(<?= (int)$c['id'] ?>)" title="Delete Client" aria-label="Delete Client" style="display:inline-flex;align-items:center;justify-content:center;width:34px;height:34px;background:#fef2f2;color:#dc2626;border:1px solid #fecaca;border-radius:10px;cursor:pointer;transition:all .15s ease">
+                                        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path><line x1="10" y1="11" x2="10" y2="17"></line><line x1="14" y1="11" x2="14" y2="17"></line></svg>
+                                    </button>
+                                </div>
+                            </td>
+                        </tr>
+                    <?php endforeach; ?>
+                </tbody>
+            </table>
+        </div>
         <?php if (($pagination['total'] ?? 0) > 0): ?>
             <?php
             $currentPage = (int) $pagination['page'];

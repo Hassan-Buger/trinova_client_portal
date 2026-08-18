@@ -16,6 +16,10 @@ final class ClientCsvController extends Controller
 {
     public function index(Request $request,Response $response):void
     {
+        if ($request->input('template') || $request->input('action') === 'template') {
+            $this->template($request, $response);
+            return;
+        }
         $this->render('staff/clients/import',['pageTitle'=>'Import Business Clients','fields'=>ClientCsv::fields()],'main');
     }
 
@@ -23,6 +27,82 @@ final class ClientCsvController extends Controller
     {
         try{$upload=(new ClientCsvImportService())->upload($_FILES['csv_file']??[]);if(!empty($upload['duplicate'])){$this->render('staff/clients/import-duplicate',['pageTitle'=>'Duplicate Import Prevented','existing'=>$upload['existing']],'main');return;}$this->render('staff/clients/import',['pageTitle'=>'Map CSV Columns','fields'=>ClientCsv::fields(),'upload'=>$upload],'main');}
         catch(UserFacingException $e){$this->userFailure($request,$response,$e->getMessage());}
+    }
+
+    public function template(Request $request, Response $response): void
+    {
+        while (ob_get_level() > 0) ob_end_clean();
+        header('Content-Type: text/csv; charset=UTF-8');
+        header('Content-Disposition: attachment; filename="trinova-client-import-template.csv"');
+        header('Cache-Control: private, no-store');
+        header('X-Content-Type-Options: nosniff');
+        $out = fopen('php://output', 'wb');
+        fwrite($out, "\xEF\xBB\xBF");
+        fputcsv($out, [
+            'COMPANY NAME',
+            'Company Number',
+            'UTR',
+            'VAT NUMBER',
+            'PAYE REF NUMBER',
+            'PAYE OFFICE NUMBER',
+            'ADDRESS',
+            'EMAIL',
+            'PHONE',
+            'END OF YEAR DATE',
+            'ACCOUNTS DEADLINE',
+            'CONFIRMATION STATEMENT DATE',
+            'VAT RETURN FREQUENCY',
+            'VAT QUARTER PATTERN',
+            'Director 1',
+            'Director 2',
+            'Director 3',
+            'Director 4',
+            'Director 5'
+        ], ',', '"', '');
+        fputcsv($out, [
+            'Trinova Accounting',
+            '16469351',
+            '1490724673',
+            '516859262',
+            '',
+            '',
+            '42 London rd, Stroud, GL5 2AJ',
+            'office@trinovaaccounting.co.uk',
+            '01453 702030',
+            '2026-05-31',
+            '2027-02-22',
+            '2027-05-21',
+            'Quarterly',
+            'Jan/Apr/Jul/Oct',
+            'Jane Dean',
+            'Kirsty Allen',
+            'Emma Dean',
+            '',
+            ''
+        ], ',', '"', '');
+        fputcsv($out, [
+            'Cotswold Garden Landscapes Limited',
+            '12303100',
+            '9138427415',
+            '381307996',
+            '',
+            '',
+            '113 Arrowsmith Drive, Stonehouse, GL10 2QS',
+            'cotswoldgardenlandscapes@yahoo.co.uk',
+            '07833089296',
+            '2026-11-30',
+            '2026-08-31',
+            '2026-11-06',
+            'Quarterly',
+            'Feb/May/Aug/Nov',
+            'Paul Tabb',
+            '',
+            '',
+            '',
+            ''
+        ], ',', '"', '');
+        fclose($out);
+        exit;
     }
 
     public function preview(Request $request,Response $response):void
@@ -44,8 +124,8 @@ final class ClientCsvController extends Controller
             while(ob_get_level()>0)ob_end_clean();
             header('Content-Type: text/csv; charset=UTF-8');header('Content-Disposition: attachment; filename="trinova-client-import-report-'.date('Y-m-d').'.csv"');header('Cache-Control: private, no-store');header('X-Content-Type-Options: nosniff');
             $out=fopen('php://output','wb');fwrite($out,"\xEF\xBB\xBF");
-            fputcsv($out,['Row','Company','Result','Action','Duplicate Match','Director Names','Placeholders Created','Placeholders Reused','Links Created','Need Details','Failure Stage','Diagnostic Reference','Warnings','Errors'],',','"','');
-            foreach($report['rows'] as $row)fputcsv($out,[$row['line'],$this->csvCell($row['data']['client_name']??''),$this->csvCell($this->importResultLabel($row)),$this->csvCell($row['action']??''),$this->csvCell(isset($row['match'])&&$row['match']?($row['match']['field'].'='.$row['match']['value']):''),$this->csvCell(implode('; ',$row['directors']??[])),(int)($row['placeholder_directors_created']??0),(int)($row['placeholder_directors_reused']??0),(int)($row['director_links_created']??0),(int)($row['directors_needing_details']??0),$this->csvCell($row['failure_stage']??''),$this->csvCell($row['diagnostic_reference']??''),$this->csvCell(implode('; ',$row['warnings']??[])),$this->csvCell(implode('; ',$row['errors']??[]))],',','"','');
+            fputcsv($out,['Row','Company','Result','Action','Duplicate Match','Director Names','Placeholders Created','Placeholders Reused','Links Created','Need Details','Failure Stage','Database State','Database Driver Code','Diagnostic Reference','Warnings','Errors'],',','"','');
+            foreach($report['rows'] as $row)fputcsv($out,[$row['line'],$this->csvCell($row['data']['client_name']??''),$this->csvCell($this->importResultLabel($row)),$this->csvCell($row['action']??''),$this->csvCell(isset($row['match'])&&$row['match']?($row['match']['field'].'='.$row['match']['value']):''),$this->csvCell(implode('; ',$row['directors']??[])),(int)($row['placeholder_directors_created']??0),(int)($row['placeholder_directors_reused']??0),(int)($row['director_links_created']??0),(int)($row['directors_needing_details']??0),$this->csvCell($row['failure_stage']??''),$this->csvCell($row['database_state']??''),$this->csvCell($row['database_driver_code']??''),$this->csvCell($row['diagnostic_reference']??''),$this->csvCell(implode('; ',$row['warnings']??[])),$this->csvCell(implode('; ',$row['errors']??[]))],',','"','');
             fclose($out);exit;
         }
         catch(UserFacingException $e){$this->userFailure($request,$response,$e->getMessage());}

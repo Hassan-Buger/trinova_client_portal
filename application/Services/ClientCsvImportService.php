@@ -102,8 +102,13 @@ final class ClientCsvImportService
                 $row['result']='failed';
                 $row['failure_stage']=$stage;
                 $row['diagnostic_reference']=$reference;
+                if($e instanceof PDOException){
+                    $row['database_state']=(string)$e->getCode();
+                    $row['database_driver_code']=(string)($e->errorInfo[1]??'');
+                }
                 $message=$e instanceof UserFacingException?$e->getMessage():'A database operation failed';
-                $row['errors'][]=$message.' during '.$stage.'. Nothing from this row was saved. Reference '.$reference.'.';
+                $databaseState=!empty($row['database_state'])?' Database state '.$row['database_state'].'.':'';
+                $row['errors'][]=$message.' during '.$stage.'. Nothing from this row was saved.'.$databaseState.' Reference '.$reference.'.';
                 $report[]=$row;
             }
         }
@@ -203,8 +208,10 @@ final class ClientCsvImportService
     {
         $practice=$this->practiceKey();$existing=$this->findTrackedImport($fileHash,$contentHash);
         if($existing){
-            if($existing['status']==='completed'&&(int)($existing['total_rows']??0)>0&&(int)($existing['failed_count']??0)>=(int)$existing['total_rows']){
-                $retry=$this->db->prepare("UPDATE client_csv_imports SET file_hash=:file_hash,content_hash=:content_hash,original_filename=:filename,created_by_user_id=:user,draft_token=:token,status='pending',total_rows=:rows,created_count=0,updated_count=0,skipped_count=0,flagged_count=0,failed_count=0,safe_error=NULL,started_at=NULL,completed_at=NULL,report_json=NULL,deleted_at=NULL WHERE id=:id AND practice_key=:practice AND import_type='business_clients' AND status='completed' AND total_rows>0 AND failed_count>=total_rows");
+            $allRowsFailed=$existing['status']==='completed'&&(int)($existing['total_rows']??0)>0&&(int)($existing['failed_count']??0)>=(int)$existing['total_rows'];
+            $targetsRemoved=$existing['status']==='completed'&&$this->completedImportTargetsAreInactive($existing);
+            if($allRowsFailed||$targetsRemoved){
+                $retry=$this->db->prepare("UPDATE client_csv_imports SET file_hash=:file_hash,content_hash=:content_hash,original_filename=:filename,created_by_user_id=:user,draft_token=:token,status='pending',total_rows=:rows,created_count=0,updated_count=0,skipped_count=0,flagged_count=0,failed_count=0,safe_error=NULL,started_at=NULL,completed_at=NULL,report_json=NULL,deleted_at=NULL WHERE id=:id AND practice_key=:practice AND import_type='business_clients' AND status='completed'");
                 $retry->execute(['file_hash'=>$fileHash,'content_hash'=>$contentHash,'filename'=>$filename,'user'=>$userId?:null,'token'=>$token,'rows'=>$rows,'id'=>$existing['id'],'practice'=>$practice]);
                 if($retry->rowCount()>0)return ['duplicate'=>false,'record'=>['id'=>(int)$existing['id']]];
                 $existing=$this->findTrackedImport($fileHash,$contentHash);
@@ -234,6 +241,29 @@ final class ClientCsvImportService
             && (int)($record['created_by_user_id']??0)===$userId;
     }
 
+    private function completedImportTargetsAreInactive(array $record): bool
+    {
+        if (($record['status'] ?? '') !== 'completed') return false;
+        try {
+            $report = $this->decodeReport($record);
+        } catch (\Throwable $e) {
+            return false;
+        }
+
+        $entityIds = [];
+        foreach (($report['rows'] ?? []) as $row) {
+            if (!in_array(($row['result'] ?? ''), ['created', 'updated'], true)) continue;
+            $entityId = (int)($row['entity_id'] ?? 0);
+            if ($entityId > 0) $entityIds[$entityId] = $entityId;
+        }
+        if (!$entityIds) return false;
+
+        $placeholders = implode(',', array_fill(0, count($entityIds), '?'));
+        $stmt = $this->db->prepare("SELECT COUNT(*) FROM client_entities e JOIN clients c ON c.id=e.client_id JOIN users u ON u.id=c.user_id WHERE e.id IN ({$placeholders}) AND e.deleted_at IS NULL AND c.deleted_at IS NULL AND u.deleted_at IS NULL");
+        $stmt->execute(array_values($entityIds));
+        return (int)$stmt->fetchColumn() === 0;
+    }
+
     private function duplicateDetails(array $record): array
     {
         return ['id'=>(int)$record['id'],'status'=>(string)$record['status'],'filename'=>(string)$record['original_filename'],'imported_by'=>(string)($record['imported_by']??'Staff user'),'completed_at'=>$record['completed_at']??null,'total_rows'=>(int)$record['total_rows'],'created'=>(int)$record['created_count'],'updated'=>(int)$record['updated_count'],'flagged'=>(int)$record['flagged_count'],'report_url'=>$record['status']==='completed'?'/staff/clients/import/report/'.(int)$record['id']:null];
@@ -257,7 +287,8 @@ final class ClientCsvImportService
         if(($data['email']??'')!==''&&!$this->validEmail((string)$data['email']))$warnings[]='Email address format appears unusual and will be skipped; an internal pending account address will be used.';
         if(!$directors)$warnings[]='No director/contact names were supplied.';
         if($directors)$warnings[]='Director names will be linked as incomplete placeholders; full profiles will be imported later.';
-        foreach(['year_end'=>'Accounting year end','filing_deadline'=>'Filing deadline'] as $key=>$label){if(($data[$key]??'')!==''&&!$this->parseDate($data[$key]))$warnings[]="{$label} appears invalid or unsupported and will be skipped; the original remains in the import source data.";}
+        foreach(['year_end'=>'Accounting year end','filing_deadline'=>'Filing deadline','confirmation_statement_date'=>'Confirmation statement date'] as $key=>$label){if(($data[$key]??'')!==''&&!$this->parseDate($data[$key]))$warnings[]="{$label} appears invalid or unsupported and will be skipped; the original remains in the import source data.";}
+        if(($data['vat_return_frequency']??'')!==''&&!$this->validVatFrequency((string)$data['vat_return_frequency']))$warnings[]='VAT return frequency must be Quarterly or Monthly and will be skipped; the original remains in the import source data.';
         if(($data['vat_quarter']??'')!==''&&!$this->vatMonths($data['vat_quarter']))$warnings[]='VAT quarter format appears unusual and will be skipped; the original remains in the import source data.';
         $match=null;
         foreach(['company_number','utr','vat_number'] as $key){
@@ -289,17 +320,41 @@ final class ClientCsvImportService
             if(!$entity){throw new UserFacingException('A matched company no longer exists.');}
             $clientId=(int)$entity['client_id'];$userId=(int)$entity['user_id'];
             $this->commitStage='restoring_matched_company';
-            if(!empty($entity['client_deleted_at']))(new Client())->restore($clientId);
-            elseif(!empty($entity['user_deleted_at']))$this->db->prepare('UPDATE users SET deleted_at=NULL WHERE id=:id')->execute(['id'=>$userId]);
-            if(!empty($entity['entity_deleted_at'])&&empty($entity['client_deleted_at']))(new ClientEntity())->restore($entityId);
+            if(!empty($entity['client_deleted_at'])){
+                // A CSV row restores only the company it matched. Calling the
+                // broad Client::restore() here would also revive every stale
+                // entity previously attached to the client account.
+                $this->db->prepare('UPDATE clients SET deleted_at=NULL WHERE id=:id')->execute(['id'=>$clientId]);
+                $this->db->prepare('UPDATE users SET deleted_at=NULL WHERE id=:id')->execute(['id'=>$userId]);
+            }elseif(!empty($entity['user_deleted_at'])){
+                $this->db->prepare('UPDATE users SET deleted_at=NULL WHERE id=:id')->execute(['id'=>$userId]);
+            }
+            if(!empty($entity['entity_deleted_at']))(new ClientEntity())->restore($entityId);
+            $this->commitStage='encoding_company_attributes';
             $attrs=json_decode((string)($entity['attributes']??'{}'),true)?:[];
             foreach($this->businessAttributes($d) as $k=>$v)if($v['value']!=='')$attrs[$k]=$v;
-            $this->commitStage='updating_matched_company';
-            $this->db->prepare('UPDATE client_entities SET company_name=:name,company_number=CASE WHEN :number<>\'\' THEN :number2 ELSE company_number END,tax_reference=CASE WHEN :utr<>\'\' THEN :utr2 ELSE tax_reference END,attributes=:attrs WHERE id=:id')->execute(['name'=>$companyName,'number'=>$companyNumber,'number2'=>$companyNumber,'utr'=>$utr,'utr2'=>$utr,'attrs'=>json_encode($attrs,JSON_UNESCAPED_UNICODE|JSON_THROW_ON_ERROR),'id'=>$entityId]);
-            $this->db->prepare('UPDATE clients SET phone=CASE WHEN :phone<>\'\' THEN :phone2 ELSE phone END,address=CASE WHEN :address<>\'\' THEN :address2 ELSE address END,notes=CASE WHEN :notes<>\'\' THEN :notes2 ELSE notes END WHERE id=:id')->execute(['phone'=>$d['phone']??'','phone2'=>$d['phone']??'','address'=>$d['address']??'','address2'=>$d['address']??'','notes'=>$d['status_notes']??'','notes2'=>$d['status_notes']??'','id'=>$clientId]);
+            $encodedAttrs=json_encode($attrs,JSON_UNESCAPED_UNICODE|JSON_THROW_ON_ERROR);
+            $entityUpdates=['company_name=:name','attributes=:attrs'];
+            $entityParams=['name'=>$companyName,'attrs'=>$encodedAttrs,'id'=>$entityId];
+            if($companyNumber!==''){$entityUpdates[]='company_number=:company_number';$entityParams['company_number']=$companyNumber;}
+            if($utr!==''){$entityUpdates[]='tax_reference=:tax_reference';$entityParams['tax_reference']=$utr;}
+            $this->commitStage='updating_company_record';
+            $this->db->prepare('UPDATE client_entities SET '.implode(',',$entityUpdates).' WHERE id=:id')->execute($entityParams);
+
+            $clientUpdates=[];$clientParams=['id'=>$clientId];
+            foreach(['phone','address','status_notes'] as $field){
+                $value=trim((string)($d[$field]??''));if($value==='')continue;
+                $column=$field==='status_notes'?'notes':$field;$clientUpdates[]=$column.'=:'.$column;$clientParams[$column]=$value;
+            }
+            if($clientUpdates){$this->commitStage='updating_client_profile';$this->db->prepare('UPDATE clients SET '.implode(',',$clientUpdates).' WHERE id=:id')->execute($clientParams);}
+
+            $this->commitStage='checking_client_email';
             $updateEmail=$this->emailAvailableToUser($suppliedEmail,$userId)?$suppliedEmail:'';
             if($suppliedEmail!==''&&$updateEmail==='')$row['warnings'][]='The supplied email already belongs to another account, so the existing company account email was kept.';
-            $this->db->prepare('UPDATE users SET name=:name,email=CASE WHEN :email<>\'\' THEN :email2 ELSE email END WHERE id=:id')->execute(['name'=>$companyName,'email'=>$updateEmail,'email2'=>$updateEmail,'id'=>$userId]);
+            $userUpdates=['name=:name'];$userParams=['name'=>$companyName,'id'=>$userId];
+            if($updateEmail!==''){$userUpdates[]='email=:email';$userParams['email']=$updateEmail;}
+            $this->commitStage='updating_client_login';
+            $this->db->prepare('UPDATE users SET '.implode(',',$userUpdates).' WHERE id=:id')->execute($userParams);
         }else{
             $this->commitStage='resolving_client_account';
             $user=$this->db->prepare('SELECT u.id,u.role,u.deleted_at,c.id AS client_id,c.deleted_at AS client_deleted_at FROM users u LEFT JOIN clients c ON c.user_id=u.id WHERE u.email=:email LIMIT 1 FOR UPDATE');$user->execute(['email'=>$primaryEmail]);$existingUser=$user->fetch();
@@ -337,6 +392,7 @@ final class ClientCsvImportService
         foreach($row['directors'] as $i=>$name){$normalized=$this->normalizeName($name);if(isset($knownContacts[$normalized])){$placeholderReused++;continue;}$stmt=$this->db->prepare('INSERT IGNORE INTO entity_contacts(entity_id,user_id,name,email,phone,is_primary,needs_contact_details) VALUES(:entity,NULL,:name,NULL,NULL,:primary,1)');$stmt->execute(['entity'=>$entityId,'name'=>$name,'primary'=>$i===0?1:0]);if($stmt->rowCount()>0){$placeholderCount++;$knownContacts[$normalized]=true;}else $placeholderReused++;}
         $this->commitStage='creating_deadlines';
         if(($date=$this->parseDate($d['filing_deadline']??''))!=='' && $this->ensureDeadline($clientId,$entityId,ClientCsv::FILING_DEADLINE_TYPE,$date))$deadlines++;
+        if(($date=$this->parseDate($d['confirmation_statement_date']??''))!=='' && $this->ensureDeadline($clientId,$entityId,ClientCsv::CONFIRMATION_STATEMENT_DEADLINE_TYPE,$date))$deadlines++;
         if(($d['vat_quarter']??'')!=='' && ($date=$this->nextVatDeadline($d['vat_quarter'])) && $this->ensureDeadline($clientId,$entityId,ClientCsv::VAT_DEADLINE_TYPE,$date))$deadlines++;
         $this->commitStage='completed';
         $row['result']=$created?'created':'updated';$row['entity_id']=$entityId;$row['failure_stage']='';$row['diagnostic_reference']='';$row['company_accounts_created']=$companyAccountCreated;$row['placeholder_directors_created']=$placeholderCount;$row['placeholder_directors_reused']=$placeholderReused;$row['director_links_created']=$placeholderCount;$row['duplicate_director_links_skipped']=$placeholderReused;$row['director_names_detected']=count($row['directors']);$row['directors_needing_details']=count($row['directors']);$row['deadlines_created']=$deadlines;return $row;
@@ -347,12 +403,18 @@ final class ClientCsvImportService
         $sourceFields=is_array($data['_source_fields']??null)?$data['_source_fields']:[];
         $yearEnd=$this->parseDate((string)($data['year_end']??''));
         $filingDeadline=$this->parseDate((string)($data['filing_deadline']??''));
+        $confirmationStatementDate=$this->parseDate((string)($data['confirmation_statement_date']??''));
         $vatQuarter=$this->vatMonths((string)($data['vat_quarter']??''))?(string)$data['vat_quarter']:'';
+        $vatFrequency=$this->normalizeVatFrequency((string)($data['vat_return_frequency']??''));
         return [
             'vat_number'=>['label'=>'VAT registration number','value'=>$this->validVatNumber((string)($data['vat_number']??''))?trim((string)$data['vat_number']):''],
             'ct_utr'=>['label'=>'Corporation Tax UTR','value'=>$this->validUtr((string)($data['utr']??''))?(string)preg_replace('/\s+/','',(string)$data['utr']):''],
+            'paye_reference'=>['label'=>'PAYE reference','value'=>trim((string)($data['paye_reference']??''))],
+            'paye_office_number'=>['label'=>'PAYE office number','value'=>trim((string)($data['paye_office_number']??''))],
             'accounting_year_end'=>['label'=>'Accounting year end','value'=>$yearEnd],
             'filing_deadline_raw'=>['label'=>'Filing deadline','value'=>$filingDeadline],
+            'confirmation_statement_date'=>['label'=>'Confirmation statement date','value'=>$confirmationStatementDate],
+            'vat_return_frequency'=>['label'=>'VAT return frequency','value'=>$vatFrequency],
             'vat_quarter'=>['label'=>'VAT quarter pattern','value'=>$vatQuarter],
             'source_email'=>['label'=>'Email as supplied','value'=>$this->validEmail((string)($data['email']??''))?strtolower(trim((string)$data['email'])):''],
             'csv_source_data'=>['label'=>'Original CSV data','value'=>$sourceFields?json_encode($sourceFields,JSON_UNESCAPED_UNICODE|JSON_UNESCAPED_SLASHES|JSON_THROW_ON_ERROR):''],
@@ -372,11 +434,13 @@ final class ClientCsvImportService
     private function validCompanyNumber(string $v):bool{$v=trim($v);return $v!==''&&preg_match('/^[A-Za-z0-9]{6,10}$/',$v)===1;}
     private function validUtr(string $v):bool{return preg_match('/^\d{10}$/',preg_replace('/\s+/','',$v)??'')===1;}
     private function validVatNumber(string $v):bool{$v=trim($v);return $v!==''&&preg_match('/^(GB)?[0-9A-Za-z ]{8,14}$/i',$v)===1;}
+    private function validVatFrequency(string $v):bool{return in_array(strtolower(trim($v)),['quarterly','quarter','qtr','monthly','month'],true);}
+    private function normalizeVatFrequency(string $v):string{if(!$this->validVatFrequency($v))return '';return in_array(strtolower(trim($v)),['quarterly','quarter','qtr'],true)?'Quarterly':'Monthly';}
     private function validEmail(string $v):bool{return trim($v)!==''&&filter_var(trim($v),FILTER_VALIDATE_EMAIL)!==false;}
     private function internalEmail(string $companyName):string{$slug=preg_replace('/[^a-z0-9]/','',strtolower($companyName))?:'company';return 'client.'.$slug.'.'.bin2hex(random_bytes(6)).'@trinova.invalid';}
     private function emailAvailableToUser(string $email,int $userId):bool{if($email==='')return false;$stmt=$this->db->prepare('SELECT id FROM users WHERE email=:email AND id<>:id LIMIT 1');$stmt->execute(['email'=>$email,'id'=>$userId]);return !$stmt->fetchColumn();}
     private function diagnosticReference(int $importId,int $line):string{return 'CSV-'.$importId.'-'.$line.'-'.strtoupper(bin2hex(random_bytes(4)));}
-    private function safeStage(string $stage):string{return ['starting_row'=>'starting the row','loading_matched_company'=>'loading the matched company','restoring_matched_company'=>'restoring the matched company','updating_matched_company'=>'updating the matched company','resolving_client_account'=>'resolving the client account','repairing_client_profile'=>'repairing the client profile','restoring_client_account'=>'restoring the client account','creating_client_account'=>'creating the client account','creating_company'=>'creating the company','linking_company_owner'=>'linking the company owner','linking_directors'=>'linking directors','creating_deadlines'=>'creating deadlines','completed'=>'completing the row'][$stage]??'processing the row';}
+    private function safeStage(string $stage):string{return ['starting_row'=>'starting the row','loading_matched_company'=>'loading the matched company','restoring_matched_company'=>'restoring the matched company','encoding_company_attributes'=>'preparing company attributes','updating_company_record'=>'updating the company record','updating_client_profile'=>'updating the client profile','checking_client_email'=>'checking the client email','updating_client_login'=>'updating the client login','resolving_client_account'=>'resolving the client account','repairing_client_profile'=>'repairing the client profile','restoring_client_account'=>'restoring the client account','creating_client_account'=>'creating the client account','creating_company'=>'creating the company','linking_company_owner'=>'linking the company owner','linking_directors'=>'linking directors','creating_deadlines'=>'creating deadlines','completed'=>'completing the row'][$stage]??'processing the row';}
     private function parseDate(string $v):string{$v=trim($v);if($v==='')return '';$v=preg_replace('/^[A-Za-z]{3}\s+/','',$v);foreach(['!d M Y','!j M Y','!Y-m-d','!d/m/Y','!d-m-Y'] as $f){$d=\DateTimeImmutable::createFromFormat($f,$v,new \DateTimeZone('UTC'));if($d&&\DateTimeImmutable::getLastErrors()!==false&&\DateTimeImmutable::getLastErrors()['warning_count']===0&&\DateTimeImmutable::getLastErrors()['error_count']===0)return $d->format('Y-m-d');if($d&&\DateTimeImmutable::getLastErrors()===false)return $d->format('Y-m-d');}return '';}
     private function vatMonths(string $v):array{$map=['jan'=>1,'feb'=>2,'mar'=>3,'apr'=>4,'may'=>5,'jun'=>6,'jul'=>7,'aug'=>8,'sep'=>9,'oct'=>10,'nov'=>11,'dec'=>12];$parts=array_map(fn($p)=>strtolower(substr(trim($p),0,3)),explode('/',$v));if(count($parts)!==4)return [];$months=[];foreach($parts as $p){if(!isset($map[$p]))return [];$months[]=$map[$p];}sort($months);for($i=1;$i<4;$i++)if(($months[$i]-$months[$i-1])!==3)return [];return $months;}
     private function nextVatDeadline(string $pattern):?string{$months=$this->vatMonths($pattern);if(!$months)return null;$today=new \DateTimeImmutable('today',new \DateTimeZone('UTC'));foreach([$today->format('Y'),(string)((int)$today->format('Y')+1)] as $year)foreach($months as $month){$end=(new \DateTimeImmutable(sprintf('%s-%02d-01',$year,$month),new \DateTimeZone('UTC')))->modify('last day of this month');$due=$end->modify('+'.ClientCsv::VAT_DEADLINE_OFFSET_DAYS.' days');if($due>=$today)return $due->format('Y-m-d');}return null;}

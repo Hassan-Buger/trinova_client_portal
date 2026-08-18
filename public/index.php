@@ -11,15 +11,33 @@ ini_set('log_errors','1');
  */
 
 $appDir = dirname(__DIR__);
-if (file_exists($appDir . '/8493files/vendor/autoload.php')) {
-    require_once $appDir . '/8493files/vendor/autoload.php';
-    $basePath = $appDir . '/8493files';
-} elseif (file_exists($appDir . '/trinova_app/vendor/autoload.php')) {
-    require_once $appDir . '/trinova_app/vendor/autoload.php';
-    $basePath = $appDir . '/trinova_app';
-} else {
-    require_once $appDir . '/vendor/autoload.php';
+$autoloadFound = false;
+
+foreach ([$appDir . '/vendor/autoload.php', $appDir . '/8493files/vendor/autoload.php', $appDir . '/trinova_app/vendor/autoload.php'] as $autoloadFile) {
+    if (file_exists($autoloadFile)) {
+        require_once $autoloadFile;
+        $basePath = dirname($autoloadFile, 2);
+        $autoloadFound = true;
+        break;
+    }
+}
+
+if (!$autoloadFound) {
     $basePath = $appDir;
+    // Built-in PSR-4 autoloader fallback for Application\ namespace
+    spl_autoload_register(function ($class) use ($appDir) {
+        $prefix = 'Application\\';
+        $baseDir = $appDir . '/application/';
+        $len = strlen($prefix);
+        if (strncmp($prefix, $class, $len) !== 0) {
+            return;
+        }
+        $relativeClass = substr($class, $len);
+        $file = $baseDir . str_replace('\\', '/', $relativeClass) . '.php';
+        if (file_exists($file)) {
+            require_once $file;
+        }
+    });
 }
 
 use Application\Core\Application;
@@ -127,6 +145,8 @@ $app->router->group([
     $r->get('/clients', [StaffClientController::class, 'index']);
     $r->get('/clients/export', [StaffClientController::class, 'exportCsv']);
     $r->get('/clients/import', [StaffClientCsvController::class, 'index']);
+    $r->get('/clients/import/template', [StaffClientCsvController::class, 'template']);
+    $r->get('/clients/import-template', [StaffClientCsvController::class, 'template']);
     $r->post('/clients/import/upload', [StaffClientCsvController::class, 'upload'])->middleware([CsrfMiddleware::class]);
     $r->post('/clients/import/preview', [StaffClientCsvController::class, 'preview'])->middleware([CsrfMiddleware::class]);
     $r->post('/clients/import/commit', [StaffClientCsvController::class, 'commit'])->middleware([CsrfMiddleware::class]);

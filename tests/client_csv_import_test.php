@@ -48,6 +48,13 @@ expect($suppliedDirectorIndexes===[14,15,16,17,18],'The supplied repeated Direct
 $suppliedUnique=$uniqueHeaders->invoke($service,$suppliedHeaders);
 $suppliedMapping=ClientCsv::defaultMapping($suppliedUnique);
 expect(($suppliedMapping['client_name']??null)===0&&($suppliedMapping['company_number']??null)===1&&($suppliedMapping['directors']??null)===14,'The supplied company and director columns were not auto-mapped.');
+expect(($suppliedMapping['paye_reference']??null)===4&&($suppliedMapping['paye_office_number']??null)===5,'The supplied PAYE columns were not auto-mapped.');
+expect(($suppliedMapping['confirmation_statement_date']??null)===11&&($suppliedMapping['vat_return_frequency']??null)===12,'Confirmation-statement or VAT-frequency columns were not auto-mapped.');
+$numberedDirectorMapping=ClientCsv::defaultMapping(['Company Name','Director 1','Director 2','Director 3','Director 4','Director 5']);
+expect(($numberedDirectorMapping['directors']??null)===1,'Unique Director 1-5 headers did not map to the first consolidated director column.');
+$canonicalHeaders=['COMPANY NAME','Company Number','UTR','VAT NUMBER','PAYE REF NUMBER','PAYE OFFICE NUMBER','ADDRESS','EMAIL','PHONE','END OF YEAR DATE','ACCOUNTS DEADLINE','CONFIRMATION STATEMENT DATE','VAT RETURN FREQUENCY','VAT QUARTER PATTERN','Director 1','Director 2','Director 3','Director 4','Director 5'];
+$canonicalMapping=ClientCsv::defaultMapping($canonicalHeaders);
+foreach(['client_name','company_number','utr','vat_number','paye_reference','paye_office_number','address','email','phone','year_end','filing_deadline','confirmation_statement_date','vat_return_frequency','vat_quarter','directors'] as $field)expect(array_key_exists($field,$canonicalMapping),"Canonical template header did not map {$field}.");
 $suppliedRows=[
     ['Trinova Accounting','16469351','1490724673','516859262','','','42 London rd, Stroud, GL5 2AJ','office@example.invalid','01453 702030','31/05/20026','22/02/2027','21/05/2027','Qtr','july/oct/jan/april','Jane Dean','Kirsty Allen','Emma Dean','',''],
     ['Cotswold Garden Landscapes Limited','12303100','9138427415','381307996','','','113 Arrowsmith Drive, Stonehouse, GL10 2QS','landscapes@example.invalid','07833089296','30/11/2026','31/08/2026','6/11/26','Qtr','may/aug/nov/','Paul Tabb','','','',''],
@@ -63,6 +70,8 @@ foreach($suppliedRows as $index=>$values){
     $attributes=$reflection->getMethod('businessAttributes')->invoke($service,$data);
     expect(($attributes['ct_utr']['value']??'')===$values[2],"Supplied CSV row {$index} lost its valid UTR.");
     expect(($attributes['vat_number']['value']??'')===$values[3],"Supplied CSV row {$index} lost its valid VAT number.");
+    expect(($attributes['confirmation_statement_date']['value']??'')!=='',"Supplied CSV row {$index} lost its confirmation statement date.");
+    expect(($attributes['vat_return_frequency']['value']??'')==='Quarterly',"Supplied CSV row {$index} did not normalize its VAT frequency.");
     expect(str_contains((string)($attributes['csv_source_data']['value']??''),$values[0]),"Supplied CSV row {$index} did not retain its original source values.");
     if($index===0)expect(($attributes['accounting_year_end']['value']??'')===''&&($attributes['filing_deadline_raw']['value']??'')==='2027-02-22','The invalid five-digit year was not skipped independently of the valid filing deadline.');
     if($index===1)expect(($attributes['accounting_year_end']['value']??'')==='2026-11-30'&&($attributes['vat_quarter']['value']??'')==='','The valid year end or invalid VAT quarter was handled incorrectly.');
@@ -120,16 +129,34 @@ expect(str_contains($source,'VAT quarter format appears unusual and will be skip
 expect(str_contains($source,'Duplicates CSV row {$seen[$key][$id]} by {$key}; database matching will determine whether this company is created or updated.'),'Duplicate business identifiers still block otherwise importable rows.');
 expect(str_contains($source,"'accounting_year_end'=>['label'=>'Accounting year end','value'=>\$yearEnd]"),'Invalid accounting-year values are not skipped from canonical attributes.');
 expect(str_contains($source,"\$this->commitStage='repairing_client_profile'"),'An orphaned client login cannot be repaired during import.');
+expect(!str_contains($source,"if(!empty(\$entity['client_deleted_at']))(new Client())->restore(\$clientId)"),'Matched-company import still revives every stale entity on a deleted client account.');
+expect(str_contains($source,"UPDATE clients SET deleted_at=NULL WHERE id=:id")&&str_contains($source,"if(!empty(\$entity['entity_deleted_at']))(new ClientEntity())->restore(\$entityId)"),'Matched-company import does not restore only the selected client and entity records.');
 expect(str_contains($source,"\$row['diagnostic_reference']=\$reference"),'Technical row failures do not include a support reference.');
-expect(str_contains($source,"Nothing from this row was saved. Reference"),'Technical row failures are not reported safely.');
-expect(str_contains($source,'failed_count>=total_rows'),'A previously all-failed CSV cannot be retried under the warning-only validation policy.');
+expect(str_contains($source,"\$this->commitStage='updating_company_record'"),'Matched-company updates are not diagnosed at the company-record operation.');
+expect(str_contains($source,"\$row['database_state']=(string)\$e->getCode()"),'Database failures do not expose a safe SQLSTATE diagnostic.');
+expect(!str_contains($source,"company_number=CASE WHEN :number"),'Matched-company updates still use the fragile combined conditional statement.');
+expect(str_contains($source,"Nothing from this row was saved.")&&str_contains($source,"Reference '.\$reference"),'Technical row failures are not reported safely.');
+expect(str_contains($source,'$allRowsFailed=')&&str_contains($source,"(int)(\$existing['failed_count']??0)>=(int)\$existing['total_rows']"),'A previously all-failed CSV cannot be retried under the warning-only validation policy.');
+expect(str_contains($source,'completedImportTargetsAreInactive'),'A completed CSV cannot be retried after all of its imported targets are removed.');
+expect(str_contains($source,"['created', 'updated']"),'Retry target detection does not cover both newly created and matched companies.');
+expect(str_contains($source,'e.deleted_at IS NULL AND c.deleted_at IS NULL AND u.deleted_at IS NULL'),'CSV retry safety does not verify that all original company targets are inactive.');
+expect(str_contains($source,'$allRowsFailed||$targetsRemoved'),'Completed-import retry does not combine failed-import and removed-record recovery safely.');
 expect(str_contains($source,"(\$row['result'] ?? '') !== 'created'"),'Batch cleanup is not restricted to companies created by that import.');
 expect(str_contains($source,"practice_key=:practice AND import_type='business_clients' FOR UPDATE"),'Batch deletion is not tenant-scoped and transactionally locked.');
 expect(str_contains($source,"if (!empty(\$batch['deleted_at']))"),'Repeated batch deletion is not idempotent.');
 $controllerSource=file_get_contents(dirname(__DIR__).'/application/Controllers/Staff/ClientCsvController.php');
 $reportViewSource=file_get_contents(dirname(__DIR__).'/application/Views/staff/clients/import-report.php');
+$mappingViewSource=file_get_contents(dirname(__DIR__).'/application/Views/staff/clients/import.php');
+$previewViewSource=file_get_contents(dirname(__DIR__).'/application/Views/staff/clients/import-preview.php');
+$appJsSource=file_get_contents(dirname(__DIR__).'/public/assets/js/app.js');
 expect(str_contains($controllerSource,"input('import_id', 0)"),'The batch endpoint does not accept legacy import_id submissions.');
 expect(str_contains($reportViewSource,'name="batch_id"'),'The import report does not submit the batch identifier expected by the endpoint.');
+expect(!str_contains($mappingViewSource,'console.'),'The mapping page still exposes import diagnostics in the browser console.');
+expect(!str_contains($previewViewSource,'console.'),'The preview page still exposes import diagnostics in the browser console.');
+expect(!str_contains($reportViewSource,'console.'),'The report page still exposes import diagnostics in the browser console.');
+expect(!str_contains($appJsSource,'[Client CSV Import]')&&!str_contains($appJsSource,'TriNova Deployment'),'The portal JavaScript still exposes importer deployment diagnostics.');
+expect(str_contains($reportViewSource,'import-report-premium')&&str_contains($reportViewSource,'Company results'),'The import report is missing the premium client-facing results layout.');
+expect(!str_contains($reportViewSource,'Director placeholders')&&!str_contains($reportViewSource,'diagnostic_reference'),'The import report still exposes technical importer language.');
 expect(str_contains($controllerSource,"'/staff/trash?tab=batches'"),'Successful deletion does not redirect to the CSV batch history in Trash.');
 expect(!str_contains($controllerSource,"'Failed to delete batch.'"),'Batch deletion still hides every failure behind the old generic toast.');
 $databaseSql=file_get_contents(dirname(__DIR__).'/config/database.sql');
