@@ -24,6 +24,7 @@ class SchemaMigrator
             // Check if core 'users' table exists
             $stmt = $pdo->query("SHOW TABLES LIKE 'users'");
             $hasUsers = (bool)$stmt->fetchColumn();
+            $stmt->closeCursor();
 
             if (!$hasUsers) {
                 error_log('[TriNova SchemaMigrator] Fresh database detected. Importing base schema and seed data...');
@@ -33,6 +34,7 @@ class SchemaMigrator
                 // Check if user accounts exist in users table
                 $countStmt = $pdo->query("SELECT COUNT(*) FROM `users`");
                 $userCount = (int)$countStmt->fetchColumn();
+                $countStmt->closeCursor();
                 if ($userCount === 0) {
                     error_log('[TriNova SchemaMigrator] Empty users table detected. Seeding default accounts...');
                     self::importSqlFile($pdo, dirname(__DIR__, 2) . '/config/database.sql');
@@ -453,7 +455,9 @@ class SchemaMigrator
         try {
             $stmt = $pdo->prepare("SELECT 1 FROM information_schema.columns WHERE table_schema = DATABASE() AND table_name = :table AND column_name = :col");
             $stmt->execute(['table' => $table, 'col' => $column]);
-            if (!$stmt->fetchColumn()) {
+            $exists = (bool)$stmt->fetchColumn();
+            $stmt->closeCursor();
+            if (!$exists) {
                 $pdo->exec("ALTER TABLE `{$table}` ADD COLUMN `{$column}` {$definition}");
             }
         } catch (Throwable $e) {
@@ -466,7 +470,9 @@ class SchemaMigrator
         try {
             $stmt = $pdo->prepare("SELECT 1 FROM information_schema.statistics WHERE table_schema = DATABASE() AND table_name = :table AND index_name = :idx");
             $stmt->execute(['table' => $table, 'idx' => $indexName]);
-            if (!$stmt->fetchColumn()) {
+            $exists = (bool)$stmt->fetchColumn();
+            $stmt->closeCursor();
+            if (!$exists) {
                 $pdo->exec($sql);
             }
         } catch (Throwable $e) {
