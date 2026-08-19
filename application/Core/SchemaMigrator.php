@@ -444,7 +444,7 @@ class SchemaMigrator
     private static function addColumnIfMissing(PDO $pdo, string $table, string $column, string $definition): void
     {
         try {
-            $stmt = $pdo->prepare("SELECT 1 FROM information_schema.columns WHERE table_schema = DATABASE() AND table_name = :table AND column_name = :col");
+            $stmt = $pdo->prepare("SELECT 1 FROM information_schema.columns WHERE table_schema = DATABASE() AND LOWER(table_name) = LOWER(:table) AND LOWER(column_name) = LOWER(:col)");
             $stmt->execute(['table' => $table, 'col' => $column]);
             $exists = (bool)$stmt->fetchColumn();
             $stmt->closeCursor();
@@ -459,7 +459,7 @@ class SchemaMigrator
     private static function addIndexIfMissing(PDO $pdo, string $table, string $indexName, string $sql): void
     {
         try {
-            $stmt = $pdo->prepare("SELECT 1 FROM information_schema.statistics WHERE table_schema = DATABASE() AND table_name = :table AND index_name = :idx");
+            $stmt = $pdo->prepare("SELECT 1 FROM information_schema.statistics WHERE table_schema = DATABASE() AND LOWER(table_name) = LOWER(:table) AND LOWER(index_name) = LOWER(:idx)");
             $stmt->execute(['table' => $table, 'idx' => $indexName]);
             $exists = (bool)$stmt->fetchColumn();
             $stmt->closeCursor();

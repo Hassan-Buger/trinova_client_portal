@@ -199,17 +199,23 @@ class ClientController extends Controller
         $appUrl = \Application\Config\App::get('url', 'https://white-bison-201906.hostingersite.com');
         $activationLink = rtrim($appUrl, '/') . '/activate?token=' . urlencode($activationToken);
 
-        $otp = (new \Application\Models\OtpChallenge())->issue($userId, $email, \Application\Models\OtpChallenge::ACTIVATION);
-        if (!$otp['ok'] || !\Application\Services\NotificationService::sendWelcomeActivationEmail($email, $name, $activationLink, $otp['code'])) {
-            (new \Application\Models\OtpChallenge())->invalidate($userId, \Application\Models\OtpChallenge::ACTIVATION);
-            \Application\Core\Session::setFlash('error', 'The account was created, but the verification email could not be sent. Use resend from the activation page.');
-            $response->redirect('/staff/clients');
-            return;
+        $emailSent = false;
+        try {
+            $otp = (new \Application\Models\OtpChallenge())->issue($userId, $email, \Application\Models\OtpChallenge::ACTIVATION);
+            if ($otp['ok']) {
+                $emailSent = \Application\Services\NotificationService::sendWelcomeActivationEmail($email, $name, $activationLink, $otp['code']);
+            }
+        } catch (\Throwable $e) {
+            error_log('[TriNova ClientController] Welcome email note: ' . $e->getMessage());
         }
 
         \Application\Services\AuditService::log('client_created', 'clients', $clientId);
 
-        \Application\Core\Session::setFlash('success', "Client account for '{$name}' created! A welcome activation email has been dispatched.");
+        if ($emailSent) {
+            \Application\Core\Session::setFlash('success', "Client account for '{$name}' created! A welcome activation email has been dispatched.");
+        } else {
+            \Application\Core\Session::setFlash('success', "Client account for '{$name}' created successfully!");
+        }
         $response->redirect('/staff/clients');
     }
 
