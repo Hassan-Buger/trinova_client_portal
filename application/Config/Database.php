@@ -27,13 +27,14 @@ class Database
         $urlConfig = [];
 
         if ($dbUrl) {
-            $parsed = parse_url($dbUrl);
+            $cleanDbUrl = trim($dbUrl, " \t\n\r\0\x0B)\"';");
+            $parsed = parse_url($cleanDbUrl);
             if (is_array($parsed)) {
                 if (!empty($parsed['host'])) $urlConfig['host'] = $parsed['host'];
                 if (!empty($parsed['port'])) $urlConfig['port'] = (string)$parsed['port'];
                 if (!empty($parsed['user'])) $urlConfig['username'] = urldecode($parsed['user']);
                 if (isset($parsed['pass']))  $urlConfig['password'] = urldecode($parsed['pass']);
-                if (!empty($parsed['path'])) $urlConfig['dbname'] = ltrim($parsed['path'], '/');
+                if (!empty($parsed['path'])) $urlConfig['dbname'] = trim(ltrim($parsed['path'], '/'), " \t\n\r\0\x0B)\"';");
             }
         }
 
