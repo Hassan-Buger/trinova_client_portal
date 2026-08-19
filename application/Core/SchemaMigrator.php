@@ -30,22 +30,10 @@ class SchemaMigrator
                 error_log('[TriNova SchemaMigrator] Fresh database detected. Importing base schema and seed data...');
                 self::importSqlFile($pdo, dirname(__DIR__, 2) . '/config/database.sql');
                 error_log('[TriNova SchemaMigrator] Base schema and initial seed data imported successfully.');
-            } else {
-                // Check if user accounts exist in users table
-                $countStmt = $pdo->query("SELECT COUNT(*) FROM `users`");
-                $userCount = (int)$countStmt->fetchColumn();
-                $countStmt->closeCursor();
-                if ($userCount === 0) {
-                    error_log('[TriNova SchemaMigrator] Empty users table detected. Seeding default accounts...');
-                    self::importSqlFile($pdo, dirname(__DIR__, 2) . '/config/database.sql');
-                }
             }
 
             // Ensure all required tables, columns, indexes, and constraints exist idempotently
             self::ensureCompleteSchema($pdo);
-
-            // Apply any additional migration files cleanly
-            self::applyIncrementalMigrations($pdo);
 
             return true;
         } catch (Throwable $e) {
