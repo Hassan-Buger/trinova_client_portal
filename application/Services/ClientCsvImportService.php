@@ -143,12 +143,21 @@ final class ClientCsvImportService
     /** @return array{0:array,1:int} */
     private function findHeaders($handle): array
     {
+        $this->stripBom($handle);
         for($line=1;$line<=10 && ($candidate=fgetcsv($handle, null, ',', '"', ''))!==false;$line++){
             $candidate=array_map(fn($value)=>$this->cleanCsvValue((string)$value),$candidate);
             $mapping=ClientCsv::defaultMapping($candidate);
             if(isset($mapping['client_name'])&&count($mapping)>=2)return [$candidate,$line];
         }
         throw new UserFacingException('The CSV header could not be recognized. Ensure the Client Name and expected business columns are present.');
+    }
+
+    private function stripBom($handle): void
+    {
+        $bom = fread($handle, 3);
+        if ($bom !== "\xEF\xBB\xBF") {
+            rewind($handle);
+        }
     }
 
     private function uniqueHeaders(array $headers): array
@@ -193,7 +202,11 @@ final class ClientCsvImportService
     private function cleanCsvValue(string $value): string
     {
         $value=str_replace(["\xC2\xA0","\xEF\xBB\xBF"],[' ',''],$value);
-        return trim($value);
+        $value=trim($value);
+        if (strlen($value) >= 2 && (($value[0] === '"' && $value[strlen($value) - 1] === '"') || ($value[0] === "'" && $value[strlen($value) - 1] === "'"))) {
+            $value = trim(substr($value, 1, -1));
+        }
+        return $value;
     }
 
     private function contentHash(array $headers,array $rows): string

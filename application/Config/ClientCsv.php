@@ -51,6 +51,7 @@ final class ClientCsv
 
     private static function normalize(string $value): string
     {
-        return preg_replace('/\s+/',' ',strtolower(trim($value," \t\n\r\0\x0B\xEF\xBB\xBF"))) ?? '';
+        $cleaned = trim($value, " \t\n\r\0\x0B\xEF\xBB\xBF\"'");
+        return preg_replace('/\s+/u', ' ', strtolower($cleaned)) ?? '';
     }
 }
