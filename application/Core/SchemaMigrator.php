@@ -73,6 +73,150 @@ class SchemaMigrator
 
     private static function ensureTables(PDO $pdo): void
     {
+        // users
+        $pdo->exec("CREATE TABLE IF NOT EXISTS `users` (
+            `id` INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+            `name` VARCHAR(100) NOT NULL,
+            `email` VARCHAR(150) NOT NULL UNIQUE,
+            `password_hash` VARCHAR(255) NOT NULL,
+            `role` ENUM('client', 'staff') NOT NULL DEFAULT 'client',
+            `status` ENUM('active', 'suspended', 'pending_activation') NOT NULL DEFAULT 'active',
+            `reset_token` VARCHAR(255) NULL,
+            `reset_token_expires_at` DATETIME NULL,
+            `verification_code` VARCHAR(6) NULL,
+            `verification_code_expires_at` DATETIME NULL,
+            `activation_token` VARCHAR(255) NULL,
+            `failed_login_attempts` INT UNSIGNED NOT NULL DEFAULT 0,
+            `locked_until` DATETIME NULL,
+            `created_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            `last_login_at` DATETIME NULL,
+            `deleted_at` DATETIME NULL,
+            INDEX `idx_users_role_status` (`role`, `status`),
+            INDEX `idx_users_deleted_at` (`deleted_at`)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
+
+        // clients
+        $pdo->exec("CREATE TABLE IF NOT EXISTS `clients` (
+            `id` INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+            `user_id` INT UNSIGNED NOT NULL UNIQUE,
+            `phone` VARCHAR(30) NULL,
+            `address` TEXT NULL,
+            `aml_status` ENUM('Complete', 'Action Required') NOT NULL DEFAULT 'Action Required',
+            `notes` TEXT NULL,
+            `created_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            `deleted_at` DATETIME NULL,
+            INDEX `idx_clients_deleted_at` (`deleted_at`)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
+
+        // client_entities
+        $pdo->exec("CREATE TABLE IF NOT EXISTS `client_entities` (
+            `id` INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+            `client_id` INT UNSIGNED NOT NULL,
+            `company_name` VARCHAR(150) NOT NULL,
+            `entity_type` VARCHAR(80) NOT NULL DEFAULT 'Other',
+            `entity_scope` ENUM('company','personal') NOT NULL DEFAULT 'company',
+            `company_number` VARCHAR(30) NULL,
+            `tax_reference` VARCHAR(50) NULL,
+            `attributes` JSON NULL,
+            `created_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            `deleted_at` DATETIME NULL,
+            INDEX `idx_entities_client` (`client_id`),
+            INDEX `idx_entities_company_number` (`company_number`),
+            INDEX `idx_entities_tax_reference` (`tax_reference`),
+            INDEX `idx_entities_deleted_at` (`deleted_at`)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
+
+        // documents
+        $pdo->exec("CREATE TABLE IF NOT EXISTS `documents` (
+            `id` INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+            `client_id` INT UNSIGNED NOT NULL,
+            `entity_id` INT UNSIGNED NULL,
+            `scope` ENUM('company','personal') NOT NULL DEFAULT 'company',
+            `uploaded_by_user_id` INT UNSIGNED NOT NULL,
+            `direction` ENUM('client_upload', 'from_trinova') NOT NULL,
+            `filename` VARCHAR(255) NOT NULL,
+            `stored_path` VARCHAR(255) NOT NULL,
+            `description` TEXT NULL,
+            `status` VARCHAR(50) NOT NULL DEFAULT 'Ready',
+            `created_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            `deleted_at` DATETIME NULL,
+            INDEX `idx_docs_client_dir` (`client_id`, `direction`),
+            INDEX `idx_docs_deleted_at` (`deleted_at`)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
+
+        // document_requests
+        $pdo->exec("CREATE TABLE IF NOT EXISTS `document_requests` (
+            `id` INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+            `client_id` INT UNSIGNED NOT NULL,
+            `entity_id` INT UNSIGNED NULL,
+            `scope` ENUM('company','personal') NOT NULL DEFAULT 'company',
+            `created_by_user_id` INT UNSIGNED NOT NULL,
+            `title` VARCHAR(200) NOT NULL,
+            `description` TEXT NULL,
+            `due_date` DATE NOT NULL,
+            `status` ENUM('Awaiting Client', 'Uploaded', 'Under Review', 'Completed') NOT NULL DEFAULT 'Awaiting Client',
+            `created_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            `deleted_at` DATETIME NULL,
+            INDEX `idx_reqs_client_status` (`client_id`, `status`),
+            INDEX `idx_reqs_deleted_at` (`deleted_at`)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
+
+        // messages
+        $pdo->exec("CREATE TABLE IF NOT EXISTS `messages` (
+            `id` INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+            `client_id` INT UNSIGNED NOT NULL,
+            `entity_id` INT UNSIGNED NULL,
+            `scope` ENUM('company','personal') NOT NULL DEFAULT 'company',
+            `sender_id` INT UNSIGNED NOT NULL,
+            `thread_id` INT UNSIGNED NULL,
+            `body` TEXT NOT NULL,
+            `read_at` DATETIME NULL,
+            `created_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            `deleted_at` DATETIME NULL,
+            INDEX `idx_msg_client_read` (`client_id`, `read_at`),
+            INDEX `idx_msg_deleted_at` (`deleted_at`)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
+
+        // deadlines
+        $pdo->exec("CREATE TABLE IF NOT EXISTS `deadlines` (
+            `id` INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+            `client_id` INT UNSIGNED NOT NULL,
+            `entity_id` INT UNSIGNED NULL,
+            `scope` ENUM('company','personal') NOT NULL DEFAULT 'company',
+            `type` VARCHAR(100) NOT NULL,
+            `due_date` DATE NOT NULL,
+            `status` ENUM('Pending', 'Overdue', 'Completed') NOT NULL DEFAULT 'Pending',
+            `created_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            `deleted_at` DATETIME NULL,
+            INDEX `idx_deadlines_client_date` (`client_id`, `due_date`),
+            INDEX `idx_deadlines_deleted_at` (`deleted_at`)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
+
+        // meetings
+        $pdo->exec("CREATE TABLE IF NOT EXISTS `meetings` (
+            `id` INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+            `client_id` INT UNSIGNED NOT NULL,
+            `type` ENUM('existing_client_meeting', 'telephone_call') NOT NULL,
+            `external_booking_reference` VARCHAR(100) NULL,
+            `created_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            `deleted_at` DATETIME NULL,
+            INDEX `idx_meetings_deleted_at` (`deleted_at`)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
+
+        // audit_log
+        $pdo->exec("CREATE TABLE IF NOT EXISTS `audit_log` (
+            `id` INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+            `user_id` INT UNSIGNED NULL,
+            `action_type` VARCHAR(50) NOT NULL,
+            `target_type` VARCHAR(50) NOT NULL,
+            `target_id` INT UNSIGNED NULL,
+            `import_metadata` JSON NULL,
+            `ip_address` VARCHAR(45) NOT NULL,
+            `created_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            INDEX `idx_audit_user_action` (`user_id`, `action_type`),
+            INDEX `idx_audit_created` (`created_at`)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
+
         // otp_challenges
         $pdo->exec("CREATE TABLE IF NOT EXISTS `otp_challenges` (
             `id` BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
@@ -253,6 +397,17 @@ class SchemaMigrator
     private static function ensureDataIntegrity(PDO $pdo): void
     {
         try {
+            // Ensure default staff and test client accounts exist
+            $pdo->exec("INSERT IGNORE INTO `users` (`id`, `name`, `email`, `password_hash`, `role`, `status`) VALUES
+                (1, 'Test Staff One', 'staff.one@example.invalid', '$2y$12$uUgV4QcXGo9b9eOEO3/rmuHsKgbwXBm06PfvEgIchptJEsOTFv4ee', 'staff', 'active'),
+                (2, 'Test Staff Two', 'staff.two@example.invalid', '$2y$12$uUgV4QcXGo9b9eOEO3/rmuHsKgbwXBm06PfvEgIchptJEsOTFv4ee', 'staff', 'active'),
+                (3, 'Test Staff Three', 'staff.three@example.invalid', '$2y$12$uUgV4QcXGo9b9eOEO3/rmuHsKgbwXBm06PfvEgIchptJEsOTFv4ee', 'staff', 'active'),
+                (4, 'Test Staff Four', 'staff.four@example.invalid', '$2y$12$uUgV4QcXGo9b9eOEO3/rmuHsKgbwXBm06PfvEgIchptJEsOTFv4ee', 'staff', 'active'),
+                (5, 'Test Client Alpha', 'test.client.alpha@example.invalid', '$2y$12$uUgV4QcXGo9b9eOEO3/rmuHsKgbwXBm06PfvEgIchptJEsOTFv4ee', 'client', 'active')");
+
+            $pdo->exec("INSERT IGNORE INTO `clients` (`id`, `user_id`, `phone`, `address`, `aml_status`, `notes`) VALUES
+                (1, 5, '07700 900000', '1 Example Street, Exampletown EX1 1AA', 'Complete', 'Fictional test client record. Use for non-production testing only.')");
+
             // Update entity_scope for existing client entities if personal/individual keywords match
             $pdo->exec("UPDATE `client_entities` SET `entity_scope` = CASE WHEN LOWER(`entity_type`) LIKE '%personal%' OR LOWER(`entity_type`) LIKE '%individual%' THEN 'personal' ELSE 'company' END WHERE `entity_scope` IS NULL OR `entity_scope` = ''");
 
