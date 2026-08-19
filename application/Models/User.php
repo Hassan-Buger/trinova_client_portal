@@ -129,14 +129,15 @@ class User extends Model
 
     public function create(array $data): int
     {
+        $passwordHash = $data['password_hash'] ?? $data['password'] ?? '';
         $stmt = $this->db->prepare("
-            INSERT INTO users (name, email, password_hash, role, status)
-            VALUES (:name, :email, :password_hash, :role, :status)
+            INSERT INTO users (name, email, password_hash, role, status, created_at)
+            VALUES (:name, :email, :password_hash, :role, :status, NOW())
         ");
         $stmt->execute([
             'name'          => $data['name'],
-            'email'         => $data['email'],
-            'password_hash' => $data['password_hash'],
+            'email'         => strtolower(trim((string)$data['email'])),
+            'password_hash' => $passwordHash,
             'role'          => $data['role'] ?? 'client',
             'status'        => $data['status'] ?? 'active',
         ]);

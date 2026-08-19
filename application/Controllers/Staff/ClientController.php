@@ -149,6 +149,10 @@ class ClientController extends Controller
         $aml     = trim($body['aml_status'] ?? 'Action Required');
 
         if (empty($name) || empty($email)) {
+            if ($request->isAjax()) {
+                $response->json(['success' => false, 'message' => 'Client name and email are required.'], 422);
+                return;
+            }
             \Application\Core\Session::setFlash('error', 'Client name and email are required.');
             $response->redirect('/staff/clients');
             return;
@@ -156,6 +160,10 @@ class ClientController extends Controller
 
         $userModel = new \Application\Models\User();
         if ($userModel->findByEmail($email)) {
+            if ($request->isAjax()) {
+                $response->json(['success' => false, 'message' => "User email '{$email}' already registered."], 409);
+                return;
+            }
             \Application\Core\Session::setFlash('error', "User email '{$email}' already registered.");
             $response->redirect('/staff/clients');
             return;
@@ -166,7 +174,7 @@ class ClientController extends Controller
         $userId = $userModel->create([
             'name'          => $name,
             'email'         => $email,
-            'password'      => password_hash($passwordToHash, PASSWORD_BCRYPT),
+            'password_hash' => password_hash($passwordToHash, PASSWORD_BCRYPT),
             'role'          => 'client',
             'status'        => $customPass !== '' ? 'active' : 'pending_activation',
         ]);
@@ -211,11 +219,17 @@ class ClientController extends Controller
 
         \Application\Services\AuditService::log('client_created', 'clients', $clientId);
 
+        $msg = "Client account for '{$name}' created successfully!";
         if ($emailSent) {
-            \Application\Core\Session::setFlash('success', "Client account for '{$name}' created! A welcome activation email has been dispatched.");
-        } else {
-            \Application\Core\Session::setFlash('success', "Client account for '{$name}' created successfully!");
+            $msg = "Client account for '{$name}' created! A welcome activation email has been dispatched.";
         }
+
+        if ($request->isAjax()) {
+            $response->json(['success' => true, 'message' => $msg, 'redirect' => '/staff/clients']);
+            return;
+        }
+
+        \Application\Core\Session::setFlash('success', $msg);
         $response->redirect('/staff/clients');
     }
 
