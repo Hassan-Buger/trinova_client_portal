@@ -384,6 +384,9 @@ class SchemaMigrator
         }
     }
 
+    private static function ensureDataIntegrity(PDO $pdo): void
+    {
+        try {
             // Ensure default staff and test client accounts exist with valid password hash ('password123')
             $defaultHash = '$2y$12$uUgV4QcXGo9b9eOEO3/rmuHsKgbwXBm06PfvEgIchptJEsOTFv4ee';
             $pdo->exec("INSERT INTO `users` (`id`, `name`, `email`, `password_hash`, `role`, `status`) VALUES
