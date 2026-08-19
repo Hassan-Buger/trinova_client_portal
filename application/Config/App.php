@@ -6,10 +6,20 @@ class App
 {
     public static function get(string $key, mixed $default = null): mixed
     {
+        $autoUrl = 'http://localhost';
+        if (!empty($_SERVER['HTTP_HOST'])) {
+            $proto = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') || ($_SERVER['SERVER_PORT'] ?? 80) == 443 || (isset($_SERVER['HTTP_X_FORWARDED_PROTO']) && $_SERVER['HTTP_X_FORWARDED_PROTO'] === 'https') ? 'https://' : 'http://';
+            $autoUrl = $proto . $_SERVER['HTTP_HOST'];
+        } elseif (!empty($_ENV['RAILWAY_PUBLIC_DOMAIN'])) {
+            $autoUrl = 'https://' . $_ENV['RAILWAY_PUBLIC_DOMAIN'];
+        } elseif (!empty($_ENV['RAILWAY_STATIC_URL'])) {
+            $autoUrl = 'https://' . $_ENV['RAILWAY_STATIC_URL'];
+        }
+
         $config = [
             'name' => 'TriNova Accounting',
-            'url' => $_ENV['APP_URL'] ?? 'https://white-bison-201906.hostingersite.com/',
-            'env' => $_ENV['APP_ENV'] ?? 'local',
+            'url' => rtrim($_ENV['APP_URL'] ?? $autoUrl, '/') . '/',
+            'env' => $_ENV['APP_ENV'] ?? (isset($_ENV['RAILWAY_ENVIRONMENT']) ? 'production' : 'local'),
             'debug' => ($_ENV['APP_DEBUG'] ?? 'false') === 'true',
             'secret' => $_ENV['APP_SECRET'] ?? 'trinova_default_secret_key_32bytes!',
             'session_timeout' => 900, // 15 minutes session inactivity timeout in seconds
