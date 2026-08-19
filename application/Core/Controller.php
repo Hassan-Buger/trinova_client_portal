@@ -14,7 +14,7 @@ abstract class Controller
         }
 
         ob_start();
-        require_once $viewFile;
+        require $viewFile;
         $content = ob_get_clean();
 
         // AJAX navigation is an opt-in enhancement. Normal requests still render
@@ -35,7 +35,7 @@ abstract class Controller
 
         $layoutFile = dirname(__DIR__) . "/Views/layouts/{$layout}.php";
         if (file_exists($layoutFile)) {
-            require_once $layoutFile;
+            require $layoutFile;
         } else {
             echo $content;
         }
