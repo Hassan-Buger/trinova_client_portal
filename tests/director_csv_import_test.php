@@ -1,6 +1,18 @@
 <?php
 declare(strict_types=1);
-require dirname(__DIR__).'/vendor/autoload.php';
+$appDir = dirname(__DIR__);
+if (file_exists($appDir . '/vendor/autoload.php')) {
+    require_once $appDir . '/vendor/autoload.php';
+} else {
+    spl_autoload_register(function ($class) use ($appDir) {
+        $prefix = 'Application\\';
+        $baseDir = $appDir . '/application/';
+        $len = strlen($prefix);
+        if (strncmp($prefix, $class, $len) !== 0) return;
+        $file = $baseDir . str_replace('\\', '/', substr($class, $len)) . '.php';
+        if (file_exists($file)) require_once $file;
+    });
+}
 
 use Application\Config\DirectorCsv;
 use Application\Services\DirectorCsvImportService;

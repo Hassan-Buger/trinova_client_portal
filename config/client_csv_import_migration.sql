@@ -24,18 +24,24 @@ SET @ddl = IF(
   'SELECT 1',
   'ALTER TABLE audit_log ADD COLUMN import_metadata JSON NULL AFTER target_id'
 );
-PREPARE trinova_stmt FROM @ddl; EXECUTE trinova_stmt; DEALLOCATE PREPARE trinova_stmt;
+PREPARE trinova_stmt FROM @ddl;
+EXECUTE trinova_stmt;
+DEALLOCATE PREPARE trinova_stmt;
 
 SET @ddl = IF(
   EXISTS(SELECT 1 FROM information_schema.statistics WHERE table_schema=DATABASE() AND table_name='client_entities' AND index_name='idx_entities_company_number'),
   'SELECT 1',
   'ALTER TABLE client_entities ADD INDEX idx_entities_company_number (company_number)'
 );
-PREPARE trinova_stmt FROM @ddl; EXECUTE trinova_stmt; DEALLOCATE PREPARE trinova_stmt;
+PREPARE trinova_stmt FROM @ddl;
+EXECUTE trinova_stmt;
+DEALLOCATE PREPARE trinova_stmt;
 
 SET @ddl = IF(
   EXISTS(SELECT 1 FROM information_schema.statistics WHERE table_schema=DATABASE() AND table_name='client_entities' AND index_name='idx_entities_tax_reference'),
   'SELECT 1',
   'ALTER TABLE client_entities ADD INDEX idx_entities_tax_reference (tax_reference)'
 );
-PREPARE trinova_stmt FROM @ddl; EXECUTE trinova_stmt; DEALLOCATE PREPARE trinova_stmt;
+PREPARE trinova_stmt FROM @ddl;
+EXECUTE trinova_stmt;
+DEALLOCATE PREPARE trinova_stmt;
