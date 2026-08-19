@@ -38,12 +38,13 @@ class Database
             }
         }
 
+        // Prioritize full connection URL (e.g. Railway MYSQL_URL / DATABASE_URL), then specific Railway vars, then standard DB vars
         return [
-            'host'     => self::env('DB_HOST', 'MYSQL_HOST', 'MYSQLHOST', 'DB_HOSTNAME') ?? $urlConfig['host'] ?? '127.0.0.1',
-            'port'     => self::env('DB_PORT', 'MYSQL_PORT', 'MYSQLPORT') ?? $urlConfig['port'] ?? '3306',
-            'dbname'   => self::env('DB_NAME', 'DB_DATABASE', 'MYSQL_DATABASE', 'MYSQLDATABASE') ?? $urlConfig['dbname'] ?? 'trinova_portal',
-            'username' => self::env('DB_USER', 'DB_USERNAME', 'MYSQL_USER', 'MYSQLUSER') ?? $urlConfig['username'] ?? 'root',
-            'password' => self::env('DB_PASS', 'DB_PASSWORD', 'MYSQL_PASSWORD', 'MYSQLPASSWORD') ?? $urlConfig['password'] ?? '',
+            'host'     => $urlConfig['host'] ?? self::env('MYSQLHOST', 'MYSQL_HOST', 'DB_HOST', 'DB_HOSTNAME') ?? '127.0.0.1',
+            'port'     => $urlConfig['port'] ?? self::env('MYSQLPORT', 'MYSQL_PORT', 'DB_PORT') ?? '3306',
+            'dbname'   => $urlConfig['dbname'] ?? self::env('MYSQLDATABASE', 'MYSQL_DATABASE', 'DB_NAME', 'DB_DATABASE') ?? 'trinova_portal',
+            'username' => $urlConfig['username'] ?? self::env('MYSQLUSER', 'MYSQL_USER', 'DB_USER', 'DB_USERNAME') ?? 'root',
+            'password' => $urlConfig['password'] ?? self::env('MYSQLPASSWORD', 'MYSQL_PASSWORD', 'DB_PASS', 'DB_PASSWORD') ?? '',
             'charset'  => 'utf8mb4',
         ];
     }
