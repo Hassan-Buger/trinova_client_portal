@@ -50,16 +50,17 @@ $summaryItems = [
 ?>
 
 <style>
-    .client-profile{--cp-ink:#17332d;--cp-muted:#687c76;--cp-teal:#0d9488;--cp-teal-dark:#08766e;--cp-navy:#41556f;--cp-line:#e0ebe7;--cp-soft:#f5f9f7;max-width:1240px;color:var(--cp-ink)}
+    :root, .client-profile, .cp-modal{--cp-ink:#17332d;--cp-muted:#687c76;--cp-teal:#0d9488;--cp-teal-dark:#08766e;--cp-navy:#41556f;--cp-line:#e0ebe7;--cp-soft:#f5f9f7;--cp-border:#dce8e4}
+    .client-profile{max-width:1240px;color:var(--cp-ink)}
     .cp-toast{display:none;margin-bottom:16px;padding:14px 18px;border-radius:15px;background:#e4f5ed;color:#287a52;font-size:13px;font-weight:750;box-shadow:0 12px 28px -22px rgba(16,54,45,.5)}
     .cp-hero{position:relative;overflow:hidden;padding:28px 30px;border:1px solid #d8e8e4;border-radius:27px;background:linear-gradient(135deg,#fff 0%,#f4faf8 64%,#e8f5f2 100%);box-shadow:0 24px 58px -46px rgba(10,72,62,.72)}
     .cp-hero::after{position:absolute;right:-90px;top:-155px;width:310px;height:310px;border:58px solid rgba(13,148,136,.06);border-radius:50%;content:"";pointer-events:none}
-    .cp-hero__top{position:relative;z-index:1;display:flex;align-items:center;justify-content:space-between;gap:24px}
+    .cp-hero__top{position:relative;z-index:20;display:flex;align-items:center;justify-content:space-between;gap:24px}
     .cp-identity{display:flex;align-items:center;gap:17px;min-width:0}.cp-avatar{display:grid;flex:0 0 58px;width:58px;height:58px;place-items:center;border-radius:18px;background:var(--cp-navy);color:#fff;font-size:19px;font-weight:800;letter-spacing:.02em;box-shadow:0 14px 28px -18px rgba(65,85,111,.85)}
     .cp-name-row{display:flex;align-items:center;gap:10px;flex-wrap:wrap}.cp-name-row h2{margin:0;font-size:clamp(23px,2.5vw,31px);line-height:1.15;letter-spacing:-.035em}.cp-active{display:inline-flex;align-items:center;gap:6px;padding:5px 10px;border-radius:999px;background:#e3f5ed;color:#247c59;font-size:10px;font-weight:850;text-transform:uppercase;letter-spacing:.04em}.cp-active::before{width:6px;height:6px;border-radius:50%;background:#2e9b6e;content:""}.cp-contact{display:flex;gap:8px;flex-wrap:wrap;margin-top:7px;color:var(--cp-muted);font-size:13px}.cp-contact a{color:inherit}.cp-contact a:hover{color:var(--cp-teal-dark)}.cp-contact__divider{color:#b2bfbb}
-    .cp-actions{display:flex;align-items:center;gap:9px;flex:0 0 auto}.cp-button{display:inline-flex;min-height:43px;align-items:center;justify-content:center;padding:10px 16px;border:1px solid transparent;border-radius:13px;font:inherit;font-size:12px;font-weight:800;cursor:pointer;text-decoration:none}.cp-button--primary{background:var(--cp-teal);color:#fff;box-shadow:0 13px 24px -16px rgba(13,148,136,.9)}.cp-button--primary:hover{background:var(--cp-teal-dark);color:#fff}.cp-button--soft{border-color:#d9e6e2;background:rgba(255,255,255,.82);color:#48635c}.cp-button--soft:hover{background:#fff;color:var(--cp-teal-dark)}
-    .cp-menu{position:relative}.cp-menu summary{list-style:none}.cp-menu summary::-webkit-details-marker{display:none}.cp-menu__panel{position:absolute;right:0;top:50px;z-index:25;width:210px;padding:8px;border:1px solid var(--cp-line);border-radius:14px;background:#fff;box-shadow:0 20px 45px -25px rgba(16,54,45,.55)}.cp-menu__panel a,.cp-menu__panel button{display:block;width:100%;padding:10px 11px;border:0;border-radius:9px;background:transparent;font:inherit;font-size:12px;font-weight:750;text-align:left;cursor:pointer}.cp-menu__panel a:hover{background:#edf7f4}.cp-menu__danger{color:#b42318}.cp-menu__danger:hover{background:#fff1f0!important}
-    .cp-summary{position:relative;z-index:1;display:grid;grid-template-columns:repeat(4,minmax(0,1fr));margin-top:24px;border:1px solid rgba(216,232,228,.95);border-radius:17px;background:rgba(255,255,255,.78)}.cp-summary__item{padding:15px 18px}.cp-summary__item+.cp-summary__item{border-left:1px solid var(--cp-line)}.cp-summary__item strong,.cp-summary__item span{display:block}.cp-summary__item strong{font-size:20px;letter-spacing:-.03em}.cp-summary__item span{margin-top:3px;color:var(--cp-muted);font-size:10px;font-weight:750;text-transform:uppercase;letter-spacing:.06em}.cp-summary__item.is-alert strong{color:#b86716}
+    .cp-actions{position:relative;z-index:25;display:flex;align-items:center;gap:9px;flex:0 0 auto}.cp-button{display:inline-flex;min-height:43px;align-items:center;justify-content:center;padding:10px 18px;border:1px solid transparent;border-radius:13px;font:inherit;font-size:12px;font-weight:800;cursor:pointer;text-decoration:none;transition:all .15s ease}.cp-button--primary{background:var(--cp-teal,#0d9488);color:#fff;box-shadow:0 13px 24px -16px rgba(13,148,136,.9)}.cp-button--primary:hover{background:var(--cp-teal-dark,#08766e);color:#fff}.cp-button--soft{border-color:#d9e6e2;background:#fff;color:#48635c}.cp-button--soft:hover{background:#f8fbf9;color:var(--cp-teal-dark,#08766e);border-color:#b8d6ce}
+    .cp-menu{position:relative}.cp-menu summary{list-style:none;user-select:none}.cp-menu summary::-webkit-details-marker{display:none}.cp-menu__panel{position:absolute;right:0;top:calc(100% + 8px);z-index:100;width:220px;padding:8px;border:1px solid #d9e6e2;border-radius:14px;background:#ffffff !important;box-shadow:0 20px 45px -15px rgba(16,54,45,.4),0 4px 16px rgba(0,0,0,.08)}.cp-menu__panel a,.cp-menu__panel button{display:block;width:100%;padding:10px 12px;border:0;border-radius:9px;background:transparent;color:#2c4039;font:inherit;font-size:12px;font-weight:750;text-align:left;cursor:pointer;text-decoration:none;transition:background .12s ease}.cp-menu__panel a:hover{background:#edf7f4;color:var(--cp-teal-dark,#08766e)}.cp-menu__danger{color:#b42318 !important}.cp-menu__danger:hover{background:#fff1f0!important;color:#991b1b !important}
+    .cp-summary{position:relative;z-index:1;display:grid;grid-template-columns:repeat(4,minmax(0,1fr));margin-top:24px;border:1px solid rgba(216,232,228,.95);border-radius:17px;background:rgba(255,255,255,.85)}.cp-summary__item{padding:15px 18px}.cp-summary__item+.cp-summary__item{border-left:1px solid var(--cp-line)}.cp-summary__item strong,.cp-summary__item span{display:block}.cp-summary__item strong{font-size:20px;letter-spacing:-.03em}.cp-summary__item span{margin-top:3px;color:var(--cp-muted);font-size:10px;font-weight:750;text-transform:uppercase;letter-spacing:.06em}.cp-summary__item.is-alert strong{color:#b86716}
     .cp-layout{display:flex;flex-direction:column;gap:20px;margin-top:20px}.cp-main{display:flex;min-width:0;flex-direction:column;gap:18px;width:100%}.cp-side{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:18px;width:100%;position:static}
     .cp-panel{overflow:hidden;border:1px solid var(--cp-line);border-radius:22px;background:#fff;box-shadow:0 18px 42px -39px rgba(13,62,54,.72)}.cp-panel__header{display:flex;align-items:flex-start;justify-content:space-between;gap:16px;padding:20px 22px;border-bottom:1px solid var(--cp-line)}.cp-panel__header h3{margin:0;font-size:16px;letter-spacing:-.015em}.cp-panel__header p{margin:5px 0 0;color:var(--cp-muted);font-size:11px;line-height:1.45}.cp-count{flex:0 0 auto;padding:5px 9px;border-radius:999px;background:#edf6f3;color:#547169;font-size:10px;font-weight:800}.cp-panel__body{padding:20px 22px}.cp-empty{margin:0;color:#84958f;font-size:12px;line-height:1.55}.cp-empty--success{color:#287a52;font-weight:700}
     .cp-entity+.cp-entity{margin-top:16px;padding-top:17px;border-top:1px solid var(--cp-line)}.cp-entity__head{display:flex;align-items:flex-start;justify-content:space-between;gap:14px}.cp-entity__title{min-width:0}.cp-entity__title strong{display:block;font-size:16px;line-height:1.35}.cp-entity__meta{display:flex;gap:6px;flex-wrap:wrap;margin-top:7px}.cp-tag{display:inline-flex;padding:4px 8px;border-radius:999px;background:#eff5f3;color:#57716a;font-size:9px;font-weight:800;text-transform:uppercase;letter-spacing:.04em}.cp-entity__delete{flex:0 0 auto;padding:5px 7px;border:0;background:transparent;color:#a94c45;font:inherit;font-size:10px;font-weight:800;cursor:pointer}.cp-entity__delete:hover{text-decoration:underline}
@@ -72,11 +73,33 @@ $summaryItems = [
     .cp-attention{border-color:#f1dfc7;background:#fffaf3}.cp-attention .cp-panel__header{border-color:#f1e5d6}.cp-outstanding{display:grid;grid-template-columns:8px minmax(0,1fr) auto;gap:10px;align-items:center;padding:9px 0}.cp-outstanding+.cp-outstanding{border-top:1px solid #f2e7d9}.cp-outstanding__dot{width:7px;height:7px;border-radius:50%;background:#e99139}.cp-outstanding strong{font-size:11px}.cp-outstanding time{color:#a45d19;font-size:9px;font-weight:800;white-space:nowrap}
     .cp-notes{border-color:#f0dfc9;background:#fffaf3}.cp-staff-label{display:inline-flex;padding:4px 8px;border-radius:999px;background:#fbe8d4;color:#a75d14;font-size:9px;font-weight:850;letter-spacing:.08em;text-transform:uppercase}.cp-note-copy{margin:11px 0 0;color:#634c32;font-size:11px;line-height:1.6;white-space:pre-wrap;overflow-wrap:anywhere}
     .cp-log{padding:10px 0}.cp-log+.cp-log{border-top:1px solid #edf2f0}.cp-log__top{display:flex;align-items:center;justify-content:space-between;gap:10px}.cp-log__top strong{color:var(--cp-teal-dark);font-size:10px}.cp-log__top time{color:#879791;font-size:9px}.cp-log p{margin:5px 0 0;color:var(--cp-muted);font-size:9px;line-height:1.45;overflow-wrap:anywhere}
-    .cp-modal{display:none;position:fixed;inset:0;z-index:199;align-items:center;justify-content:center;padding:20px;background:rgba(18,40,35,.48);backdrop-filter:blur(7px)}.cp-modal__card{width:100%;max-width:680px;max-height:92vh;overflow:auto;padding:28px;border-radius:23px;background:#fff;box-shadow:0 30px 75px -34px rgba(0,0,0,.5);animation:tnpop .22s ease}.cp-modal__card--small{max-width:460px}.cp-modal__head{display:flex;align-items:center;justify-content:space-between;gap:20px;margin-bottom:20px}.cp-modal__head h3{margin:0;font-size:18px;letter-spacing:-.02em}.cp-close{width:34px;height:34px;border:0;border-radius:10px;background:#f1f5f3;color:#6e817b;font-size:21px;line-height:1;cursor:pointer}.cp-form-group{margin-bottom:14px}.cp-form-group label,.cp-form-label{display:block;margin-bottom:6px;color:#3d5750;font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.045em}.cp-input{width:100%;padding:12px 13px;border:1px solid #dce8e4;border-radius:12px;background:#fbfdfc;color:var(--cp-ink);font:inherit;font-size:12px}.cp-form-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}.cp-form-dates{margin-top:18px;padding-top:17px;border-top:1px solid var(--cp-line)}.cp-form-date-row{display:grid;grid-template-columns:minmax(0,1fr) 155px;gap:9px;margin-top:8px}.cp-modal__actions{display:flex;justify-content:flex-end;gap:10px;margin-top:22px}.cp-danger-copy{margin:0;color:var(--cp-muted);font-size:12px;line-height:1.6}.cp-danger-copy strong{color:var(--cp-ink)}.cp-danger-input{border-color:#f3b4b0;background:#fffafa}.cp-button--danger{background:#c83d34;color:#fff}.cp-button--danger:hover{background:#ae3029;color:#fff}
+    .cp-modal{display:none;position:fixed;inset:0;z-index:999;overflow-y:auto;padding:24px 16px;background:rgba(18,40,35,.55);backdrop-filter:blur(7px);-webkit-backdrop-filter:blur(7px)}
+    .cp-modal[style*="display: flex"]{display:flex !important;align-items:center;justify-content:center}
+    .cp-modal__card{width:100%;max-width:680px;max-height:calc(100vh - 48px);margin:auto;display:flex;flex-direction:column;border-radius:24px;background:#fff;box-shadow:0 30px 80px -25px rgba(10,45,38,.45),0 0 0 1px rgba(13,148,136,.08);overflow:hidden;animation:tnpop .22s ease-out}
+    .cp-modal__card--small{max-width:480px}
+    .cp-modal__head{display:flex;align-items:center;justify-content:space-between;gap:16px;padding:22px 26px;border-bottom:1px solid var(--cp-line,#e0ebe7);background:#fff;flex-shrink:0}
+    .cp-modal__head h3{margin:0;font-size:18px;font-weight:800;color:var(--cp-ink,#17332d);letter-spacing:-.02em}
+    .cp-modal__body{padding:22px 26px;overflow-y:auto;overscroll-behavior:contain;flex:1 1 auto}
+    .cp-close{display:inline-flex;align-items:center;justify-content:center;width:34px;height:34px;border:0;border-radius:10px;background:#f1f5f3;color:#6e817b;font-size:22px;line-height:1;cursor:pointer;transition:background .15s}
+    .cp-close:hover{background:#e3ebe7;color:#243e37}
+    .cp-form-group{margin-bottom:14px}
+    .cp-form-group label,.cp-form-label{display:block;margin-bottom:6px;color:#3d5750;font-size:10.5px;font-weight:800;text-transform:uppercase;letter-spacing:.045em}
+    .cp-input{width:100%;padding:11px 13px;border:1px solid var(--cp-border,#dce8e4);border-radius:12px;background:#fbfdfc;color:var(--cp-ink,#17332d);font:inherit;font-size:12.5px;transition:border-color .15s,box-shadow .15s}
+    .cp-input:focus{outline:0;border-color:var(--cp-teal,#0d9488);box-shadow:0 0 0 3px rgba(13,148,136,.12);background:#fff}
+    .cp-form-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+    .cp-form-section-title{margin:18px 0 12px;padding-top:14px;border-top:1px dashed var(--cp-line,#e0ebe7);color:#41556f;font-size:11px;font-weight:800;letter-spacing:.04em;text-transform:uppercase}
+    .cp-form-dates{margin-top:20px;padding-top:16px;border-top:1px solid var(--cp-line,#e0ebe7)}
+    .cp-form-dates__header{display:flex;flex-direction:column;gap:2px;margin-bottom:12px}
+    .cp-form-date-row{display:grid;grid-template-columns:minmax(0,1fr) 175px;gap:10px;margin-top:8px;align-items:center}
+    .cp-date-badge{display:flex;align-items:center;gap:9px;padding:10px 13px;border:1px solid var(--cp-border,#dce8e4);border-radius:12px;background:#f8fbf9;color:#29473f;font-size:12px;font-weight:700}
+    .cp-date-badge svg{flex-shrink:0;color:var(--cp-teal,#0d9488)}
+    .cp-date-badge__text{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+    .cp-modal__actions{display:flex;justify-content:flex-end;align-items:center;gap:10px;padding:18px 26px;border-top:1px solid var(--cp-line,#e0ebe7);background:#fafcfb;flex-shrink:0}
+    .cp-danger-copy{margin:0;color:var(--cp-muted);font-size:12px;line-height:1.6}.cp-danger-copy strong{color:var(--cp-ink)}.cp-danger-input{border-color:#f3b4b0;background:#fffafa}.cp-button--danger{background:#c83d34;color:#fff}.cp-button--danger:hover{background:#ae3029;color:#fff}
     .cp-sr-only{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
     @media(max-width:1020px){.cp-layout{grid-template-columns:1fr}.cp-side{display:grid;grid-template-columns:repeat(2,minmax(0,1fr))}.cp-side .cp-panel:last-child{grid-column:1/-1}}
     @media(max-width:760px){.cp-hero{padding:22px 19px}.cp-hero__top{align-items:flex-start;flex-direction:column}.cp-actions{width:100%}.cp-actions>.cp-button{flex:1}.cp-menu{flex:1}.cp-menu>summary{width:100%}.cp-summary{grid-template-columns:repeat(2,minmax(0,1fr))}.cp-summary__item:nth-child(3){border-left:0;border-top:1px solid var(--cp-line)}.cp-summary__item:nth-child(4){border-top:1px solid var(--cp-line)}.cp-side{display:flex;flex-direction:column}.cp-facts{grid-template-columns:1fr 1fr}.cp-deadline-form{grid-template-columns:1fr 1fr}.cp-deadline-form .cp-mini-button{grid-column:1/-1;min-height:40px}.cp-form-grid{grid-template-columns:1fr}.cp-form-date-row{grid-template-columns:1fr}.cp-panel__header,.cp-panel__body{padding-left:18px;padding-right:18px}}
-    @media(max-width:520px){.cp-identity{align-items:flex-start}.cp-avatar{width:49px;height:49px;flex-basis:49px;border-radius:15px;font-size:16px}.cp-contact{display:block}.cp-contact__divider{display:none}.cp-contact a,.cp-contact span:not(.cp-contact__divider){display:block;margin-top:3px}.cp-actions{display:grid;grid-template-columns:1fr 1fr}.cp-name-row h2{font-size:23px}.cp-facts{grid-template-columns:1fr}.cp-entity__head{align-items:flex-start}.cp-inline-form{grid-template-columns:1fr}.cp-inline-form .cp-mini-button{min-height:38px}.cp-table,.cp-table tbody,.cp-table tr,.cp-table td{display:block;width:100%}.cp-table colgroup,.cp-table thead{display:none}.cp-table tbody{padding:0 17px}.cp-table tr{padding:11px 0;border-top:1px solid var(--cp-line)}.cp-table tr:first-child{border-top:0}.cp-table td{display:grid;grid-template-columns:86px minmax(0,1fr);gap:9px;padding:5px 0;border:0}.cp-table td::before{color:#82938e;font-size:8px;font-weight:850;letter-spacing:.08em;text-transform:uppercase;content:attr(data-label)}.cp-modal__card{padding:22px 18px}.cp-modal__actions{display:grid;grid-template-columns:1fr 1fr}.cp-modal__actions .cp-button{width:100%}}
+    @media(max-width:520px){.cp-identity{align-items:flex-start}.cp-avatar{width:49px;height:49px;flex-basis:49px;border-radius:15px;font-size:16px}.cp-contact{display:block}.cp-contact__divider{display:none}.cp-contact a,.cp-contact span:not(.cp-contact__divider){display:block;margin-top:3px}.cp-actions{display:grid;grid-template-columns:1fr 1fr}.cp-name-row h2{font-size:23px}.cp-facts{grid-template-columns:1fr}.cp-entity__head{align-items:flex-start}.cp-inline-form{grid-template-columns:1fr}.cp-inline-form .cp-mini-button{min-height:38px}.cp-table,.cp-table tbody,.cp-table tr,.cp-table td{display:block;width:100%}.cp-table colgroup,.cp-table thead{display:none}.cp-table tbody{padding:0 17px}.cp-table tr{padding:11px 0;border-top:1px solid var(--cp-line)}.cp-table tr:first-child{border-top:0}.cp-table td{display:grid;grid-template-columns:86px minmax(0,1fr);gap:9px;padding:5px 0;border:0}.cp-table td::before{color:#82938e;font-size:8px;font-weight:850;letter-spacing:.08em;text-transform:uppercase;content:attr(data-label)}.cp-modal{padding:12px}.cp-modal__card{max-height:calc(100vh - 24px);border-radius:18px}.cp-modal__head{padding:16px 18px}.cp-modal__body{padding:16px 18px}.cp-modal__actions{padding:14px 18px;display:grid;grid-template-columns:1fr 1fr}.cp-modal__actions .cp-button{width:100%}}
 </style>
 
 <div class="tn-screen client-profile">
@@ -186,7 +209,8 @@ $summaryItems = [
                             <?php if (empty($group['deadlines'])): ?><p class="cp-empty" style="margin-top:9px">No dates recorded for this entity.</p><?php endif; ?>
                             <?php if (!empty($group['deadlines'])): ?><div class="cp-deadline-list"><?php foreach ($group['deadlines'] as $deadline): ?><div class="cp-deadline"><span><?= htmlspecialchars((string) $deadline['type']) ?></span><strong><?= date('d M Y', strtotime((string) $deadline['due_date'])) ?></strong></div><?php endforeach; ?></div><?php endif; ?>
                             <form action="/staff/deadlines/create" method="POST" data-ajax-form class="cp-deadline-form">
-                                <input type="hidden" name="csrf_token" value="<?= htmlspecialchars($csrfToken) ?>"><input type="hidden" name="client_id" value="<?= (int) $client['id'] ?>"><input type="hidden" name="entity_id" value="<?= (int) $group['entity_id'] ?>"><input type="hidden" name="return_to" value="/staff/clients/<?= (int) $client['id'] ?>">
+                                <input type="hidden" name="csrf_token" value="<?= htmlspecialchars($csrfToken) ?>"><input type="hidden" name="client_id" value="<?= (int) $client['id'] ?>">
+            <div class="cp-modal__body"><input type="hidden" name="entity_id" value="<?= (int) $group['entity_id'] ?>"><input type="hidden" name="return_to" value="/staff/clients/<?= (int) $client['id'] ?>">
                                 <input class="cp-field" name="type" placeholder="Date type" required><input class="cp-field" type="date" name="due_date" min="<?= date('Y-m-d') ?>" required><button class="cp-mini-button">Add date</button>
                             </form>
                         </section>
@@ -239,10 +263,13 @@ $summaryItems = [
 <div id="deleteClientModal" class="cp-modal" role="dialog" aria-modal="true" aria-labelledby="delete-client-title">
     <div class="cp-modal__card cp-modal__card--small">
         <div class="cp-modal__head"><h3 id="delete-client-title">Delete client account</h3><button type="button" class="cp-close" aria-label="Close" onclick="document.getElementById('deleteClientModal').style.display='none'">&times;</button></div>
-        <form action="/staff/clients/delete" method="POST" data-ajax-form>
-            <input type="hidden" name="csrf_token" value="<?= htmlspecialchars($csrfToken) ?>"><input type="hidden" name="client_id" value="<?= (int) $client['id'] ?>"><input type="hidden" name="is_ajax" value="1">
+        <form action="/staff/clients/delete" method="POST" data-ajax-form style="display:flex;flex-direction:column;min-height:0;margin:0">
+            <div class="cp-modal__body">
+            <input type="hidden" name="csrf_token" value="<?= htmlspecialchars($csrfToken) ?>"><input type="hidden" name="client_id" value="<?= (int) $client['id'] ?>">
+            <input type="hidden" name="is_ajax" value="1">
             <p class="cp-danger-copy">Are you sure you want to delete <strong><?= htmlspecialchars($clientName) ?></strong>? This permanently removes their profile, files, messages, and login access.</p>
             <div class="cp-form-group" style="margin-top:18px"><label for="confirmClientDelete">Type DELETE to confirm</label><input id="confirmClientDelete" class="cp-input cp-danger-input" type="text" name="confirm_delete" pattern="DELETE" required autocomplete="off"></div>
+            </div>
             <div class="cp-modal__actions"><button type="button" class="cp-button cp-button--soft" onclick="document.getElementById('deleteClientModal').style.display='none'">Cancel</button><button type="submit" class="cp-button cp-button--danger" data-loading-text="Deleting...">Delete permanently</button></div>
         </form>
     </div>
@@ -250,18 +277,73 @@ $summaryItems = [
 
 <div id="addEntityModal" class="cp-modal" role="dialog" aria-modal="true" aria-labelledby="add-entity-title">
     <div class="cp-modal__card">
-        <div class="cp-modal__head"><h3 id="add-entity-title">Link business entity</h3><button type="button" class="cp-close" aria-label="Close" onclick="document.getElementById('addEntityModal').style.display='none'">&times;</button></div>
-        <form action="/staff/clients/add-entity" method="POST" data-ajax-form>
+        <div class="cp-modal__head">
+            <div>
+                <h3 id="add-entity-title">Link business entity</h3>
+                <p style="margin:3px 0 0;font-size:11.5px;color:var(--cp-muted,#687c76)">Add a company or tax record for this client.</p>
+            </div>
+            <button type="button" class="cp-close" aria-label="Close" onclick="document.getElementById('addEntityModal').style.display='none'">&times;</button>
+        </div>
+        <form action="/staff/clients/add-entity" method="POST" data-ajax-form style="display:flex;flex-direction:column;min-height:0;flex:1 1 auto;overflow:hidden;margin:0">
             <input type="hidden" name="csrf_token" value="<?= htmlspecialchars($csrfToken) ?>"><input type="hidden" name="client_id" value="<?= (int) $client['id'] ?>">
-            <div class="cp-form-group"><label for="entityName">Entity name</label><input id="entityName" class="cp-input" type="text" name="entity_name" placeholder="e.g. Example Services Ltd" required></div>
+            <div class="cp-modal__body">
+                <div class="cp-form-group"><label for="entityName">Entity name <span style="color:#c83d34">*</span></label><input id="entityName" class="cp-input" type="text" name="entity_name" placeholder="e.g. Example Services Ltd" required></div>
             <div class="cp-form-grid">
-                <div class="cp-form-group"><label for="entityType">Entity type</label><input id="entityType" class="cp-input" name="entity_type" list="profileEntityTypes" placeholder="Select or enter type" required><datalist id="profileEntityTypes"><option value="Limited Company"><option value="Personal Tax Return"><option value="Sole Trader"><option value="Partnership"><option value="Other"></datalist></div>
+                    <div class="cp-form-group"><label for="entityType">Entity type <span style="color:#c83d34">*</span></label><input id="entityType" class="cp-input" name="entity_type" list="profileEntityTypes" placeholder="Select or enter type" required><datalist id="profileEntityTypes"><option value="Limited Company"><option value="Personal Tax Return"><option value="Sole Trader"><option value="Partnership"><option value="Other"></datalist></div>
                 <div class="cp-form-group"><label for="entityScope">Record access</label><select id="entityScope" class="cp-input" name="entity_scope"><option value="company">Shared company record</option><option value="personal">Private personal record</option></select></div>
             </div>
-            <div data-entity-fields class="cp-form-grid">
-                <input class="cp-input" name="company_number" placeholder="Company number"><input class="cp-input" name="vat_number" placeholder="VAT registration number"><input class="cp-input" name="ct_utr" placeholder="Corporation Tax UTR"><input class="cp-input" name="personal_utr" placeholder="Personal UTR"><input class="cp-input" type="date" name="accounting_year_end" title="Accounting year end"><input class="cp-input" name="tax_year" placeholder="Tax year"><input class="cp-input" name="custom_attribute_label" placeholder="Other reference label"><input class="cp-input" name="custom_attribute_value" placeholder="Other reference value">
+                <div class="cp-form-section-title">Registration & Tax Identifiers</div>
+                <div data-entity-fields class="cp-form-grid">
+                    <div class="cp-form-group">
+                        <label for="companyNumber">Company number</label>
+                        <input id="companyNumber" class="cp-input" name="company_number" placeholder="e.g. 12345678">
+                    </div>
+                    <div class="cp-form-group">
+                        <label for="vatNumber">VAT registration number</label>
+                        <input id="vatNumber" class="cp-input" name="vat_number" placeholder="e.g. GB123456789">
+                    </div>
+                    <div class="cp-form-group">
+                        <label for="ctUtr">Corporation Tax UTR</label>
+                        <input id="ctUtr" class="cp-input" name="ct_utr" placeholder="10-digit UTR">
+                    </div>
+                    <div class="cp-form-group">
+                        <label for="personalUtr">Personal UTR</label>
+                        <input id="personalUtr" class="cp-input" name="personal_utr" placeholder="10-digit personal UTR">
+                    </div>
+                    <div class="cp-form-group">
+                        <label for="accountingYearEnd">Accounting year end</label>
+                        <input id="accountingYearEnd" class="cp-input" type="date" name="accounting_year_end" title="Accounting year end">
+                    </div>
+                    <div class="cp-form-group">
+                        <label for="taxYear">Tax year</label>
+                        <input id="taxYear" class="cp-input" name="tax_year" placeholder="e.g. 2025/26">
+                    </div>
+                    <div class="cp-form-group">
+                        <label for="customAttrLabel">Other reference label</label>
+                        <input id="customAttrLabel" class="cp-input" name="custom_attribute_label" placeholder="e.g. PAYE Reference">
+                    </div>
+                    <div class="cp-form-group">
+                        <label for="customAttrValue">Other reference value</label>
+                        <input id="customAttrValue" class="cp-input" name="custom_attribute_value" placeholder="e.g. 123/AB456">
+                    </div>
             </div>
-            <div class="cp-form-dates"><span class="cp-form-label">Important dates</span><?php foreach (["Accounts Due", "Corporation Tax Due", "Next VAT Return Due"] as $suggestion): ?><div data-deadline-row class="cp-form-date-row"><input class="cp-input" name="deadline_type[]" value="<?= htmlspecialchars($suggestion) ?>"><input class="cp-input" type="date" name="deadline_due_date[]" min="<?= date('Y-m-d') ?>"></div><?php endforeach; ?></div>
+                <div class="cp-form-dates">
+                    <div class="cp-form-dates__header">
+                        <span class="cp-form-label" style="margin-bottom:2px">Important dates & deadlines</span>
+                        <span style="font-size:11px;color:var(--cp-muted,#687c76)">Set optional upcoming compliance dates for this entity.</span>
+                    </div>
+                    <?php foreach (["Accounts Due", "Corporation Tax Due", "Next VAT Return Due"] as $suggestion): ?>
+                        <div data-deadline-row class="cp-form-date-row">
+                            <div class="cp-date-badge">
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line></svg>
+                                <span class="cp-date-badge__text"><?= htmlspecialchars($suggestion) ?></span>
+                                <input type="hidden" name="deadline_type[]" value="<?= htmlspecialchars($suggestion) ?>">
+                            </div>
+                            <input class="cp-input" type="date" name="deadline_due_date[]" min="<?= date('Y-m-d') ?>" aria-label="<?= htmlspecialchars($suggestion) ?> due date">
+                        </div>
+                    <?php endforeach; ?>
+                </div>
+            </div>
             <div class="cp-modal__actions"><button type="button" class="cp-button cp-button--soft" onclick="document.getElementById('addEntityModal').style.display='none'">Cancel</button><button type="submit" class="cp-button cp-button--primary">Link entity</button></div>
         </form>
     </div>
@@ -270,9 +352,12 @@ $summaryItems = [
 <div id="deleteEntityModal" class="cp-modal" role="dialog" aria-modal="true" aria-labelledby="delete-entity-title">
     <div class="cp-modal__card cp-modal__card--small">
         <div class="cp-modal__head"><h3 id="delete-entity-title">Move business entity to Trash?</h3><button type="button" class="cp-close" aria-label="Close" onclick="document.getElementById('deleteEntityModal').style.display='none'">&times;</button></div>
-        <p class="cp-danger-copy">The entity and its linked records will be soft-deleted and can be restored from Trash.</p>
-        <form action="/staff/clients/delete-entity" method="POST" data-ajax-form>
+        <form action="/staff/clients/delete-entity" method="POST" data-ajax-form style="display:flex;flex-direction:column;min-height:0;margin:0">
+            <div class="cp-modal__body">
+                <p class="cp-danger-copy">The entity and its linked records will be soft-deleted and can be restored from Trash.</p>
+
             <input type="hidden" name="csrf_token" value="<?= htmlspecialchars($csrfToken) ?>"><input type="hidden" name="entity_id" id="deleteEntityId"><input type="hidden" name="client_id" value="<?= (int) $client['id'] ?>">
+            </div>
             <div class="cp-modal__actions"><button type="button" class="cp-button cp-button--soft" onclick="document.getElementById('deleteEntityModal').style.display='none'">Cancel</button><button type="submit" class="cp-button cp-button--danger">Move to Trash</button></div>
         </form>
     </div>
@@ -283,4 +368,26 @@ function tnDeleteEntity(id) {
     document.getElementById('deleteEntityId').value = id;
     document.getElementById('deleteEntityModal').style.display = 'flex';
 }
+
+document.addEventListener('click', function(e) {
+    if (e.target && e.target.classList && e.target.classList.contains('cp-modal')) {
+        e.target.style.display = 'none';
+    }
+    document.querySelectorAll('details.cp-menu[open]').forEach(function(details) {
+        if (!details.contains(e.target)) {
+            details.removeAttribute('open');
+        }
+    });
+});
+
+document.addEventListener('keydown', function(e) {
+    if (e.key === 'Escape') {
+        document.querySelectorAll('.cp-modal').forEach(function(m) {
+            m.style.display = 'none';
+        });
+        document.querySelectorAll('details.cp-menu[open]').forEach(function(d) {
+            d.removeAttribute('open');
+        });
+    }
+});
 </script>
